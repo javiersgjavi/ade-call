@@ -1,6 +1,6 @@
 # Installation
 
-This guide installs ADE Call on the Linux machine where your ADE runs and ends with a first call from the same computer. Phone access needs HTTPS and is covered in [Deployment](deployment.md). The commands use Bash.
+This guide installs ADE Call on the Linux machine where your ADE runs and ends with a first call from the same computer. To use it from your phone, including away from home, choose a route in [Phone access](deployment.md#phone-access): public HTTPS through Caddy, or private HTTPS through Tailscale Serve. Installing the service and generating a pairing link do not set up that network route. The commands use Bash.
 
 ## 1. Check the requirements
 

@@ -85,7 +85,7 @@ The owner may give you only this repository's link. Follow these steps in order;
      ADE Call must run on the same machine as the ADE.
    - Whether they want a permanent service that starts on its own, or only `npm start`.
    - Whether they will use it from their phone, and if so by which HTTPS route: Caddy
-     with a domain they control (DNS pointing here, ports 80/443 open to the Internet)
+     with a public hostname (own domain or automatic DNS, ports 80/443 reachable)
      or Tailscale Serve (no domain or open ports; the phone joins their tailnet). The
      table in [docs/deployment.md](docs/deployment.md#phone-access) helps them choose.
    - Whether they already have an OpenAI API key on an account with billing and
@@ -111,11 +111,22 @@ The owner may give you only this repository's link. Follow these steps in order;
    was still in use or could not be asked. For the phone, follow the route the owner
    chose in [docs/deployment.md](docs/deployment.md#phone-access), then pair the
    phone against the HTTPS address ([Pairing browsers](#pairing-browsers)).
-   Changing DNS, the router, Caddy's configuration or the tailnet's settings is the
-   owner's decision: tell them exactly what to do or ask before doing it. The
-   Tailscale route is not yet validated end to end; say so.
+   Remote access is supported: do not refuse it merely because it exposes an HTTPS
+   page outside the LAN. Inspect existing proxies, including containers, before
+   proposing a new one. If the owner has no domain, explain the automatic DNS
+   option in the deployment guide; if incoming ports are unavailable, offer Serve.
+   Changing DNS, the router, firewall, Caddy's configuration or the tailnet's
+   settings is the owner's decision. Prepare the exact changes and ask only for
+   authorization that is still missing; an explicit earlier approval of those
+   changes remains valid. If you cannot access a required control panel, give the
+   owner precise steps and continue independent work. Name concrete blockers
+   instead of ending with a generic warning about Internet exposure. The Tailscale
+   route is not yet validated end to end; say so.
 8. Report the access URL, where the token is, how to start and stop the service,
-   and which checks were real and which simulated.
+   and which checks were real and which simulated. Follow the deployment guide's
+   outside-access check: the owner opens the page over mobile data (with Tailscale
+   connected for Serve), pairs and checks projects. A pairing link or a successful
+   local request does not prove outside access. Report it as unverified until tested.
 
 ## Secrets and personal data
 

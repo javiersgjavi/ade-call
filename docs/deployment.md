@@ -57,17 +57,68 @@ A restart ends the calls in progress. A tool cut short is left without a confirm
 
 ## Phone access
 
-Browsers only grant microphone access on HTTPS (or `localhost`), so the phone needs an HTTPS address with a certificate it trusts. Two ways are documented:
+**Access from outside your home network is supported.** ADE Call stays on the Linux machine where T3 or Orca runs; that machine must remain on and connected. Installing the service or generating a pairing link does not publish it on the Internet. You also need a network route to it and HTTPS for the phone's microphone, even when the phone is on your Wi-Fi.
 
-| | [Caddy with your own domain](#https-reverse-proxy) (recommended) | [Tailscale Serve](#tailscale-serve) |
+Choose based on how you want to connect:
+
+- **Open the URL in an ordinary phone browser, without a VPN app:** use Caddy with a public hostname and incoming ports 80/443. You can use your own domain or the [automatic DNS option](#without-your-own-domain).
+- **Avoid opening router ports, or connect through carrier-grade NAT (CGNAT):** use Tailscale Serve. Install Tailscale on both the server and the phone and join the same private network (tailnet). It works away from home too; the URL is private to your tailnet. This project's setup is documented but not yet validated end to end.
+
+The two routes have different requirements:
+
+| | [Caddy with a public hostname](#https-reverse-proxy) | [Tailscale Serve](#tailscale-serve) |
 | --- | --- | --- |
-| You need | A domain whose DNS points to this machine, and ports 80 and 443 reachable from the Internet | A Tailscale account, with MagicDNS and HTTPS certificates enabled |
+| You need | A hostname pointing to your public IP (your own domain or automatic DNS), and ports 80 and 443 reachable from the Internet | A Tailscale account, with MagicDNS and HTTPS certificates enabled |
 | On the phone | Nothing | The Tailscale app, connected to the same tailnet |
 | Who can reach the page | Anyone on the Internet; pairing still gates access | Only devices in your tailnet; pairing still gates access |
 | Address to pair with | `https://call.example.com` | `https://<machine>.<tailnet>.ts.net` |
 | Status | Example configuration in [`deploy/`](../deploy/Caddyfile.example) | Documented, not yet validated end to end |
 
 Pick Tailscale if you have no domain, cannot open ports (for example behind carrier-grade NAT) or prefer the page to be invisible from the Internet. Either way, pair the phone against the HTTPS address afterwards; see [Access](access.md).
+
+### What the installer and your agent do
+
+`scripts/install-user.sh` builds ADE Call and installs its user service. It does not install a proxy, create DNS records, open router ports or configure Tailscale. `access pair --url` records the address and generates a browser credential; it does not make that address reachable.
+
+An installation agent should inspect existing services and proxies, explain which route fits, and carry out the route you authorize. Remote access is an intended deployment, not a reason to refuse installation. A missing domain alone is not a blocker. If a step needs access the agent lacks, such as your router's administration page, it should give you the exact change needed and continue the independent setup work. Your approval of a specific network change need not be requested again for that same change.
+
+### Public access from a home connection
+
+For the Caddy route, the request travels from the phone over the Internet to your router, then to Caddy on the ADE machine, and finally to ADE Call's internal HTTP port.
+
+1. Check whether the connection accepts inbound traffic. With CGNAT, forwarding ports on your own router is not enough: use Tailscale Serve or ask your ISP for a public address. If another router sits in front of yours, forwarding may be needed on both.
+2. Give the ADE machine a stable LAN address, for example with a DHCP reservation. Forward **TCP 80 to TCP 80** and **TCP 443 to TCP 443** at that address, and allow those ports through the host firewall. Forward them to Caddy, not directly to ADE Call. On a hosted Linux machine, configure the equivalent inbound firewall rules instead.
+3. Point the chosen hostname at the public address. Use an `A` record for IPv4; only add an `AAAA` record if IPv6 actually reaches Caddy. If the public IP changes, update the DNS record, for example through your DNS provider's dynamic DNS support.
+4. Configure [Caddy](#https-reverse-proxy) to forward that hostname to ADE Call. Reuse an existing proxy on ports 80/443 instead of starting a competing one. If it runs in Docker, follow [Caddy in a container](#caddy-in-a-container).
+5. Configure ADE Call's HTTPS address and pair the phone as described under [Verify access from outside](#verify-access-from-outside).
+
+The owner chooses the route and authorizes changes to their DNS, router, firewall and proxy. An agent should prepare the exact records, port mappings and proxy block before asking for any missing approval.
+
+### Without your own domain
+
+[sslip.io](https://sslip.io/) provides DNS names that resolve to the IP address embedded in them. For example, `call.203-0-113-10.sslip.io` resolves to `203.0.113.10` (a documentation-only address: replace it with your actual public IPv4 address). Use the resulting hostname in the Caddy block and its `https://` URL when pairing.
+
+This avoids buying a domain or creating DNS records. It is DNS, not a tunnel: you still need a reachable public IP, incoming ports and a valid HTTPS certificate from Caddy. It depends on an external DNS service. If your public IP changes, the hostname changes too, requiring a Caddy update and an [address change](access.md#changing-the-address) that revokes existing pairings. A domain you control is more convenient for a lasting address.
+
+### Verify access from outside
+
+Use the same `ADE_CALL_CONFIG` as the running service for these commands. Replace the example URL with the HTTPS address of your chosen route.
+
+1. If you already configured a local address, switch it first with `npm run access -- configure --url https://call.example.com`. **This revokes existing browser pairings and pending codes.** Skip this command on a fresh installation or if the configured address is already correct.
+2. Run `npm run access -- pair --url https://call.example.com --name "Phone"`. Share the generated link only with the owner.
+3. Turn off Wi-Fi on the phone and open the link using mobile data. For Tailscale Serve, keep the Tailscale connection enabled. Confirm HTTPS has no certificate warning, pair the browser and check that projects appear.
+4. This verifies remote page access and authenticated reads. Test voice only if the owner requests a paid call; ask a read-only question and do not send work as a test.
+
+If nobody has tested from an outside connection, report that remote reachability is still unverified. Loading the page from the server or home Wi-Fi does not prove it works from elsewhere.
+
+| Symptom | Check next |
+| --- | --- |
+| Hostname does not resolve | DNS record or the public IP embedded in the automatic hostname. For Serve, the phone's Tailscale connection and MagicDNS. |
+| Connection times out | Router forwarding, host firewall, CGNAT, or the machine being asleep. For Serve, both devices must be connected and tailnet access rules must allow the connection. |
+| Certificate warning | The hostname and Caddy's certificate issuance; do not bypass the warning. |
+| Proxy returns `502` | Whether ADE Call is running and the proxy can reach its internal address, especially from Docker. |
+| Page loads but pairing or API requests return `403` | The configured URL must match the browser's scheme, host and port, and the proxy must preserve `Host`. |
+| Public URL works on mobile data but not home Wi-Fi | The router may lack NAT loopback; use suitable local DNS or the private Tailscale route. |
 
 ## HTTPS reverse proxy
 

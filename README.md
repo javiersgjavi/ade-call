@@ -85,6 +85,8 @@ You can give this repository to your coding agent and ask:
 
 [AGENTS.md](AGENTS.md) tells the agent what it may and may not do during an installation.
 
+**Using it away from home:** ADE Call stays on the machine running your ADE. Choose public HTTPS through Caddy (a public hostname and incoming ports 80/443), or private HTTPS through Tailscale Serve (Tailscale on the machine and phone, no router port forwarding). You do not have to buy a domain: the guide also covers automatic DNS names. See [Phone access](docs/deployment.md#phone-access) for the steps, common blockers and a check over mobile data. Tailscale Serve is documented but not yet validated end to end for this project.
+
 ## Documentation
 
 | Document | What it covers |
