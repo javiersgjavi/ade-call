@@ -16,6 +16,7 @@ Start with the [project README](../README.md) for what the project is and a quic
 
 | Document | What it covers |
 | --- | --- |
+| [How it works](how-it-works.md) | One call from the phone to the agents: audio, reads and sends, with a diagram |
 | [Architecture](architecture.md) | Components, data stores, call lifecycle, tool calls, ADE selection |
 | [Voice](voice.md) | Realtime session setup, instructions, turn detection, language, notices, tones |
 | [Delivery safety](delivery-safety.md) | The send rule, deduplication, uncertain deliveries, what hanging up does |
