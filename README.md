@@ -18,33 +18,44 @@ A voice line to the agents in [T3 Code](docs/t3.md) or [Orca](docs/orca.md), sel
 
 ---
 
-Your agents keep working while you are away from the keyboard. ADE Call lets you check on them and give them the next instruction by voice: open a page on your phone, press **Call** and ask.
+You leave an agent refactoring, go for a walk, and wonder whether it is stuck on a question. With ADE Call you open a page on your phone, press **Call** and ask. It reads your threads, tells you what happened and, if you want, passes the agent its next instruction.
 
 > **You:** How's the auth refactor in billing-api going?<br>
 > **ADE Call:** All 42 tests pass. The agent is waiting for your approval to run the database migration. Shall I tell it to run the migration now?<br>
 > **You:** Yes, go ahead.<br>
 > **ADE Call:** Done, I've sent it. I'll tell you when it finishes.
 
-The voice is OpenAI Realtime (`gpt-realtime-2.1` by default, or `gpt-realtime-2.1-mini`, chosen in Settings) and it uses the ADE's tools directly. There is no text chat: the conversation is the call. You install it yourself on the machine where your ADE runs, and only you use it.
+There is no text chat: the conversation is the call. The voice is OpenAI Realtime (`gpt-realtime-2.1` by default, or `gpt-realtime-2.1-mini`, chosen in Settings) and it uses the ADE's own CLI as its tools. You install it on the machine where your ADE runs, and only you use it.
 
-## Highlights
+## What you can ask
 
-- **Ask about anything your agents did.** It finds threads by their spoken name and reads threads, subagents, documents (T3) and agent terminals (Orca) to answer.
-- **Sends only after your yes.** It proposes the exact request first. The server refuses any send that does not follow something new you said, runs each send once and never retries an uncertain one automatically ([delivery safety](docs/delivery-safety.md)).
-- **Hears back from the agents.** During the call it tells you when an agent you just sent work to makes progress or finishes its turn (T3 only).
-- **Fast reads.** For T3, a read-only fingerprint of the local database skips the CLI when nothing changed.
+- *"What's every agent in the web project doing?"*
+- *"Read me the last message in the migration thread."*
+- *"Did the subagent that wrote the tests finish?"*
+- *"Tell the docs agent to also cover the new flag."*
+
+It finds threads by the name you say out loud and reads threads, subagents and documents (T3 Code) or agent terminals (Orca) to answer.
+
+## Why you can trust it with your agents
+
+- **Nothing is sent without your yes.** It proposes the exact request first. The server refuses any send that does not follow something new you said, runs each send once and never retries an uncertain one automatically ([delivery safety](docs/delivery-safety.md)).
 - **Your keys stay home.** Audio goes from the phone straight to OpenAI; the OpenAI key and every action on your projects stay on your machine.
-- **Speaks your language.** The voice follows your language; the interface is in English and Spanish.
-- **Keeps the record.** The conversation carries across calls, and the Conversation panel shows the transcript and every tool run.
+- **It keeps the record.** The conversation carries across calls, and the Conversation panel shows the transcript and every tool run.
+
+## And a few more things
+
+- **It tells you when the agent is done.** During the call it lets you know when an agent you just sent work to makes progress or finishes its turn (T3 Code only).
+- **It answers quickly.** With T3 Code, a read-only fingerprint of the local database skips the CLI when nothing changed.
+- **It speaks your language.** The voice follows whichever language you use; the interface is in English and Spanish.
 
 See [How it works](docs/how-it-works.md) for the full path from your phone to the agents.
 
-## Limits
+## What it does not do
 
-- One person only. Every paired browser has full access to the owner's projects. There are no accounts or roles.
-- It does not stop or cancel agents. Hanging up does not cancel work that was already sent either.
-- It cannot read or continue Orca's structured chats, or notify you when an Orca agent finishes.
-- Only Linux has been tested. macOS and Windows have no guarantee.
+- It is for one person. Every paired browser has full access to the owner's projects; there are no accounts or roles.
+- It does not stop or cancel agents, and hanging up does not cancel work already sent.
+- It cannot read or continue Orca's structured chats, or tell you when an Orca agent finishes.
+- Only Linux has been tested. macOS and Windows may work, with no guarantee.
 - It is not free. Every call and every message the model writes uses your OpenAI API quota.
 
 ## Requirements
