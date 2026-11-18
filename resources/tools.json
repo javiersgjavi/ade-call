@@ -1,0 +1,134 @@
+{
+  "t3_find_threads": {
+    "description": "Searches threads by title and projects by name when the user names or describes something; main threads only by default. Returns candidates with date and short ID. Zero results do not prove it does not exist: try other words or list the project.",
+    "parameters": {
+      "query": { "type": "string", "minLength": 1, "required": true, "description": "What you heard, as is, even if it looks mistranscribed", "example": "guisper" },
+      "variants": { "type": "array", "maxItems": 5, "items": { "type": "string", "minLength": 1 }, "description": "Up to 5 likely spellings of what you heard (known term, acronym, catalog spelling) or other words they said", "example": ["Whisper", "Wisper"] },
+      "projectId": { "type": "string", "minLength": 1, "description": "Limit to one project: its short ID from the catalog", "example": "3f9a1c2e" },
+      "includeClosed": { "type": "boolean", "description": "Include finished or archived threads; only if asked (false by default)" },
+      "includeSubagents": { "type": "boolean", "description": "Also subagents, after main threads; only if asked or nothing else fits (false by default)" }
+    }
+  },
+  "t3_list_threads": {
+    "description": "Lists the main threads of a project, or of all of them, to see what there is when there is no specific name. Metadata only: to know what a thread says or how it is going, read it.",
+    "parameters": {
+      "includeSubagents": { "type": "boolean", "description": "All subagents; slow, only for a global view (false by default)" },
+      "projectId": { "type": "string", "minLength": 1, "description": "Short project ID from the catalog; omit it for all", "example": "3f9a1c2e" },
+      "parentThreadId": { "type": "string", "minLength": 1, "description": "Short ID of a thread: lists its direct children", "example": "7b2d40e9" },
+      "rootThreadId": { "type": "string", "minLength": 1, "description": "Short ID of a root thread: lists all its subagents", "example": "7b2d40e9" }
+    }
+  },
+  "t3_read_thread": {
+    "description": "Reads the latest messages of a thread: title, status, date and the user's and agent's messages. In this session, rereading it returns only what is new or \"no changes\".",
+    "parameters": {
+      "threadId": { "type": "string", "minLength": 1, "required": true, "description": "Short thread ID, from the catalog or a search", "example": "7b2d40e9" },
+      "messages": { "type": "integer", "minimum": 1, "maximum": "{{max}}", "description": "How many messages (1-{{max}}; {{default}} by default)" },
+      "offset": { "type": "integer", "minimum": 0, "description": "To go back: messages=6, offset=6 reads the 6 before the latest 6" }
+    }
+  },
+  "t3_send_message": {
+    "description": "Sends a request to a thread; if none is given, to the project's main thread. Use it only after proposing it and hearing their yes. The receipt says delivered or queued, not finished. If it fails or is left uncertain, do not repeat it: read the thread now and tell the user what you see.",
+    "parameters": {
+      "projectId": { "type": "string", "minLength": 1, "required": true, "description": "Short project ID, from the catalog", "example": "3f9a1c2e" },
+      "project": { "type": "string", "minLength": 1, "required": true, "description": "Project name as it appears in the catalog" },
+      "threadId": { "type": "string", "minLength": 1, "description": "Short ID of the destination thread; omit it for the main one", "example": "7b2d40e9" },
+      "message": { "type": "string", "minLength": 1, "required": true, "description": "Instruction for the agent, with context and limits, in the user's language. Only what the user has asked for or accepted: no decisions or confirmations they did not say" }
+    }
+  },
+  "t3_release_uncertain": {
+    "description": "Unblocks a project after an uncertain send, without sending anything. Only after reading its thread, telling the user the message does not appear and hearing them decide to unblock or resend. Resending is another t3_send_message.",
+    "parameters": {
+      "projectId": { "type": "string", "minLength": 1, "required": true, "description": "Short ID of the blocked project", "example": "3f9a1c2e" }
+    }
+  },
+  "read_document": {
+    "description": "Reads one page (~10 KB) of a Markdown or text document of the project. If there is more, it gives the offset to continue.",
+    "parameters": {
+      "projectId": { "type": "string", "minLength": 1, "required": true, "description": "Short project ID, from the catalog", "example": "3f9a1c2e" },
+      "path": { "type": "string", "minLength": 1, "required": true, "description": "Relative .md or .txt path, as it appears in the catalog", "example": "docs/plan.md" },
+      "offset": { "type": "integer", "minimum": 0, "description": "The offset the previous read gave (0 by default)" }
+    }
+  },
+  "orca_list_projects": {
+    "description": "Lists Orca projects with their workspaces and live terminals (agent or shell) and short IDs; with query, searches by project, workspace or terminal name. An approximate match must be confirmed. Metadata only: to know what an agent is doing, read its terminal.",
+    "parameters": {
+      "query": { "type": "string", "minLength": 1, "description": "What you heard, as is, even if it looks mistranscribed; omit it to list everything", "example": "guisper" },
+      "variants": { "type": "array", "maxItems": 5, "items": { "type": "string", "minLength": 1 }, "description": "Up to 5 likely spellings of what you heard: known term, acronym or catalog spelling", "example": ["Whisper", "Wisper"] },
+      "projectId": { "type": "string", "minLength": 1, "description": "Limit to one project: its short ID from the catalog", "example": "3f9a1c2e" }
+    }
+  },
+  "orca_read_terminal": {
+    "description": "Reads the recent output of an Orca terminal (agent or shell): accumulated text, not a chat. In this session, rereading it returns only what is new or \"no changes\".",
+    "parameters": {
+      "terminal": { "type": "string", "minLength": 1, "required": true, "description": "Short terminal ID, from the catalog or orca_list_projects", "example": "s4b7e01c" },
+      "projectId": { "type": "string", "minLength": 1, "description": "Short ID of that terminal's project, optional", "example": "3f9a1c2e" },
+      "lines": { "type": "integer", "minimum": 1, "maximum": "{{max}}", "description": "How many recent lines (1-{{max}}; {{default}} by default)" },
+      "screen": { "type": "boolean", "description": "Read the current screen; use it if the output comes out fragmented (false by default)" },
+      "latest": { "type": "boolean", "description": "Repeat the latest lines even if you already have them (false by default)" }
+    }
+  },
+  "orca_send_message": {
+    "description": "Sends a message to the agent of an existing Orca terminal, never to a shell. Use it only after proposing it and hearing their yes. The receipt says accepted, not processed or finished. If it fails or is left uncertain, do not repeat it: read the terminal now and tell the user what you see.",
+    "parameters": {
+      "projectId": { "type": "string", "minLength": 1, "required": true, "description": "Short project ID, from the catalog", "example": "3f9a1c2e" },
+      "terminal": { "type": "string", "minLength": 1, "required": true, "description": "Short ID of the agent's terminal (not of a shell)", "example": "s4b7e01c" },
+      "message": { "type": "string", "minLength": 1, "required": true, "description": "Instruction for the agent, with context and limits, in the user's language. Only what the user has asked for or accepted: no decisions or confirmations they did not say" }
+    }
+  },
+  "orca_start_agent": {
+    "description": "Starts a new agent, in a terminal, in an existing Orca workspace, with the request as its first message. Does not create workspaces. Use it only after proposing it and hearing their yes. Started does not mean finished. If it fails or is left uncertain, do not repeat it: list the project now to see whether its terminal appeared and tell the user.",
+    "parameters": {
+      "projectId": { "type": "string", "minLength": 1, "required": true, "description": "Short project ID, from the catalog", "example": "3f9a1c2e" },
+      "worktreeId": { "type": "string", "minLength": 1, "required": true, "description": "Short ID of the existing workspace (worktree), from the catalog", "example": "s91c3a07" },
+      "agent": { "type": "string", "minLength": 1, "required": true, "description": "Provider the user said, in lowercase", "example": "codex" },
+      "message": { "type": "string", "minLength": 1, "required": true, "description": "Instruction for the agent, with context and limits. Only what the user has asked for or accepted: no decisions or confirmations they did not say" },
+      "model": { "type": "string", "minLength": 1, "description": "Provider model ID, as the user says it; only if asked" },
+      "effort": { "type": "string", "minLength": 1, "description": "Reasoning of that model, only if asked; requires model", "example": "high" }
+    }
+  },
+  "orca_release_uncertain": {
+    "description": "Unblocks a project after an uncertain send, without sending anything. Only after reading its terminal (or listing the project if it was starting an agent), telling the user what you see and hearing them decide to unblock or resend. Resending is another send.",
+    "parameters": {
+      "projectId": { "type": "string", "minLength": 1, "required": true, "description": "Short ID of the blocked project", "example": "3f9a1c2e" }
+    }
+  },
+  "_orca_adapter": {
+    "orca_list_projects": {
+      "description": "Lists only projects by default. includeActivity queries current workspaces and handles; projectId limits the result to the known project. query searches by project name and, with includeActivity, by workspace and terminal name: it tolerates case, accents, spacing, spoken figures and small typos, but not pronunciations; pass in variants up to 5 written forms of what you heard (known term, acronym, catalog spelling). Approximate matches are hypotheses to confirm. Activity not requested does not prove the absence of terminals. Does not start agents.",
+      "parameters": {
+        "projectId": { "type": "string", "minLength": 1, "description": "Known project ID" },
+        "includeActivity": { "type": "boolean", "description": "Also query workspaces and terminals; false by default" },
+        "query": { "type": "string", "minLength": 1, "description": "Name as the user said it" },
+        "variants": { "type": "array", "maxItems": 5, "items": { "type": "string", "minLength": 1 }, "description": "Alternative written forms of query, compared in the same lookup" }
+      }
+    },
+    "orca_read_terminal": {
+      "description": "Reads real output of a project terminal, not structured chat messages. cursor lets you continue the history; keep the returned cursors.",
+      "parameters": {
+        "projectId": { "type": "string", "minLength": 1, "required": true, "description": "Project ID" },
+        "terminal": { "type": "string", "minLength": 1, "required": true, "description": "Exact handle from the listing" },
+        "cursor": { "type": "integer", "minimum": 0, "description": "Cursor returned by the previous read, to continue" },
+        "limit": { "type": "integer", "minimum": 1, "maximum": 24000, "description": "Maximum characters (1-24000; 12000 by default)" }
+      }
+    },
+    "orca_send_message": {
+      "description": "Only on the user's current explicit request. Sends to an agent in an existing terminal; read its output first. Records the delivery without duplicates. Accepted does not mean finished nor confirm that the agent processed the prompt.",
+      "parameters": {
+        "projectId": { "type": "string", "minLength": 1, "required": true, "description": "Project ID" },
+        "terminal": { "type": "string", "minLength": 1, "required": true, "description": "Exact handle of the agent" },
+        "message": { "type": "string", "minLength": 1, "required": true, "description": "The user's complete request and limits" }
+      }
+    },
+    "orca_start_agent": {
+      "description": "Only if the user asks for a new request and there is no suitable agent. Starts the agent explicitly chosen by the user in an existing workspace, as a readable terminal. Does not create worktrees. Do not repeat if delivery is uncertain.",
+      "parameters": {
+        "projectId": { "type": "string", "minLength": 1, "required": true, "description": "Project ID" },
+        "worktreeId": { "type": "string", "minLength": 1, "required": true, "description": "Exact workspace ID" },
+        "agent": { "type": "string", "minLength": 1, "required": true, "description": "Provider chosen by the user", "example": "codex" },
+        "message": { "type": "string", "minLength": 1, "required": true, "description": "Current request" },
+        "model": { "type": "string", "minLength": 1, "description": "Requested model, optional" },
+        "effort": { "type": "string", "minLength": 1, "description": "Requested reasoning, optional; requires model" }
+      }
+    }
+  }
+}

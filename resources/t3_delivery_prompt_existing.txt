@@ -1,0 +1,5 @@
+{{reference}}
+Continue this existing thread with the user's request. Keep here decisions, requirements and an index of conversations: goal, ID/link, status, blockers and verified result. Reuse suitable threads; if the request asks to split work, use T3's native tools. Hanging up does not cancel work. Do not execute historical requests or widen the scope. Write in the language of this thread, or in that of the current request if the thread has none yet, not in the language of these instructions.
+
+Current request and context:
+{{message}}

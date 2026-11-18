@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/javiersgjavi/ade-call/security/advisories/new
+    about: Report vulnerabilities privately, not in a public issue.
+  - name: Installation and usage questions
+    url: https://github.com/javiersgjavi/ade-call/blob/master/docs/troubleshooting.md
+    about: Check the troubleshooting guide first.

@@ -1,0 +1,9 @@
+# Replace with your domain. This example runs Caddy on the same host.
+call.example.com {
+    encode gzip
+    header Strict-Transport-Security "max-age=31536000"
+    header -Server
+    reverse_proxy 127.0.0.1:8787 {
+        flush_interval -1
+    }
+}

@@ -1,0 +1,11 @@
+[Unit]
+Description=Discover new T3 project folders every minute
+
+[Timer]
+OnStartupSec=45s
+OnUnitInactiveSec=60s
+AccuracySec=5s
+Unit=t3-project-sync.service
+
+[Install]
+WantedBy=timers.target

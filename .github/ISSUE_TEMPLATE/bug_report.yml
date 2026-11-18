@@ -1,0 +1,61 @@
+name: Bug report
+description: Something does not work as documented.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not paste API keys, access tokens, pairing codes, cookies, transcripts,
+        recordings or the contents of your T3/Orca threads. Redact personal paths
+        and domains. For a security problem, use a private report instead (see SECURITY.md).
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: Steps to reproduce, then what you expected and what you saw.
+      value: |
+        Steps:
+        1.
+
+        Expected:
+
+        Actual:
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system and architecture
+      placeholder: Debian 13, arm64
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      placeholder: output of node --version
+    validations:
+      required: true
+  - type: input
+    id: ade
+    attributes:
+      label: ADE and version
+      description: T3 Code and/or Orca, with the version of each CLI you use.
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and device
+      placeholder: Chrome 142 on Android, via HTTPS proxy
+  - type: input
+    id: commit
+    attributes:
+      label: ADE Call commit
+      placeholder: output of git rev-parse --short HEAD
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log lines
+      description: Only the lines that show the error, redacted. For voice problems, include the error shown on the call screen.
+      render: text

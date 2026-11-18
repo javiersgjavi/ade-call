@@ -1,0 +1,52 @@
+{
+  "name": "ade-call",
+  "version": "0.1.0",
+  "description": "Talk by voice with the coding agents of a local T3 Code or Orca installation.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/javiersgjavi/ade-call.git"
+  },
+  "homepage": "https://github.com/javiersgjavi/ade-call#readme",
+  "bugs": {
+    "url": "https://github.com/javiersgjavi/ade-call/issues"
+  },
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "start": "npm run build && node dist/src/server.mjs",
+    "test": "npm run build && node --test dist/test/*.test.mjs",
+    "lint": "eslint . --max-warnings=0",
+    "format": "eslint . --fix",
+    "check:fast": "node scripts/check.mts --fast",
+    "check": "node scripts/check.mts",
+    "hooks:install": "node scripts/install-hooks.mts",
+    "benchmark:startup": "npm run build && node dist/scripts/measure-startup.mjs",
+    "build": "node scripts/build.mts",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.browser.json",
+    "access": "node dist/scripts/access.mjs"
+  },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "@playwright/test": "1.65.0",
+    "@stylistic/eslint-plugin": "5.10.0",
+    "@types/node": "24.19.2",
+    "@types/ws": "8.18.2",
+    "eslint": "10.15.0",
+    "globals": "17.14.0",
+    "jiti": "2.7.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.2"
+  },
+  "overrides": {
+    "@typescript-eslint/typescript-estree": {
+      "minimatch": "11.0.8"
+    }
+  }
+}

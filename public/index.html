@@ -1,0 +1,299 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#100e13" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f5efe6" media="(prefers-color-scheme: light)">
+  <title>ADE Call</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='16' fill='%23ff6a3d'/%3E%3Ccircle cx='10.5' cy='16' r='2.6' fill='%231b0c05'/%3E%3Cg fill='none' stroke='%231b0c05' stroke-width='2.6' stroke-linecap='round'%3E%3Cpath d='M14.2 12.2a5 5 0 0 1 0 7.6'/%3E%3Cpath d='M16.8 9.1a9 9 0 0 1 0 13.8'/%3E%3Cpath d='M20.6 6.8a12.5 12.5 0 0 1 0 18.4'/%3E%3C/g%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/style.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <svg class="sprite" aria-hidden="true" focusable="false">
+    <symbol id="i-waves" viewBox="0 0 32 32"><circle cx="9" cy="16" r="2.4" fill="currentColor"/><g fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path class="w1" d="M13 11.5a6 6 0 0 1 0 9"/><path class="w2" d="M16.5 8a11 11 0 0 1 0 16"/><path class="w3" d="M20 4.6a15.5 15.5 0 0 1 0 22.8"/></g></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M6.6 3.5h2.6l1.6 4.4-2 1.4a11.6 11.6 0 0 0 5.9 5.9l1.4-2 4.4 1.6v2.6a2.2 2.2 0 0 1-2.4 2.2A16.5 16.5 0 0 1 4.4 5.9a2.2 2.2 0 0 1 2.2-2.4Z"/></symbol>
+    <symbol id="i-hangup" viewBox="0 0 24 24"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" d="M3.3 14.6c-.6-.6-.6-1.6 0-2.2C8 7.9 16 7.9 20.7 12.4c.6.6.6 1.6 0 2.2l-1.6 1.6-3.6-1.4v-2.4a10 10 0 0 0-7 0v2.4l-3.6 1.4Z"/></symbol>
+    <symbol id="i-mic" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></g></symbol>
+    <symbol id="i-new-session" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 1 1-3.1-6.3"/><path d="M20 4v4h-4"/><path d="M12 9v6M9 12h6"/></g></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8"/><path d="M4 3.5V8h4.5"/><path d="M4 13a8 8 0 0 0 14.3 4.9L20 16"/><path d="M20 20.5V16h-4.5"/></g></symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></g></symbol>
+    <symbol id="i-out" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 16 17 7M9 7h8v8"/></g></symbol>
+    <!-- Official logos: pingdotgg/t3code apps/mobile/assets/widget/T3Mark.svg and stablyai/orca resources/logo.svg (both MIT). -->
+    <symbol id="i-logo-t3" viewBox="15.5309 37 94.3941 56.96"><path fill="currentColor" d="M33.4509 93V47.56H15.5309V37H64.3309V47.56H46.4109V93H33.4509ZM86.7253 93.96C82.832 93.96 78.9653 93.4533 75.1253 92.44C71.2853 91.3733 68.032 89.88 65.3653 87.96L70.4053 78.04C72.5386 79.5867 75.0186 80.8133 77.8453 81.72C80.672 82.6267 83.5253 83.08 86.4053 83.08C89.6586 83.08 92.2186 82.44 94.0853 81.16C95.952 79.88 96.8853 78.12 96.8853 75.88C96.8853 73.7467 96.0586 72.0667 94.4053 70.84C92.752 69.6133 90.0853 69 86.4053 69H80.4853V60.44L96.0853 42.76L97.5253 47.4H68.1653V37H107.365V45.4L91.8453 63.08L85.2853 59.32H89.0453C95.9253 59.32 101.125 60.8667 104.645 63.96C108.165 67.0533 109.925 71.0267 109.925 75.88C109.925 79.0267 109.099 81.9867 107.445 84.76C105.792 87.48 103.259 89.6933 99.8453 91.4C96.432 93.1067 92.0586 93.96 86.7253 93.96Z"/></symbol>
+    <symbol id="i-logo-orca" viewBox="0 0 318.60232 202.66667"><path fill="currentColor" transform="translate(-6.6666669,-70.666669)" d="m 177.81311,248.33334 c 23.82304,-41.29793 40.54045,-66.84626 49.51207,-75.66667 6.81685,-6.70196 10.07373,-8.7374 20.07265,-12.54475 34.57822,-13.16655 61.04674,-26.78733 72.37222,-37.24295 9.62924,-8.88966 9.34286,-9.01142 -23.43671,-9.964 -35.71756,-1.03796 -43.72989,0.42119 -62.17546,11.323 -16.72118,9.88265 -34.20103,30.11225 -42.74704,49.47157 -2.57353,5.82985 -14.81294,44.3056 -27.96399,87.90747 -2.86036,9.48343 -3.02466,11.71633 -0.86213,11.71633 0.44382,0 7.29659,-11.25 15.22839,-25 z m -65.14644,-8.32267 C 120,239.3326 130.5,237.50979 136,235.95998 c 5.5,-1.5498 12.25,-3.13783 15,-3.52895 2.75,-0.39111 5,-0.95485 5,-1.25275 0,-0.29789 2.15135,-7.58487 4.78078,-16.19328 8.49209,-27.80201 12.21334,-40.41629 21.13747,-71.65166 4.81891,-16.86667 11.23502,-39.185 14.25802,-49.596301 5.12803,-17.66103 5.74763,-23.07037 2.64253,-23.07037 -1.84887,0 -4.07048,6.908293 -16.72243,52.000001 -21.78975,77.65896 -20.80806,74.74393 -26.84794,79.72251 -7.5925,6.25838 -25.03916,14.82524 -36.10856,17.73044 -17.0947,4.48656 -33.410599,3.86724 -53.116765,-2.01622 -18.569242,-5.54403 -23.142662,-5.80284 -33.639754,-1.9037 -5.875424,2.18242 -9.864152,5.04363 -16.716684,11.99127 -4.95,5.0187 -9.0000001,10.02884 -9.0000001,11.13364 0,1.75174 5.9276921,2.00299 46.3333351,1.96383 25.483334,-0.0247 52.333338,-0.59969 59.666668,-1.27777 z M 252.69513,104.63708 c 12.18267,-3.48651 15.77304,-7.895503 9.63821,-11.835773 -10.19296,-6.546726 -36.19849,-1.77301 -41.19436,7.561863 -1.2556,2.3461 -0.98698,3.2037 1.68353,5.375 2.69471,2.19098 4.59991,2.47691 12.53928,1.88189 5.14899,-0.3859 12.94899,-1.72824 17.33334,-2.98298 z"/></symbol>
+  </svg>
+
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="ADE Call, home" data-i18n-aria-label="brand.home">
+      <svg class="brand-mark" aria-hidden="true" viewBox="0 0 32 32"><circle cx="16" cy="16" r="16" class="mark-disc"/><circle cx="10.5" cy="16" r="2.6" class="mark-ink"/><g class="mark-waves"><path d="M14.2 12.2a5 5 0 0 1 0 7.6"/><path d="M16.8 9.1a9 9 0 0 1 0 13.8"/><path d="M20.6 6.8a12.5 12.5 0 0 1 0 18.4"/></g></svg>
+      <span class="brand-name">ADE Call</span>
+    </a>
+    <div id="backend" class="ade-switch" role="radiogroup" aria-label="ADE" hidden>
+      <button type="button" class="ade-option" role="radio" data-ade="t3" aria-checked="true" tabindex="0"><span class="ade-logo" aria-hidden="true"><svg><use href="#i-logo-t3"/></svg></span><span class="ade-name">T3</span></button>
+      <button type="button" class="ade-option" role="radio" data-ade="orca" aria-checked="false" tabindex="-1"><span class="ade-logo" aria-hidden="true"><svg><use href="#i-logo-orca"/></svg></span><span class="ade-name">Orca</span></button>
+    </div>
+    <div class="topbar-end">
+      <span id="connection" class="pill" data-state="pending" role="status" data-i18n="connection.connecting">Connecting</span>
+      <button id="open-settings" class="icon-btn" type="button" aria-haspopup="dialog" aria-controls="settings" aria-label="Settings" data-i18n-aria-label="settings.open"><svg aria-hidden="true"><use href="#i-gear"/></svg></button>
+    </div>
+  </header>
+
+  <main>
+    <p id="notice" role="status" hidden></p>
+
+    <section id="login" hidden class="login" aria-labelledby="login-title">
+      <h1 id="login-title"><span data-i18n="login.titleLead">Talk with</span> <em data-i18n="login.titleEmphasis">your projects</em> <span data-i18n="login.titleTail">by voice</span></h1>
+      <form id="login-form" class="login-form">
+        <label for="access" data-i18n="login.codeLabel">Pairing code</label>
+        <div class="field">
+          <input id="access" type="password" autocomplete="one-time-code" autocapitalize="off" spellcheck="false" required>
+          <button type="button" id="reveal" class="reveal" aria-controls="access" aria-pressed="false" data-i18n="login.show">Show</button>
+        </div>
+        <button id="login-submit" class="btn btn-accent btn-block" data-i18n="login.submit">Pair browser</button>
+      </form>
+      <p class="fine" data-i18n="login.hint">Ask the agent that sets up your installation for a code and the access link. This browser will remember the pairing.</p>
+    </section>
+
+    <div id="workspace" hidden class="workspace">
+      <h1 class="sr-only">ADE Call</h1>
+
+      <section id="stage" class="stage" data-state="idle" data-muted="false" aria-label="Call" data-i18n-aria-label="stage.label">
+        <div class="stage-head">
+          <p class="voice-pick"><span class="voice-label" data-i18n="stage.voice">Voice</span><span id="voice-name" class="voice-name">GPT Realtime</span><span class="voice-chips"><span id="voice-reasoning" class="voice-chip" hidden></span><span id="voice-language" class="voice-chip" hidden></span></span></p>
+        </div>
+
+        <div class="dial">
+          <span class="ring" aria-hidden="true"></span><span class="ring" aria-hidden="true"></span><span class="ring" aria-hidden="true"></span>
+          <button id="call" class="call-btn" type="button">
+            <svg aria-hidden="true"><use href="#i-phone"/></svg><span data-i18n="call.button">Call</span>
+          </button>
+          <div class="orb">
+            <svg aria-hidden="true" viewBox="0 0 32 32"><use href="#i-waves"/></svg>
+            <span id="call-timer" class="timer" hidden></span>
+          </div>
+        </div>
+
+        <div class="readout" role="status" aria-live="polite">
+          <p id="call-state" class="state-word" data-i18n="call.state.idle">Available</p>
+          <p id="call-status"></p>
+        </div>
+        <p class="muted-flag" data-i18n="stage.muted">Your microphone is muted</p>
+
+        <div class="call-actions">
+          <button id="mute" hidden class="ctl" type="button" aria-pressed="false">
+            <span class="ctl-icon"><svg aria-hidden="true" viewBox="0 0 24 24"><use href="#i-mic"/><path class="slash" d="M4 4l16 16"/></svg></span><span id="mute-label" data-i18n="call.mute">Mute</span>
+          </button>
+          <button id="restart-session" hidden class="ctl" type="button">
+            <span class="ctl-icon"><svg aria-hidden="true"><use href="#i-new-session"/></svg></span><span data-i18n="session.new">New session</span>
+          </button>
+          <button id="hangup" hidden class="ctl ctl-hang" type="button">
+            <span class="ctl-icon"><svg aria-hidden="true"><use href="#i-hangup"/></svg></span><span data-i18n="call.hangUp">Hang up</span>
+          </button>
+        </div>
+        <audio id="audio" controls autoplay hidden></audio>
+        <p id="recording-status" class="fine recording-status" role="status"></p>
+      </section>
+
+      <section class="convo" aria-labelledby="convo-title">
+        <div class="convo-head">
+          <div class="convo-title">
+            <h2 id="convo-title" data-i18n="conversation.title">Conversation</h2>
+            <p id="session-status" class="fine"></p>
+          </div>
+          <button id="new-session" class="btn btn-ghost" type="button" data-i18n="session.new">New session</button>
+        </div>
+
+        <div id="messages" role="log" aria-live="polite" aria-label="Transcript of the calls and the tools run" data-i18n-aria-label="conversation.log" tabindex="0">
+          <p id="calls-truncated" class="fine calls-truncated" hidden data-i18n="conversation.truncated">Showing the latest turns and tools of this conversation.</p>
+          <div id="empty" class="empty">
+            <h3 data-i18n="conversation.emptyTitle">Call to start</h3>
+            <p class="fine" data-i18n="conversation.emptyText">Here you see what you say and what the agent answers in each call, with the tools it runs, their parameters and their result. Requests keep running in their ADE even if you hang up or close this page.</p>
+          </div>
+        </div>
+        <button id="transcript-toggle" class="transcript-toggle" type="button" aria-controls="messages" aria-expanded="false" hidden><span class="when-collapsed" data-i18n="conversation.showAll">Show the whole conversation</span><span class="when-expanded" data-i18n="conversation.showLess">Show only the latest</span></button>
+      </section>
+
+      <aside class="side" aria-labelledby="projects-title">
+        <div class="side-head">
+          <div class="side-title">
+            <h2 id="projects-title" data-i18n="projects.title">Projects</h2>
+            <span id="projects-updated" class="fine"></span>
+          </div>
+          <button id="refresh" class="icon-btn" type="button" aria-label="Refresh projects" data-i18n-aria-label="projects.refresh"><svg aria-hidden="true"><use href="#i-refresh"/></svg></button>
+        </div>
+        <div id="projects" class="project-list"></div>
+        <h3 id="threads-title" class="sub" hidden data-i18n="projects.followed">Followed threads</h3>
+        <div id="threads" class="thread-list"></div>
+      </aside>
+    </div>
+  </main>
+  <dialog id="settings" class="settings" aria-labelledby="settings-title">
+    <div class="settings-head">
+      <h2 id="settings-title" data-i18n="settings.title">Settings</h2>
+      <button id="close-settings" class="icon-btn" type="button" aria-label="Close" data-i18n-aria-label="settings.close">×</button>
+    </div>
+    <div class="settings-tabs" role="tablist" aria-label="Settings" data-i18n-aria-label="settings.title" data-auth>
+      <button type="button" role="tab" id="tab-general" data-tab="general" aria-controls="general-settings" aria-selected="true" data-i18n="settings.tabGeneral">General</button>
+      <button type="button" role="tab" id="tab-voice" data-tab="voice" aria-controls="voice-settings" aria-selected="false" tabindex="-1" data-i18n="settings.tabVoice">Voice</button>
+      <button type="button" role="tab" id="tab-key" data-tab="key" aria-controls="key-settings" aria-selected="false" tabindex="-1" data-i18n="settings.tabKey">API key</button>
+      <button type="button" role="tab" id="tab-devices" data-tab="devices" aria-controls="browser-access" aria-selected="false" tabindex="-1" data-i18n="settings.tabDevices">Devices</button>
+    </div>
+    <div class="settings-body">
+    <section class="settings-section settings-panel" data-panel="general" id="general-settings" role="tabpanel" aria-labelledby="tab-general">
+      <div class="settings-block" aria-labelledby="language-title">
+      <h3 id="language-title" data-i18n="settings.language">Language</h3>
+      <label for="ui-language" class="sr-only" data-i18n="settings.language">Language</label>
+      <select id="ui-language">
+        <option value="auto" data-i18n="settings.languageAuto">Browser</option>
+        <option value="en" lang="en">English</option>
+        <option value="es" lang="es">Español</option>
+      </select>
+      <p class="fine" data-i18n="settings.languageHint">The web and the voice use this language. With Browser, they follow your browser and the voice answers in the language you speak. Changing it reloads the page, or waits for the call to end.</p>
+      </div>
+      <div class="settings-block" data-auth aria-labelledby="recording-title">
+      <h3 id="recording-title" data-i18n="settings.recording">Call recording</h3>
+      <div class="recording-controls">
+        <label class="switch-row"><span data-i18n="recording.toggle">Record a diagnostic of the call</span><input id="record-call" class="switch" type="checkbox" role="switch" autocomplete="off"></label>
+        <p class="fine" data-i18n="recording.explain">Microphone and received audio, with timings and transcripts. It is saved in the private recordings folder of the ADE Call server. It applies to the calls of this page and turns off when the page is reloaded or closed; you can also turn it off during a call.</p>
+        <details class="fine">
+          <summary data-i18n="recording.whatSaved">What is saved</summary>
+          <p data-i18n="recording.details">Stereo audio: microphone on the left, received answer on the right, even if you silence it. At most 30 minutes or 64 MB per recording. The files contain private conversations and are kept for local analysis; they are not downloaded to the browser.</p>
+        </details>
+      </div>
+      </div>
+    </section>
+    <section class="settings-section settings-panel" data-auth data-panel="voice" id="voice-settings" role="tabpanel" aria-labelledby="tab-voice" hidden>
+      <p id="voice-hint" class="fine settings-lead" data-i18n="settings.voiceHint">For the whole server and every paired browser. Each change is saved at once and applies from the next call.</p>
+      <form id="voice-form" class="setting-groups" aria-describedby="voice-hint">
+        <fieldset class="setting-group">
+          <legend data-i18n="settings.groupModel">Intelligence</legend>
+        <div class="setting" data-field="model">
+          <div class="setting-text">
+            <div class="setting-label"><label for="setting-model" data-i18n="settings.model">Model</label><span class="setting-saved" aria-hidden="true"></span></div>
+          <p id="setting-model-hint" class="fine" data-i18n="settings.modelHint">Mini answers faster and costs less; the full model reasons better.</p>
+          </div>
+          <div class="setting-control">
+            <select id="setting-model" aria-describedby="setting-model-hint"></select>
+          </div>
+        </div>
+        <div class="setting" data-field="reasoning">
+          <div class="setting-text">
+            <div class="setting-label"><label for="setting-reasoning" data-i18n="settings.reasoning">Reasoning</label><span class="setting-saved" aria-hidden="true"></span></div>
+          <p id="setting-reasoning-hint" class="fine" data-i18n="settings.reasoningHint">More reasoning thinks longer before answering: slower and more expensive.</p>
+          </div>
+          <div class="setting-control">
+            <select id="setting-reasoning" aria-describedby="setting-reasoning-hint"></select>
+          </div>
+        </div>
+        </fieldset>
+        <fieldset class="setting-group">
+          <legend data-i18n="settings.groupConversation">Conversation</legend>
+        <div class="setting" data-field="voice">
+          <div class="setting-text">
+            <div class="setting-label"><label for="setting-voice" data-i18n="settings.voiceName">Voice</label><span class="setting-saved" aria-hidden="true"></span></div>
+          </div>
+          <div class="setting-control">
+            <select id="setting-voice"></select>
+          </div>
+        </div>
+        <div class="setting" data-field="eagerness">
+          <div class="setting-text">
+            <div class="setting-label"><label for="setting-eagerness" data-i18n="settings.eagerness">Turn taking</label><span class="setting-saved" aria-hidden="true"></span></div>
+          <p id="setting-eagerness-hint" class="fine" data-i18n="settings.eagernessHint">How soon the voice answers when you pause.</p>
+          </div>
+          <div class="setting-control">
+            <select id="setting-eagerness" aria-describedby="setting-eagerness-hint"></select>
+          </div>
+        </div>
+        </fieldset>
+        <fieldset class="setting-group">
+          <legend data-i18n="settings.groupAudio">Microphone and transcript</legend>
+        <div class="setting" data-field="noiseReduction">
+          <div class="setting-text">
+            <div class="setting-label"><label for="setting-noise" data-i18n="settings.noise">Noise reduction</label><span class="setting-saved" aria-hidden="true"></span></div>
+          <p id="setting-noise-hint" class="fine" data-i18n="settings.noiseHint">Pick how you usually talk to the phone or computer.</p>
+          </div>
+          <div class="setting-control">
+            <select id="setting-noise" aria-describedby="setting-noise-hint"></select>
+          </div>
+        </div>
+        <div class="setting" data-field="transcriptionModel">
+          <div class="setting-text">
+            <div class="setting-label"><label for="setting-transcription" data-i18n="settings.transcription">Transcription</label><span class="setting-saved" aria-hidden="true"></span></div>
+          <p id="setting-transcription-hint" class="fine" data-i18n="settings.transcriptionHint">The model that writes down what you say in the conversation panel.</p>
+          </div>
+          <div class="setting-control">
+            <select id="setting-transcription" aria-describedby="setting-transcription-hint"></select>
+          </div>
+        </div>
+        </fieldset>
+      </form>
+      <p id="voice-status" class="fine form-status" role="status" aria-live="polite"></p>
+    </section>
+    <section class="settings-section settings-panel" data-auth data-panel="key" id="key-settings" role="tabpanel" aria-labelledby="tab-key" hidden>
+      <div class="settings-section-head">
+        <h3 id="key-title" data-i18n="settings.key">OpenAI API key</h3>
+        <span id="key-state" class="key-state" data-state="loading"></span>
+      </div>
+      <p id="key-hint" class="fine settings-lead"></p>
+      <form id="key-form" class="key-form" autocomplete="off">
+        <label for="openai-key" class="sr-only" data-i18n="settings.keyLabel">New API key</label>
+        <div class="field">
+          <input id="openai-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="sk-…" aria-describedby="key-hint" maxlength="512">
+          <button type="button" id="reveal-key" class="reveal" aria-controls="openai-key" aria-pressed="false" data-i18n="login.show">Show</button>
+        </div>
+        <div class="settings-actions">
+          <button id="save-key" class="btn btn-accent" type="submit" data-i18n="settings.keySave">Save key</button>
+          <button id="remove-key" class="btn btn-ghost btn-danger" type="button" hidden data-i18n="settings.keyRemove">Remove saved key</button>
+        </div>
+        <p id="key-status" class="fine form-status" role="status" aria-live="polite"></p>
+      </form>
+    </section>
+    <section class="settings-section settings-panel" data-auth data-panel="devices" id="browser-access" role="tabpanel" aria-labelledby="tab-devices" hidden>
+      <div class="settings-section-head">
+        <h3 id="browsers-title" data-i18n="browsers.title">Paired browsers</h3>
+        <button type="button" id="refresh-browsers" class="icon-btn" aria-label="Refresh list" data-i18n-aria-label="browsers.refresh"><svg aria-hidden="true"><use href="#i-refresh"/></svg></button>
+      </div>
+      <ul id="browser-list" class="device-list" aria-labelledby="browsers-title" aria-live="polite"></ul>
+      <div id="pair-panel" class="pair-panel" hidden>
+        <form id="pair-form" class="pair-form" novalidate>
+          <label for="pair-name" data-i18n="pair.nameLabel">Name of the other device</label>
+          <input id="pair-name" type="text" autocomplete="off" spellcheck="false" enterkeyhint="go" required>
+          <div class="pair-actions">
+            <button type="submit" id="pair-submit" class="btn btn-accent" data-i18n="pair.create">Create link</button>
+            <button type="button" id="pair-cancel" class="btn btn-ghost" data-i18n="pair.cancel">Cancel</button>
+          </div>
+        </form>
+        <div id="pair-result" class="pair-result" hidden>
+          <div class="pair-result-head">
+            <p id="pair-for" class="pair-for"></p>
+            <span id="pair-timer" class="pair-timer" role="timer"></span>
+          </div>
+          <label for="pair-link" class="sr-only" data-i18n="pair.linkLabel">Pairing link</label>
+          <input id="pair-link" class="pair-link" type="text" readonly spellcheck="false">
+          <p class="pair-code-row"><span data-i18n="pair.code">Code</span> <code id="pair-code" class="pair-code"></code></p>
+          <div class="pair-actions">
+            <button type="button" id="pair-copy" class="btn btn-accent" data-i18n="pair.copy">Copy link</button>
+            <button type="button" id="pair-share" class="btn btn-ghost" hidden data-i18n="pair.share">Share</button>
+            <button type="button" id="pair-done" class="btn btn-ghost" data-i18n="pair.done">Done</button>
+          </div>
+          <p class="fine" data-i18n="pair.hint">Open the link on the other device and press Pair browser, or type the code there. It works once and only for ten minutes: send it only to yourself.</p>
+        </div>
+        <p id="pair-status" class="pair-status" role="status"></p>
+        <div id="pair-ended" class="pair-actions" hidden>
+          <button type="button" id="pair-again" class="btn btn-accent" data-i18n="pair.again">Generate another</button>
+          <button type="button" id="pair-end-done" class="btn btn-ghost" data-i18n="pair.done">Done</button>
+        </div>
+      </div>
+      <div class="settings-actions">
+        <button type="button" id="pair-open" class="btn btn-accent" aria-expanded="false" aria-controls="pair-panel" data-i18n="pair.open">Pair another device</button>
+        <button type="button" id="logout" class="btn btn-ghost btn-danger" data-i18n="browsers.logout">Unpair this browser</button>
+      </div>
+    </section>
+    </div>
+  </dialog>
+</body>
+</html>

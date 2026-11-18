@@ -1,0 +1,9 @@
+[Unit]
+Description=Register new Projects folders in T3
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 %h/.local/lib/t3-project-sync/sync-t3-projects.py
+TimeoutStartSec=5min
+UMask=0077
+Nice=10

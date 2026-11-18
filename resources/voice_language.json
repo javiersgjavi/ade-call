@@ -1,0 +1,6 @@
+{
+  "settings": "The user chose {{language}} in the settings: speak it from your first word, with a native {{variety}} accent.",
+  "browser": "The user's browser prefers {{language}}: start in it, with a native {{variety}} accent, unless their latest words in the history are in another language.",
+  "unknown": "Until the user speaks, use the language of their latest words in the history, or English if there are none.",
+  "reminder": "Keep speaking the user's current language with its native accent; the English of tool results and notices changes neither."
+}
