@@ -23,8 +23,6 @@
 :root {
   color-scheme: dark;
   --bg: #100e13;
-  --glow-t3: rgba(255, 106, 61, .11);
-  --glow-orca: rgba(21, 60, 67, .9);
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
   --surface: #1a171f;
   --surface-2: #221e28;
@@ -62,8 +60,6 @@
   :root {
     color-scheme: light;
     --bg: #f5efe6;
-    --glow-t3: rgba(201, 65, 26, .09);
-    --glow-orca: rgba(96, 165, 250, .12);
     --surface: #fffcf7;
     --surface-2: #f3ebe0;
     --surface-3: #e9dfd1;
@@ -119,14 +115,6 @@ svg { width: 1em; height: 1em; flex: none; }
 :root.ade-shift .mark-disc, :root.ade-shift .mark-ink { transition: fill 480ms var(--ease); }
 :root.ade-shift .mark-waves { transition: stroke 480ms var(--ease); }
 
-.kicker {
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 500;
-  letter-spacing: .08em;
-  text-transform: uppercase;
-  color: var(--muted);
-}
 /* Secondary text stays legible: never below 13px, never the faintest tone. */
 .fine { font-size: 13px; line-height: 1.45; color: var(--muted); }
 
@@ -137,36 +125,20 @@ svg { width: 1em; height: 1em; flex: none; }
   z-index: 10;
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   padding: calc(10px + env(safe-area-inset-top)) max(var(--gutter), env(safe-area-inset-right)) 10px max(var(--gutter), env(safe-area-inset-left));
   background: linear-gradient(var(--bg), color-mix(in srgb, var(--bg) 82%, transparent));
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
 }
-.brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; min-height: 44px; }
+.brand { flex: none; display: inline-flex; align-items: center; gap: 10px; text-decoration: none; min-height: 44px; }
 .brand-mark { font-size: 30px; }
-.brand-name { font-weight: 700; font-size: 17px; letter-spacing: -.01em; }
-/* Each ADE's glow keeps its own geometry; switching crossfades the two layers. */
-body::before, body::after {
-  content: "";
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-}
-body::before { background: radial-gradient(900px 520px at 0% -8%, var(--glow-t3), transparent 65%); }
-body::after { background: radial-gradient(1100px 560px at 50% -22%, var(--glow-orca), transparent 62%); opacity: 0; }
-:root[data-ade="orca"] body::before { opacity: 0; }
-:root[data-ade="orca"] body::after { opacity: 1; }
-:root.ade-shift body::before, :root.ade-shift body::after { transition: opacity 480ms var(--ease); }
+.brand-name { font-weight: 600; font-size: 17px; letter-spacing: -.01em; }
 :root.ade-shift {
   transition-property: --bg, --surface, --surface-2, --surface-3, --line, --line-strong, --text, --muted, --faint, --accent, --accent-ink, --accent-soft, --bubble, --dock;
   transition-duration: 480ms;
   transition-timing-function: var(--ease);
 }
-
-.brand-name em { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 19px; color: var(--muted); }
 
 /* ADE switch: a track with one thumb that slides to the checked option. */
 .ade-switch {
@@ -240,7 +212,7 @@ body::after { background: radial-gradient(1100px 560px at 50% -22%, var(--glow-o
   align-items: center;
   gap: 8px;
   min-width: 0;
-  max-width: 60vw;
+  max-width: 100%;
   min-height: 32px;
   padding: 5px 12px 5px 10px;
   border: 1px solid var(--line);
@@ -255,7 +227,7 @@ body::after { background: radial-gradient(1100px 560px at 50% -22%, var(--glow-o
 }
 .pill::before { content: ""; width: 8px; height: 8px; flex: none; border-radius: 50%; background: var(--faint); }
 .pill[data-state="ok"] { color: var(--text); }
-.pill[data-state="ok"]::before { background: var(--live); box-shadow: 0 0 0 3px var(--live-soft); }
+.pill[data-state="ok"]::before { background: var(--live); }
 .pill[data-state="wait"]::before, .pill[data-state="pending"]::before { background: var(--wait); animation: blink 1.2s ease-in-out infinite; }
 .pill[data-state="offline"] { color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, var(--line)); }
 .pill[data-state="offline"]::before { background: var(--danger); }
@@ -296,7 +268,7 @@ main {
   border-radius: 50%;
   background: var(--wait);
   color: var(--bg);
-  font-weight: 800;
+  font-weight: 600;
   font-size: 13px;
 }
 
@@ -357,7 +329,6 @@ main {
   border: 1px solid var(--line);
   border-radius: var(--r-l);
   background: var(--surface);
-  box-shadow: var(--shadow);
 }
 .login-form label { display: block; margin-bottom: 8px; font-size: 13px; font-weight: 600; color: var(--muted); }
 .field { position: relative; margin-bottom: 14px; }
@@ -405,29 +376,15 @@ main {
 .stage {
   grid-area: stage;
   position: relative;
-  padding: 16px 18px 20px;
+  padding: 16px 16px 20px;
   text-align: center;
   overflow: hidden;
-  isolation: isolate;
 }
-.stage::before {
-  content: "";
-  position: absolute;
-  inset: -40% -20% auto;
-  height: 80%;
-  z-index: -1;
-  background: radial-gradient(closest-side, var(--stage-glow, transparent), transparent);
-  transition: background .4s;
-}
-.stage[data-state="idle"], .stage[data-state="ended"] { --stage-glow: var(--accent-soft); }
-.stage[data-state="connecting"] { --stage-glow: var(--wait-soft); }
-.stage[data-state="live"], .stage[data-state="thinking"] { --stage-glow: var(--live-soft); }
-.stage[data-state="error"], .stage[data-state="dropped"] { --stage-glow: var(--danger-soft); }
 
 .stage-head { display: flex; justify-content: center; }
-/* The voice the call uses, centered: a small label over the model name and a
-   row of chips below (reasoning and language), always stacked the same way so
-   every font and width gives the same layout. */
+/* The voice the call uses, centered: the model name over a row of chips
+   (reasoning and language), always stacked the same way so every font and
+   width gives the same layout. */
 .voice-pick {
   display: flex;
   flex-direction: column;
@@ -437,8 +394,8 @@ main {
   margin: 0;
   text-align: center;
 }
-.voice-label { font-size: 11.5px; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
-.voice-name { white-space: nowrap; color: var(--text); font-size: 17px; font-weight: 650; letter-spacing: -.01em; }
+/* The model name is machine data: mono, like the call timer. */
+.voice-name { white-space: nowrap; color: var(--text); font-family: var(--mono); font-size: 16px; font-weight: 500; line-height: 1.3; }
 /* Always one row, whatever the font: a chip that does not fit ends in an ellipsis. */
 .voice-chips { display: flex; flex-wrap: nowrap; justify-content: center; gap: 6px; max-width: 100%; min-width: 0; }
 .voice-chip {
@@ -493,14 +450,14 @@ main {
   border: 0;
   background: var(--accent);
   color: var(--accent-ink);
-  font-weight: 700;
+  font-weight: 600;
   font-size: 15px;
   letter-spacing: .01em;
-  box-shadow: 0 0 0 10px var(--accent-soft), 0 20px 40px -16px var(--accent);
-  transition: transform .15s, box-shadow .2s, background-color .2s;
+  box-shadow: 0 0 0 10px var(--accent-soft);
+  transition: transform 150ms var(--ease), box-shadow 150ms var(--ease), background-color 150ms var(--ease);
 }
 .call-btn svg { font-size: 34px; }
-.call-btn:hover:not(:disabled) { transform: scale(1.03); box-shadow: 0 0 0 14px var(--accent-soft), 0 24px 44px -16px var(--accent); }
+.call-btn:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 88%, var(--text)); }
 .call-btn:active:not(:disabled) { transform: scale(.97); }
 .call-btn:disabled { background: var(--surface-3); color: var(--faint); box-shadow: none; }
 .call-btn:focus-visible { outline-offset: 6px; border-radius: 50%; }
@@ -609,7 +566,7 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
   flex-wrap: wrap;
   align-items: center;
   gap: 10px 12px;
-  padding: 16px 18px 14px;
+  padding: 16px 16px 12px;
   border-bottom: 1px solid var(--line);
 }
 .convo-title { flex: 1 1 160px; min-width: 0; }
@@ -622,7 +579,7 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
   max-height: 64dvh;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 20px 18px 8px;
+  padding: 20px 16px 8px;
   scroll-behavior: smooth;
 }
 #messages:focus-visible { outline-offset: -3px; }
@@ -631,7 +588,7 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
 .empty h3 { font-family: var(--serif); font-weight: 400; font-size: 26px; letter-spacing: -.01em; }
 .empty p { max-width: 46ch; }
 .calls-truncated { margin: 0 0 14px; text-align: center; }
-.call-log { margin-bottom: 26px; }
+.call-log { margin-bottom: 24px; }
 .call-head {
   display: flex;
   flex-wrap: wrap;
@@ -674,10 +631,9 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
   border-left: 2px solid var(--accent);
   line-height: 1.6;
 }
-.message.assistant small::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--accent); }
 /* ——— Projects ——— */
 .side { grid-area: side; align-self: start; padding: 0 0 14px; overflow: hidden; }
-.side-head { display: flex; align-items: center; gap: 8px; padding: 12px 8px 10px 18px; border-bottom: 1px solid var(--line); }
+.side-head { display: flex; align-items: center; gap: 8px; padding: 12px 8px 12px 16px; border-bottom: 1px solid var(--line); }
 /* Title with the read status on one line below it, never squeezed beside it. */
 .side-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .side-head h2 { font-size: 22px; }
@@ -685,7 +641,7 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
 #projects-updated:empty { display: none; }
 /* A long catalog scrolls inside the panel instead of growing the page. */
 .project-list { max-height: min(60vh, 520px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
-.list-empty { padding: 16px 18px; color: var(--faint); font-size: 13.5px; }
+.list-empty { padding: 16px; color: var(--faint); font-size: 13.5px; }
 .project { border-bottom: 1px solid var(--line); }
 .project-main {
   display: grid;
@@ -694,7 +650,7 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
   gap: 2px 10px;
   width: 100%;
   min-height: 60px;
-  padding: 12px 18px;
+  padding: 12px 16px;
   border: 0;
   background: transparent;
   text-align: left;
@@ -702,16 +658,6 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
 .project-name { font-weight: 650; font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-meta { grid-column: 1; font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
 .project[data-active] .project-meta { color: var(--live); }
-.project[data-active] .project-name::before {
-  content: "";
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  margin: 0 8px 1px 0;
-  border-radius: 50%;
-  background: var(--live);
-  box-shadow: 0 0 0 3px var(--live-soft);
-}
 .project-threads { margin: -4px 0 0; padding: 0 10px 10px 26px; list-style: none; }
 
 .thread-link {
@@ -732,7 +678,7 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
 .thread-status[data-active] { color: var(--live); }
 .project-more { padding: 2px 8px; font-size: 13px; color: var(--muted); }
 
-.sub { margin: 16px 18px 4px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.sub { margin: 16px 16px 4px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
 .thread-list { padding: 0 10px; }
 
 /* ——— Call in progress on mobile: the controls anchor to the bottom ——— */
@@ -777,7 +723,7 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
     align-items: center;
     justify-content: center;
     min-height: 48px;
-    margin: 0 18px 14px;
+    margin: 0 16px 16px;
     border: 1px solid var(--line-strong);
     border-radius: 999px;
     background: transparent;
@@ -792,11 +738,18 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
 
 @media (max-width: 599px) {
   .brand-name { display: none; }
+  /* With the ADE switch there is no room for words: the dot alone says the
+     state, and the text stays for screen readers. */
+  .topbar:has(.ade-switch:not([hidden])) .pill { flex: none; width: 32px; padding: 0; gap: 0; justify-content: center; font-size: 0; }
+}
+/* iOS zooms into any field under 16px when it gets focus, and the page then
+   stays wider than the screen. */
+@media (pointer: coarse) {
+  .pair-link { font-size: 16px; }
 }
 @media (max-width: 380px) {
   :root { --gutter: 12px; }
   .ade-option { gap: 6px; padding-right: 10px; }
-  .brand-name em { display: none; }
   .ctl { min-width: 72px; }
   .state-word { font-size: 26px; }
 }
@@ -804,19 +757,32 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
 /* ——— Tablet and desktop ——— */
 @media (min-width: 900px) {
   :root { --gutter: 24px; }
+  /* The ADE switch sits exactly in the middle: the two side columns are equal
+     whatever the brand and the status measure. The bar's edges line up with
+     the panels below, which stop at 1440px. */
+  .topbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    --edge: max(var(--gutter), calc((100% - 1440px) / 2 + var(--gutter)));
+    padding-left: max(var(--edge), env(safe-area-inset-left));
+    padding-right: max(var(--edge), env(safe-area-inset-right));
+  }
+  .brand { grid-column: 1; justify-self: start; }
+  .ade-switch { grid-column: 2; }
+  .topbar-end { grid-column: 3; justify-self: end; margin-left: 0; }
   main { padding-top: 12px; }
   .workspace {
     grid-template-columns: 340px minmax(0, 1fr);
     grid-template-rows: auto 1fr;
     grid-template-areas: "stage convo" "side convo";
-    gap: 18px;
+    gap: 20px;
     align-items: start;
   }
-  .stage { padding: 20px 22px 24px; }
-  .dial { width: 230px; margin-top: 22px; }
+  .stage { padding: 20px 24px 24px; }
+  .dial { width: 232px; margin-top: 24px; }
   .convo { position: sticky; top: 76px; height: calc(100dvh - var(--workspace-top, 76px) - 24px); min-height: 560px; }
-  #messages { max-height: none; padding: 26px 28px 10px; }
-  .convo-head { padding: 18px 24px 16px; }
+  #messages { max-height: none; padding: 24px 24px 8px; }
+  .convo-head { padding: 20px 24px 16px; }
 }
 @media (min-width: 1280px) {
   .workspace {
@@ -883,7 +849,10 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
 .recording-status:empty { display: none; }
 
 /* ——— Settings ——— */
-.topbar-end { display: flex; align-items: center; gap: 8px; }
+/* The status pill is the only part of the top bar that gives way: it shrinks
+   and ends in an ellipsis, so a long status never widens the page. */
+.topbar-end { flex: 0 1 auto; min-width: 0; margin-left: auto; display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.topbar-end .icon-btn { flex: none; margin-right: -12px; }
 .settings {
   width: min(560px, calc(100vw - 2 * var(--gutter)));
   height: min(680px, calc(100dvh - 2 * var(--gutter)));
@@ -914,7 +883,7 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
 .settings-section { padding: 16px 20px 20px; }
 .settings-section[hidden] { display: none; }
 .settings-section h3 { margin: 0 0 10px; font-size: 15px; }
-.settings-block + .settings-block { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.settings-block + .settings-block { margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--line); }
 .settings-block[hidden] { display: none; }
 .settings-section select { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--r-s); background: var(--surface-2); color: var(--text); font: inherit; }
 .settings-section .fine { margin: 10px 0 0; }
@@ -924,9 +893,9 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
 .settings-section .settings-lead { margin: 0 0 16px; }
 /* Voice: groups drawn as cards, a row per setting with its label and hint on
    the left and the select on the right; stacked on narrow screens. */
-.setting-groups { display: grid; gap: 18px; }
+.setting-groups { display: grid; gap: 16px; }
 .setting-group { min-width: 0; margin: 0; padding: 0; border: 0; }
-.setting-group legend { padding: 0 0 8px 2px; color: var(--faint); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.setting-group legend { padding: 0 0 8px 2px; color: var(--faint); font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
 .setting-group > .setting { padding: 12px 14px; border: 1px solid var(--line); border-top-width: 0; background: var(--surface-2); }
 .setting-group > .setting:first-of-type { border-top-width: 1px; border-radius: var(--r-s) var(--r-s) 0 0; }
 .setting-group > .setting:last-of-type { border-radius: 0 0 var(--r-s) var(--r-s); }
@@ -965,7 +934,7 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
 .device-list:empty { display: none; }
 .device, .device-note { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 8px 8px 8px 14px; }
 .device + .device { border-top: 1px solid var(--line); }
-.device-main { flex: 1; min-width: 0; display: grid; gap: 3px; }
+.device-main { flex: 1; min-width: 0; display: grid; gap: 4px; }
 .device-title { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .device-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 15px; }
 .device-badge { flex: none; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); font-size: 11.5px; font-weight: 650; letter-spacing: .05em; text-transform: uppercase; }

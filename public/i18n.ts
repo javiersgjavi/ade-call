@@ -26,7 +26,6 @@ const en = {
   'login.hint': 'Ask the agent that sets up your installation for a code and the access link. This browser will remember the pairing.',
 
   'stage.label': 'Call',
-  'stage.voice': 'Voice',
   'stage.muted': 'Your microphone is muted',
   'call.button': 'Call',
   'call.mute': 'Mute',
@@ -81,7 +80,7 @@ const en = {
   'conversation.showAll': 'Show the whole conversation',
   'conversation.showLess': 'Show only the latest',
   'conversation.emptyTitle': 'Call to start',
-  'conversation.emptyText': 'Here you see what you say and what the agent answers in each call, with the tools it runs, their parameters and their result. Requests keep running in their ADE even if you hang up or close this page.',
+  'conversation.emptyText': 'Requests keep running in their ADE even if you hang up or close this page.',
   'conversation.call': 'Call',
   'conversation.you': 'You',
   'conversation.agent': 'Agent',
@@ -273,7 +272,6 @@ const es: Dictionary = {
   'login.hint': 'Pide un código y el enlace de acceso al agente que configura tu instalación. Este navegador recordará la vinculación.',
 
   'stage.label': 'Llamada',
-  'stage.voice': 'Voz',
   'stage.muted': 'Tu micrófono está silenciado',
   'call.button': 'Llamar',
   'call.mute': 'Silenciar',
@@ -328,7 +326,7 @@ const es: Dictionary = {
   'conversation.showAll': 'Ver toda la conversación',
   'conversation.showLess': 'Ver solo lo último',
   'conversation.emptyTitle': 'Llama para empezar',
-  'conversation.emptyText': 'Aquí ves lo que dices y lo que responde el agente en cada llamada, con las herramientas que ejecuta, sus parámetros y su resultado. Los encargos siguen en marcha en su ADE aunque cuelgues o cierres esta página.',
+  'conversation.emptyText': 'Los encargos siguen en marcha en su ADE aunque cuelgues o cierres esta página.',
   'conversation.call': 'Llamada',
   'conversation.you': 'Tú',
   'conversation.agent': 'Agente',

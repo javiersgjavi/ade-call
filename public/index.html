@@ -62,7 +62,7 @@
 
       <section id="stage" class="stage" data-state="idle" data-muted="false" aria-label="Call" data-i18n-aria-label="stage.label">
         <div class="stage-head">
-          <p class="voice-pick"><span class="voice-label" data-i18n="stage.voice">Voice</span><span id="voice-name" class="voice-name">GPT Realtime</span><span class="voice-chips"><span id="voice-reasoning" class="voice-chip" hidden></span><span id="voice-language" class="voice-chip" hidden></span></span></p>
+          <p class="voice-pick"><span id="voice-name" class="voice-name">GPT Realtime</span><span class="voice-chips"><span id="voice-reasoning" class="voice-chip" hidden></span><span id="voice-language" class="voice-chip" hidden></span></span></p>
         </div>
 
         <div class="dial">
@@ -110,7 +110,7 @@
           <p id="calls-truncated" class="fine calls-truncated" hidden data-i18n="conversation.truncated">Showing the latest turns and tools of this conversation.</p>
           <div id="empty" class="empty">
             <h3 data-i18n="conversation.emptyTitle">Call to start</h3>
-            <p class="fine" data-i18n="conversation.emptyText">Here you see what you say and what the agent answers in each call, with the tools it runs, their parameters and their result. Requests keep running in their ADE even if you hang up or close this page.</p>
+            <p class="fine" data-i18n="conversation.emptyText">Requests keep running in their ADE even if you hang up or close this page.</p>
           </div>
         </div>
         <button id="transcript-toggle" class="transcript-toggle" type="button" aria-controls="messages" aria-expanded="false" hidden><span class="when-collapsed" data-i18n="conversation.showAll">Show the whole conversation</span><span class="when-expanded" data-i18n="conversation.showLess">Show only the latest</span></button>
