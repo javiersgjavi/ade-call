@@ -65,6 +65,17 @@ test('creates a WebRTC call with the ADE tools, its instructions and configurabl
   assert.equal(f.published.find(e => e.type === 'voice')!.data.provider, 'realtime');
 });
 
+test('custom instructions reach the session and change only from the next call', async t => {
+  const f = fixture(); t.after(() => f.close());
+  assert.equal(f.realtime.session().instructions, directInstructions(f.ade), 'nothing added without them');
+  f.realtime.configure({ instructions: 'Report every result in full.' });
+  assert.ok(f.realtime.session().instructions.endsWith('\nReport every result in full.'));
+  f.realtime.configure({ settings: { model: 'gpt-realtime-2' } });
+  assert.ok(f.realtime.session().instructions.endsWith('\nReport every result in full.'), 'other changes keep them');
+  f.realtime.configure({ instructions: null });
+  assert.equal(f.realtime.session().instructions, directInstructions(f.ade), 'cleared');
+});
+
 test('changed settings and key apply from the next call and are refused while one is active or connecting', async t => {
   const f = fixture(undefined, { model: 'gpt-realtime-2' }); t.after(() => f.close());
   f.realtime.configure({ settings: { model: 'gpt-realtime-2.1-mini', voice: 'cedar', reasoning: 'high', eagerness: 'auto', noiseReduction: 'off', transcriptionModel: 'gpt-4o-mini-transcribe' }, key: 'next-key' });

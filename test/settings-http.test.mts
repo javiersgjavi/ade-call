@@ -81,6 +81,33 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
   assert.equal(statSync(configPath).mode & 0o777, 0o600);
   assert.equal((await post('/api/settings/voice', { reasoning: 'low' })).body.settings.model, 'gpt-realtime-2.1-mini', 'a partial change keeps the rest');
 
+  // Custom instructions: authenticated, validated, saved as customInstructions and removed when empty.
+  assert.equal((await post('/api/settings/instructions', { instructions: 'x' }, { 'Content-Type': 'application/json' })).status, 401);
+  assert.equal((await post('/api/settings/instructions', { instructions: 'x' }, { ...bearer, Origin: 'https://attacker.invalid' })).status, 403);
+  assert.equal((await call('/api/settings/voice', { headers: bearer })).body.instructions, '');
+  assert.equal((await call('/api/settings/voice', { headers: bearer })).body.instructionsMax, 4000);
+  for (const bad of [{}, { instructions: 3 }, { instructions: ['a'] }, { instructions: 'a', extra: 1 }, { instructions: 'x'.repeat(4001) }, { instructions: 'bell\u0007' }])
+    assert.equal((await post('/api/settings/instructions', bad)).status, 400, JSON.stringify(bad).slice(0, 40));
+  assert.equal('customInstructions' in config(), false, 'a refused change saves nothing');
+  const instructions = await post('/api/settings/instructions', { instructions: '  Tell me everything the agent says.\r\nIn full.  ' });
+  assert.equal(instructions.status, 200);
+  assert.equal(instructions.body.instructions, 'Tell me everything the agent says.\nIn full.');
+  assert.equal(config().customInstructions, 'Tell me everything the agent says.\nIn full.');
+  assert.equal(config().realtimeModel, 'gpt-realtime-2.1-mini', 'the other fields stay');
+  assert.equal(statSync(configPath).mode & 0o777, 0o600);
+  assert.equal((await post('/api/settings/instructions', { instructions: 'x'.repeat(4000) })).status, 200, 'the maximum is accepted');
+  // Text pasted with spaces around it counts after trimming: nothing is cut.
+  assert.equal((await post('/api/settings/instructions', { instructions: ` ${'y'.repeat(4000)}\n` })).body.instructions, 'y'.repeat(4000));
+  assert.equal(config().customInstructions, 'y'.repeat(4000));
+  assert.equal((await post('/api/settings/instructions', { instructions: '  \n ' })).body.instructions, '', 'blank removes them');
+  assert.equal('customInstructions' in config(), false);
+  assert.equal((await post('/api/settings/instructions', { instructions: 'Keep agent answers complete.' })).status, 200);
+  // A control character is refused, never trimmed into a removal: the saved text stays.
+  for (const bad of ['\r', 'a\rb', '\u000b', 'A\u0085B', '\u001f', 'tab\tok but bell\u0007'])
+    assert.equal((await post('/api/settings/instructions', { instructions: bad })).status, 400, JSON.stringify(bad));
+  assert.equal(config().customInstructions, 'Keep agent answers complete.');
+  assert.equal((await call('/api/settings/voice', { headers: bearer })).body.instructions, 'Keep agent answers complete.');
+
   // The key: format checks that never quote it, a saved key over the environment, removal.
   for (const bad of [{ key: '' }, { key: '   ' }, { key: 'sk-has space inside-0123456789' }, { key: 'sk-short' }, { key: 'x'.repeat(513) }, { key: 42 }, { key: 'sk-ñññññññññññññññññññññññ' }, {}]) {
     const refused = await post('/api/settings/key', bad), value = (bad as { key?: unknown }).key;
@@ -104,6 +131,9 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
   assert.equal((await post('/api/settings/key', { key: savedKey })).status, 200);
   assert.equal((await call('/api/status', { headers: bearer })).body.voiceReady, true, 'the key applies without a restart');
   assert.deepEqual((await call('/api/settings/voice', { headers: bearer })).body.settings.reasoning, 'low', 'the saved settings are read at startup');
+  assert.equal((await call('/api/settings/voice', { headers: bearer })).body.instructions, 'Keep agent answers complete.', 'the instructions are read at startup');
+  assert.equal((await post('/api/settings/instructions', { instructions: null })).status, 200);
+  assert.equal('customInstructions' in config(), false, 'null removes them');
   await stop(); await start({ OPENAI_API_KEY: '' });
   assert.deepEqual((await call('/api/settings/voice', { headers: bearer })).body.key, { set: true, source: 'config' }, 'the saved key survives a restart');
   assert.equal((await post('/api/settings/key', { key: null })).status, 200);
