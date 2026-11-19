@@ -43,6 +43,8 @@ export class RelayedCall {
     audio.srcObject = this.output.stream;
     audio.play().catch(() => { if (this.active()) this.options.onAutoplayBlocked?.(); });
     if (context.state === 'suspended') await context.resume().catch(() => {});
+    // Hung up while the audio started: no socket is opened.
+    if (!this.active()) return;
     const socket = this.socket = new WebSocket(this.options.url);
     socket.binaryType = 'arraybuffer';
     capture.port.onmessage = ({ data }: MessageEvent<ArrayBuffer>) => this.sendFrame(data);

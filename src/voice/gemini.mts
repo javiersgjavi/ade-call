@@ -282,23 +282,27 @@ export class GeminiCalls {
     const call = this.sessions.get(id);
     if (!call || call.closed || call.browser) { browser.close(1008, 'no_call'); return false; }
     call.browser = browser; call.seen = Date.now();
+    // A failure handling one frame drops that frame; it never reaches the process.
     browser.on('message', (data: Buffer, binary: boolean) => {
-      if (call.closed) return;
-      call.seen = Date.now();
-      if (binary) {
-        if (!call.ready || data.length > MAX_FRAME || data.length % 2) return;
-        this.send(call, { realtimeInput: { audio: { data: data.toString('base64'), mimeType: `audio/pcm;rate=${INPUT_RATE}` } } });
-        return;
-      }
-      let message: { type?: string };
-      try { message = JSON.parse(data.toString()); } catch { return; }
-      // Muting stops the audio: the provider flushes what it has cached.
-      if (message?.type === 'audio.end') this.send(call, { realtimeInput: { audioStreamEnd: true } });
+      try { this.fromBrowser(call, data, binary); } catch { /* Dropped. */ }
     });
     browser.on('close', () => { if (call.browser === browser && !call.closed) this.close(id, 'The connection with the phone was lost.'); });
     browser.on('error', () => {});
     this.toBrowser(call, { type: 'session.started', inputRate: INPUT_RATE, outputRate: OUTPUT_RATE });
     return true;
+  }
+  fromBrowser(call: GeminiCall, data: Buffer, binary: boolean) {
+    if (call.closed) return;
+    call.seen = Date.now();
+    if (binary) {
+      if (!call.ready || data.length > MAX_FRAME || data.length % 2) return;
+      this.send(call, { realtimeInput: { audio: { data: data.toString('base64'), mimeType: `audio/pcm;rate=${INPUT_RATE}` } } });
+      return;
+    }
+    let message: { type?: string };
+    try { message = JSON.parse(data.toString()); } catch { return; }
+    // Muting stops the audio: the provider flushes what it has cached.
+    if (message?.type === 'audio.end') this.send(call, { realtimeInput: { audioStreamEnd: true } });
   }
   event(call: GeminiCall, message: ServerMessage) {
     if (call.closed) return;
@@ -567,8 +571,10 @@ export class GeminiCalls {
     if (Buffer.isBuffer(data)) call.browser.send(data, { binary: true });
     else call.browser.send(JSON.stringify(data));
   }
+  // A conversation that cannot be read is not current: nothing is sent.
   isCurrent(call: GeminiCall) {
-    return !call.conversationId || !this.context?.conversation || call.conversationId === this.context.conversation().id;
+    try { return !call.conversationId || !this.context?.conversation || call.conversationId === this.context.conversation().id; }
+    catch { return false; }
   }
   speakable(call: GeminiCall) {
     // A socket that is closing cannot take the notice: the watch keeps it for the next call.

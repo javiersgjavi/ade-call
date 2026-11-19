@@ -114,6 +114,15 @@ test('a failure while preparing a call leaves the engine free for the next one',
   assert.equal(f.gemini.sessions.size, 1);
 });
 
+test('a conversation read that fails during a call drops the frame instead of throwing', async t => {
+  const f = fixture(); t.after(() => f.close());
+  await f.start();
+  const sent = f.upstream().sent.length;
+  f.gemini.context.conversation = () => { throw new Error('store unavailable'); };
+  assert.doesNotThrow(() => f.browser.audio(Buffer.from([1, 0])));
+  assert.equal(f.upstream().sent.length, sent, 'nothing forwarded');
+});
+
 test('audio is relayed both ways and an interruption empties the page\'s playback', async t => {
   const f = fixture(); t.after(() => f.close());
   await f.start();
