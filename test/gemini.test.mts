@@ -152,6 +152,65 @@ test('a late piece of the same utterance, after the model spoke, does not author
   assert.equal(f.runs.length, 2);
 });
 
+test('a repeat of a call ID still running neither runs nor releases the utterance it used, and gets its result', async t => {
+  let release!: () => void;
+  const f = fixture({ execute: () => new Promise(resolve => { release = () => resolve({ text: 'delivered' }); }) }); t.after(() => f.close());
+  await f.start();
+  f.heard('Yes,');
+  f.call('fake_send', 'fc1');
+  await wait();
+  // Renewed connection asks for fc1 again while it runs.
+  f.upstream().server({ sessionResumptionUpdate: { resumable: true, newHandle: 'h' } });
+  f.upstream().server({ goAway: { timeLeft: '5s' } });
+  await wait();
+  const next = f.sockets[1];
+  next.server({ toolCall: { functionCalls: [{ id: 'fc1', name: 'fake_send', args: {} }] } });
+  await wait();
+  assert.equal(f.runs.length, 1);
+  await wait(300); next.server({ serverContent: { inputTranscription: { text: ' send it please.' } } });
+  release(); await wait();
+  assert.deepEqual(next.sent.filter(m => m.toolResponse).flatMap(m => m.toolResponse.functionResponses), [{ id: 'fc1', name: 'fake_send', response: { output: 'delivered' } }], 'answered to the connection that asked');
+  next.server({ toolCall: { functionCalls: [{ id: 'fc2', name: 'fake_send', args: {} }] } });
+  await wait(2800);
+  assert.equal(f.runs.length, 1, 'the late words are still the utterance fc1 used');
+});
+
+test('a result note still queued does not let the end of other speech release the utterance', async t => {
+  let release!: () => void;
+  const f = fixture({ execute: () => new Promise(resolve => { release = () => resolve({ text: 'delivered' }); }) }); t.after(() => f.close());
+  await f.start();
+  f.heard('Yes.');
+  f.call('fake_send', 'fc1');
+  await wait();
+  // The model is speaking when the provider cancels fc1 and the send then finishes.
+  f.content({ modelTurn: { parts: [{ inlineData: { mimeType: 'audio/pcm;rate=24000', data: Buffer.from([1, 1]).toString('base64') } }] } });
+  f.upstream().server({ toolCallCancellation: { ids: ['fc1'] } });
+  release(); await wait();
+  // That speech ends after the pause: the note goes out now, but the model has not answered it yet.
+  await wait(300); f.done(); await wait(400);
+  f.heard(' and the docs.');
+  f.call('fake_send', 'fc2');
+  await wait(2800);
+  assert.equal(f.runs.length, 1);
+});
+
+test('a checkpoint in the same read as the renewed connection\'s setup is kept', async t => {
+  const f = fixture(); t.after(() => f.close());
+  const { session } = await f.start();
+  f.options.hold = true;
+  f.upstream().server({ sessionResumptionUpdate: { resumable: true, newHandle: 'h1' } });
+  f.upstream().server({ goAway: { timeLeft: '5s' } });
+  await wait();
+  const next = f.sockets[1];
+  next.confirm(); next.server({ sessionResumptionUpdate: { resumable: true, newHandle: 'h2' } });
+  await wait();
+  f.options.hold = false;
+  next.close(1011);
+  await wait();
+  assert.equal(f.sockets.length, 3); assert.equal(f.sockets[2].sent[0].setup.sessionResumption.handle, 'h2');
+  assert.ok(f.gemini.sessions.has(session.id));
+});
+
 test('a send the provider cancels while it waits for its transcript is never sent', async t => {
   const f = fixture(); t.after(() => f.close());
   await f.start();

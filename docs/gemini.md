@@ -101,15 +101,18 @@ events that feed it differ.
 - The utterance a send uses is held from that moment: every piece transcribed
   while it is held joins it, however late, so the words a send already used
   never authorize another send. It is released only at a clear boundary: the
-  model has answered the send and completed a turn and the user has paused
-  since, or the user speaks again and Gemini interrupts the model. Words you
+  send's result has been written to Gemini, the model has spoken after it and
+  completed that turn, and the user has paused since; or the user speaks again
+  and Gemini interrupts the model. Words you
   say before that boundary therefore count as part of the same turn; say them
   again after the reply if they were a new request.
 - A `toolCall` may carry several `functionCalls`. Each runs once per `id`
   through `DirectSession.run()`. A sending tool with no new user words waits up
   to 2.5 s for a transcript, then is refused with `NOT SENT (no_user_turn)`.
   The results go back in one `toolResponse`. A call ID the provider asks for
-  again gets the same result without running again.
+  again never runs again: if it already finished it gets the same result, and
+  if it is still running the result goes, when it ends, to the connection that
+  asked last.
 - If you speak over the model, Gemini may cancel calls (`toolCallCancellation`).
   A send cancelled while it still waits for its transcript is abandoned and
   sends nothing. A read that was cancelled is dropped. A send that already

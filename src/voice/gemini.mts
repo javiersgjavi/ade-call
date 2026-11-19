@@ -74,7 +74,10 @@ interface OpenItem { id: string; text: string; message: { text: string }; at: nu
 // again (the provider interrupts the model).
 interface Held {
   callId: string; message: { text: string }; base: string; late: string; lastAt: number;
-  item?: OpenItem; responded?: boolean; completed?: boolean; timer?: NodeJS.Timeout;
+  item?: OpenItem; timer?: NodeJS.Timeout;
+  // responded: its result was written to the provider; spoke: the model said
+  // something after that; completed: then it finished that turn.
+  responded?: boolean; spoke?: boolean; completed?: boolean;
 }
 export interface GeminiCall {
   id: string; backend?: string; conversationId?: string; seen: number; closed: boolean; closing?: boolean;
@@ -85,10 +88,14 @@ export interface GeminiCall {
   handle?: string; resumable?: boolean; goAway?: NodeJS.Timeout;
   // Function results by call ID: answered again if the provider repeats the ID.
   results: Map<string, { name?: string; output: string }>;
+  // The connection that last asked for each call ID still running: its result
+  // goes as a function response only to that connection, if still current.
+  requested: Map<string, Socket | undefined>;
   direct?: DirectSession; items: number; user?: OpenItem; assistant?: OpenItem; held?: Held; order: Map<string, number>;
   greeted?: boolean; responding?: boolean; userSpeaking?: boolean; lastUserAt?: number;
   toolsPending: Set<string>; cancelled: Set<string>;
-  queue: { text: string; speak: boolean; reply?: boolean }[]; flushTimer?: NodeJS.Timeout;
+  // callId: the note carries the result of that function call.
+  queue: { text: string; speak: boolean; reply?: boolean; callId?: string }[]; flushTimer?: NodeJS.Timeout;
   usage: Record<string, number>; diagnosticsAt?: number; setup: Record<string, unknown>;
 }
 export interface GeminiSettings { model?: string; voice?: string }
@@ -160,7 +167,7 @@ export class GeminiCalls {
     this.creating = true;
     const id = `gem_${randomUUID()}`, spoken = callLanguage(language, languages);
     const call: GeminiCall = { id, backend: this.context.snapshot?.backend, conversationId: this.context.conversation?.().id, seen: Date.now(), closed: false,
-      resumes: 0, items: 0, order: new Map(), toolsPending: new Set(), cancelled: new Set(), results: new Map(), queue: [], usage: {}, setup: this.setup(spoken) };
+      resumes: 0, items: 0, order: new Map(), toolsPending: new Set(), cancelled: new Set(), results: new Map(), requested: new Map(), queue: [], usage: {}, setup: this.setup(spoken) };
     this.sessions.set(id, call);
     try {
       const direct = call.direct = new DirectSession(this.ade);
@@ -188,6 +195,7 @@ export class GeminiCalls {
       const fail = (message: string) => { if (!settled) { settled = true; reject(new StatusError(502, message)); } };
       // Nothing goes to a new socket until it confirms the setup.
       call.ready = false;
+      const resuming = !!call.handle;
       const socket = call.upstream = this.connect(this.key!);
       const timeout = setTimeout(() => { fail('Gemini Live did not confirm the session.'); socket.close(); }, 20_000);
       timeout.unref?.();
@@ -198,7 +206,14 @@ export class GeminiCalls {
       socket.on('message', (raw: Buffer) => {
         let message: ServerMessage;
         try { message = JSON.parse(raw.toString()); } catch { return; }
-        if (message.setupComplete && !settled) { settled = true; clearTimeout(timeout); if (call.upstream === socket) call.ready = true; resolve(); return; }
+        if (message.setupComplete && !settled) {
+          settled = true; clearTimeout(timeout);
+          // The handle just used belongs to the old connection: this one must
+          // report its own checkpoint (possibly in the next message) before it
+          // can be resumed in turn.
+          if (call.upstream === socket) { call.ready = true; if (resuming) call.resumable = false; }
+          resolve(); return;
+        }
         if (call.upstream !== socket) return;
         try { this.event(call, message); }
         catch { this.publish('notice', { text: 'A voice event could not be processed. No action will be repeated.' }); }
@@ -254,9 +269,6 @@ export class GeminiCalls {
     const previous = call.upstream;
     let resumed = false;
     try { await this.open(call); resumed = true; } catch { /* Retried or ended below. */ } finally { call.reconnecting = false; }
-    // The handle just used belongs to the old connection: the new one must
-    // report its own checkpoint before it can be resumed in turn.
-    if (resumed) call.resumable = false;
     if (previous && previous !== call.upstream) try { previous.close(); } catch { /* Already closed. */ }
     if (call.closed || call.closing) { call.upstream?.close(); return; }
     if (resumed) this.flush(call); else this.lost(call);
@@ -307,14 +319,20 @@ export class GeminiCalls {
         const audio = part.inlineData;
         if (audio?.data && audio.mimeType?.startsWith('audio/pcm')) {
           call.responding = true; call.greeted = true;
+          if (call.held?.responded) call.held.spoke = true;
           this.toBrowser(call, Buffer.from(audio.data, 'base64'));
         }
       }
-      if (content.outputTranscription?.text) { call.responding = true; call.greeted = true; this.said(call, content.outputTranscription.text); }
+      if (content.outputTranscription?.text) {
+        call.responding = true; call.greeted = true;
+        if (call.held?.responded) call.held.spoke = true;
+        this.said(call, content.outputTranscription.text);
+      }
       if (content.interrupted) { this.toBrowser(call, { type: 'interrupted' }); this.end(call, 'assistant'); call.responding = false; }
       if (content.turnComplete) {
         this.end(call, 'assistant');
-        if (call.held?.responded) { call.held.completed = true; this.releaseLater(call); }
+        // The model answered the send and finished that answer: a boundary, once the user pauses.
+        if (call.held?.responded && call.held.spoke) { call.held.completed = true; this.releaseLater(call); }
         if (content.interactionStatus !== 'IN_PROGRESS') call.responding = false;
         this.toBrowser(call, { type: 'turn.done' });
         clearTimeout(call.flushTimer); call.flushTimer = undefined; this.later(call, this.replies(call) ? 50 : 300);
@@ -323,12 +341,16 @@ export class GeminiCalls {
     if (message.toolCall?.functionCalls?.length) {
       // What was said so far precedes the call in the conversation.
       this.end(call, 'assistant');
-      // A call ID already answered gets the same result again; it never runs twice.
-      const repeated = message.toolCall.functionCalls.filter(fc => fc.id && call.results.has(fc.id));
-      if (repeated.length) this.send(call, { toolResponse: { functionResponses: repeated.map(fc => ({ id: fc.id, name: call.results.get(fc.id!)!.name, response: { output: call.results.get(fc.id!)!.output } })) } });
-      const calls = message.toolCall.functionCalls.filter(fc => !repeated.includes(fc));
-      for (const fc of calls) if (fc.id) { call.toolsPending.add(fc.id); this.slot(call, `fn:${fc.id}`); }
-      if (calls.length) void this.tools(call, calls, call.upstream);
+      // A call ID never runs twice. One already answered gets the same result
+      // again; one still running is answered, when it ends, to the connection
+      // that asked last.
+      const functionCalls = message.toolCall.functionCalls.filter(fc => fc.id);
+      const answered = functionCalls.filter(fc => call.results.has(fc.id!));
+      if (answered.length) this.send(call, { toolResponse: { functionResponses: answered.map(fc => ({ id: fc.id, name: call.results.get(fc.id!)!.name, response: { output: call.results.get(fc.id!)!.output } })) } });
+      for (const fc of functionCalls) if (call.requested.has(fc.id!)) call.requested.set(fc.id!, call.upstream);
+      const calls = functionCalls.filter(fc => !call.results.has(fc.id!) && !call.requested.has(fc.id!) && !call.direct?.toolIds.has(fc.id!));
+      for (const fc of calls) { call.toolsPending.add(fc.id!); call.requested.set(fc.id!, call.upstream); this.slot(call, `fn:${fc.id}`); }
+      if (calls.length) void this.tools(call, calls);
     }
     for (const id of message.toolCallCancellation?.ids || []) call.cancelled.add(id);
   }
@@ -412,38 +434,37 @@ export class GeminiCalls {
   }
   // The functions of one tool call run together; the provider gets their
   // results in one response, as the synchronous models expect.
-  // origin: the connection that asked; a renewed one never waits for these results.
-  async tools(call: GeminiCall, calls: FunctionCallPart[], origin?: Socket) {
+  async tools(call: GeminiCall, calls: FunctionCallPart[]) {
     const results = await Promise.all(calls.map(fc => this.tool(call, fc).catch(() => {
       const failure = toolFailure(this.ade, fc.name);
       return { callId: fc.id || '', name: fc.name || '', output: failure.output, status: failure.status } as Pick<ToolRun, 'callId' | 'name' | 'output' | 'status'>;
     })));
     const responses = [];
-    // Renewing the connection meanwhile: the resumed session does not wait for these.
-    const sendable = call.upstream === origin && this.sendable(call);
     for (const [index, run] of results.entries()) {
       const fc = calls[index];
       if (!fc.id) continue;
       call.toolsPending.delete(fc.id);
-      if (call.held?.callId === fc.id) call.held.responded = true;
+      // A renewed connection that did not ask for this call does not wait for it.
+      const sendable = call.requested.get(fc.id) === call.upstream && this.sendable(call);
+      call.requested.delete(fc.id);
       if (!run) continue;
       call.results.set(fc.id, { name: fc.name, output: run.output });
       // A send that ran, or may have, is told to the model even when its call
       // was dropped; reads are not.
       const tool = this.ade.tools.find(t => t.name === fc.name);
       const told = tool?.sends && (run.status === 'completed' || run.status === 'unknown');
-      if (call.cancelled.has(fc.id)) {
-        if (told) this.system(call, voiceNoteText('cancelled', { tool: run.name, output: run.output }), true, true);
-        continue;
-      }
-      if (!sendable) {
-        if (told) this.system(call, voiceNoteText('reconnected', { tool: run.name, output: run.output }), true, true);
+      if (call.cancelled.has(fc.id) || !sendable) {
+        if (told) this.system(call, voiceNoteText(call.cancelled.has(fc.id) ? 'cancelled' : 'reconnected', { tool: run.name, output: run.output }), true, true, fc.id);
+        // Nothing reaches the model for this call: its utterance stays held until the user speaks again.
         continue;
       }
       responses.push({ id: fc.id, name: fc.name, response: { output: run.output } });
     }
     if (call.closed || call.closing) return;
-    if (responses.length) this.send(call, { toolResponse: { functionResponses: responses } });
+    if (responses.length) {
+      this.send(call, { toolResponse: { functionResponses: responses } });
+      if (call.held && responses.some(response => response.id === call.held!.callId)) call.held.responded = true;
+    }
     this.flush(call);
   }
   async tool(call: GeminiCall, fc: FunctionCallPart) {
@@ -468,7 +489,8 @@ export class GeminiCalls {
     } finally {
       this.running--;
       // Nothing was used after all (refused, or failed before dispatch): no hold.
-      if (call.held?.callId === fc.id && direct.submittedThrough === before) this.release(call);
+      // Only this execution owns its hold; a repeat of the ID never runs here.
+      if (run && call.held?.callId === fc.id && direct.submittedThrough === before) this.release(call);
     }
     if (!run) return null;
     if (run.delivered) this.delivered?.(run.delivered, call.conversationId);
@@ -481,9 +503,10 @@ export class GeminiCalls {
   // to speak completes the turn, which would cut the model off, so it waits for
   // the model to be idle and the user quiet.
   // reply: it answers what the user just asked, so it does not wait for a quiet moment.
-  system(call: GeminiCall, text: string, speak = false, reply = false) {
+  // callId: the note carries that function call's result.
+  system(call: GeminiCall, text: string, speak = false, reply = false, callId?: string) {
     if (!speak) { this.send(call, { clientContent: { turns: [{ role: 'user', parts: [{ text: voiceNoteText('note', { text }) }] }], turnComplete: false } }); return; }
-    call.queue.push({ text, speak, reply }); this.flush(call);
+    call.queue.push({ text, speak, reply, callId }); this.flush(call);
   }
   idle(call: GeminiCall, reply = false) {
     return !call.toolsPending.size && !call.responding && !call.userSpeaking && (reply || Date.now() - (call.lastUserAt || 0) >= USER_QUIET_MS);
@@ -499,7 +522,10 @@ export class GeminiCalls {
     // Right after English data, so the reply keeps the user's language and accent.
     if (speak) texts.push(languageReminder());
     if (speak) call.responding = true;
+    const written = this.sendable(call);
     this.send(call, { clientContent: { turns: texts.map(text => ({ role: 'user', parts: [{ text: voiceNoteText('note', { text }) }] })), turnComplete: speak } });
+    // A held utterance counts as answered only once its result was written.
+    if (written && call.held && items.some(item => item.callId === call.held!.callId)) call.held.responded = true;
   }
   later(call: GeminiCall, ms = 500) {
     if (call.flushTimer || !call.queue.length) return;
