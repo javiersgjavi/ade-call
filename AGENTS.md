@@ -34,6 +34,7 @@ keep the code free of personal names, machines, domains and networks.
 | `src/resources.mts`, `resources/` | Model-facing text and its loader ([resources/README.md](resources/README.md)). |
 | `public/` | Browser UI and audio; `public/i18n.ts` holds the interface dictionaries. |
 | `scripts/`, `deploy/` | Build, checks, installer, access CLI, integration scripts, systemd units, proxy example. |
+| `skills/` | Agent skills ([skills/README.md](skills/README.md)), such as running a branch as a separate preview. |
 | `test/` | Node tests with simulated providers and CLIs; `test/project-sync_test.py`. |
 
 ## Commands
@@ -49,6 +50,14 @@ git diff --check
 Node version: [.node-version](.node-version) (24 or later). Tests never need keys or
 a real ADE. Paid or real-system scripts are listed in [docs/testing.md](docs/testing.md);
 do not run them unless the task asks for it.
+
+## Trying a branch
+
+To let the owner see or try a branch, PR or change before merging, use the
+[branch-preview skill](skills/branch-preview/SKILL.md): it runs the branch next to
+the installed service, on its own port, configuration and state, and opens it
+already signed in. Never restart or reconfigure the installed service to show a
+change.
 
 ## Hard rules
 
