@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
@@ -109,7 +109,8 @@ test('service installer generates isolated configuration with simulated npm/syst
   const result = await install(env);
   assert.equal(result.status, 0, result.stderr);
   const unit = unitOf(home);
-  assert.ok(unit.includes(`WorkingDirectory="${resolve('.')}"`));
+  assert.equal(unit.split('\n').find(line => line.startsWith('WorkingDirectory=')),
+    `WorkingDirectory=${resolve('.').replaceAll('%', '%%')}`);
   assert.ok(unit.includes(`T3CODE_HOME=${env.T3CODE_HOME}`));
   assert.ok(unit.includes(`T3_BIN=${env.T3_BIN}`));
   assert.ok(unit.includes('ADE_CALL_TIME_ZONE=Europe/Madrid'));
@@ -121,6 +122,45 @@ test('service installer generates isolated configuration with simulated npm/syst
   assert.match(commands, /systemctl --user enable --now ade-call.service/);
   assert.doesNotMatch(commands, /restart/);
   assert.doesNotMatch(commands, /\/t3 /);
+});
+
+function writeUnit(t: test.TestContext, checkoutName: string) {
+  const { home, env } = sandbox(t, []);
+  const cwd = join(home, checkoutName);
+  mkdirSync(cwd);
+  const directory = join(home, '.config/systemd/user');
+  mkdirSync(directory, { recursive: true });
+  const result = spawnSync(process.execPath, [resolve('dist/scripts/write-service.mjs')], { cwd, env, encoding: 'utf8' });
+  assert.ifError(result.error);
+  return { cwd, home, env, unitPath: join(directory, 'ade-call.service'), result };
+}
+
+test('WorkingDirectory preserves spaces, backslashes and quotes and escapes specifiers', t => {
+  const { cwd, home, result } = writeUnit(t, 'checkout %n with "quotes" and a\\backslash');
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(unitOf(home).split('\n').find(line => line.startsWith('WorkingDirectory=')),
+    `WorkingDirectory=${cwd.replaceAll('%', '%%')}`);
+});
+
+for (const [label, separator] of [['newline', '\n'], ['carriage return', '\r']]) {
+  test(`unit writer refuses a checkout path containing a ${label}`, t => {
+    const { result, unitPath } = writeUnit(t, `checkout${separator}directory`);
+    assert.equal(result.signal, null);
+    assert.notEqual(result.status, 0, 'writer accepted a line break in the checkout path');
+    assert.match(result.stderr, /newline|new line|line[ -]?break|carriage return|control character|\b(?:CR|LF)\b/i);
+    assert.equal(existsSync(unitPath), false, 'no broken unit is written');
+  });
+}
+
+test('systemd-analyze verifies the generated service settings', t => {
+  // The sandbox sets NODE_BIN to process.execPath so verify can check a real ExecStart executable.
+  const { result, unitPath, env } = writeUnit(t, 'checkout with %n');
+  assert.equal(result.status, 0, result.stderr);
+  const verify = spawnSync('systemd-analyze', ['verify', unitPath], { env, encoding: 'utf8' });
+  if ((verify.error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') return t.skip('systemd-analyze is unavailable');
+  assert.ifError(verify.error);
+  assert.equal(verify.status, 0, verify.stderr);
+  assert.ok(!verify.stderr.includes(unitPath), verify.stderr);
 });
 
 test('running again restarts an active service once it reports being idle, or anyway', async t => {
