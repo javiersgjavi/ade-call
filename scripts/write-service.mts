@@ -7,13 +7,16 @@ const quote = (value: string) => '"' + value.replaceAll('\\', '\\\\').replaceAll
 const execQuote = (value: string) => quote(value.replaceAll('$', '$$'));
 // WorkingDirectory takes the path as is: systemd does not remove quotes there
 // (it would read them as part of the path) and has no escape for a line
-// break, and it trims surrounding whitespace. Only specifiers are escaped.
+// break. Only specifiers are escaped. A path ending in a space or tab would
+// be trimmed, and one ending in a backslash would continue onto the next
+// line, so those end in "/." (the same directory).
 const workingDirectory = (path: string) => {
-  if (/[\r\n]/.test(path) || path !== path.trim()) {
-    console.error(`Cannot install from ${JSON.stringify(path)}: systemd cannot use a working directory with a line break or surrounding spaces. Move the checkout to another folder.`);
+  if (/[\r\n]/.test(path)) {
+    console.error(`Cannot install from ${JSON.stringify(path)}: systemd cannot use a working directory with a line break in its path. Move or rename the checkout.`);
     process.exit(1);
   }
-  return path.replaceAll('%', '%%');
+  const escaped = path.replaceAll('%', '%%');
+  return /[\\ \t]$/.test(escaped) ? `${escaped}/.` : escaped;
 };
 const cwd = workingDirectory(process.cwd());
 const settings: Record<string, string> = {

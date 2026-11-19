@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { join, resolve, dirname } from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
 import http from 'node:http';
@@ -152,15 +152,51 @@ for (const [label, separator] of [['newline', '\n'], ['carriage return', '\r']])
   });
 }
 
+for (const [label, ending] of [['space', ' '], ['tab', '\t'], ['backslash', '\\']]) {
+  test(`WorkingDirectory keeps a checkout path ending in a ${label}`, t => {
+    // systemd trims a trailing space or tab and reads a trailing backslash as
+    // a line continuation, so the path ends in "/." instead.
+    const { cwd, home, result } = writeUnit(t, `checkout${ending}`);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(unitOf(home).split('\n').find(line => line.startsWith('WorkingDirectory=')), `WorkingDirectory=${cwd}/.`);
+  });
+}
+
+test('the installer does not drop a line break at the end of its checkout path', async t => {
+  // $(pwd) would turn "checkout\n" into "checkout", a sibling folder.
+  const { home, bin, env } = sandbox(t, ['systemctl']);
+  writeFileSync(join(bin, 'npm'), '#!/bin/sh\nprintf "%s\\0" "$PWD" >> "$HOME/npm-dirs"\n', { mode: 0o755 });
+  const checkout = join(home, 'checkout\n'), sibling = join(home, 'checkout');
+  for (const dir of [checkout, sibling]) mkdirSync(join(dir, 'scripts'), { recursive: true });
+  writeFileSync(join(checkout, 'scripts/install-user.sh'), readFileSync('scripts/install-user.sh'));
+  mkdirSync(join(checkout, 'dist/scripts'), { recursive: true });
+  writeFileSync(join(checkout, 'dist/scripts/write-service.mjs'), readFileSync('dist/scripts/write-service.mjs'));
+  const child = spawnSync('bash', [join(checkout, 'scripts/install-user.sh')], { env: { ...env, T3_BIN: process.execPath }, encoding: 'utf8' });
+  assert.notEqual(child.status, 0);
+  assert.match(child.stderr, /line break/);
+  assert.equal(existsSync(join(home, '.config/systemd/user/ade-call.service')), false);
+  // NUL-separated: the checkout's own name ends in a line break.
+  const npmDirs = readFileSync(join(home, 'npm-dirs'), 'utf8').split('\0');
+  assert.ok(npmDirs.includes(checkout) && !npmDirs.includes(sibling), JSON.stringify(npmDirs));
+});
+
 test('systemd-analyze verifies the generated service settings', t => {
-  // The sandbox sets NODE_BIN to process.execPath so verify can check a real ExecStart executable.
-  const { result, unitPath, env } = writeUnit(t, 'checkout with %n');
+  // NODE_BIN is process.execPath, so verify checks a real ExecStart executable.
+  // The trailing backslash also checks that the unit's lines stay separate.
+  const { result, unitPath, env } = writeUnit(t, 'checkout with %n and \\');
   assert.equal(result.status, 0, result.stderr);
-  const verify = spawnSync('systemd-analyze', ['verify', unitPath], { env, encoding: 'utf8' });
-  if ((verify.error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') return t.skip('systemd-analyze is unavailable');
-  assert.ifError(verify.error);
-  assert.equal(verify.status, 0, verify.stderr);
-  assert.ok(!verify.stderr.includes(unitPath), verify.stderr);
+  // A minimal unit tells whether this machine's systemd can verify at all
+  // (some containers lack the units every service depends on).
+  const control = join(dirname(unitPath), 'control.service');
+  writeFileSync(control, `[Service]\nExecStart=${process.execPath}\n`);
+  const verify = (path: string) => spawnSync('systemd-analyze', ['verify', path], { env, encoding: 'utf8' });
+  const probe = verify(control);
+  if ((probe.error as NodeJS.ErrnoException | undefined)?.code === 'ENOENT') return t.skip('systemd-analyze is unavailable');
+  assert.ifError(probe.error);
+  if (probe.status !== 0) return t.skip(`systemd-analyze cannot verify a minimal unit here: ${probe.stderr.trim()}`);
+  const generated = verify(unitPath);
+  assert.equal(generated.status, 0, generated.stderr);
+  assert.ok(!generated.stderr.includes(unitPath), generated.stderr);
 });
 
 test('running again restarts an active service once it reports being idle, or anyway', async t => {
