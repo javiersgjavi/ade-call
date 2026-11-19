@@ -97,9 +97,14 @@ events that feed it differ.
   utterance, whatever the model says or finishes in between; only a pause
   starts a new user turn. The utterance is placed in the conversation at its
   first piece and its text grows with each one, so a "yes" counts as soon as it
-  is transcribed, and a late piece of the words a send already used never
-  authorizes another send. It is published to the conversation panel after the
-  pause.
+  is transcribed. It is published to the conversation panel after the pause.
+- The utterance a send uses is held from that moment: every piece transcribed
+  while it is held joins it, however late, so the words a send already used
+  never authorize another send. It is released only at a clear boundary: the
+  model has answered the send and completed a turn and the user has paused
+  since, or the user speaks again and Gemini interrupts the model. Words you
+  say before that boundary therefore count as part of the same turn; say them
+  again after the reply if they were a new request.
 - A `toolCall` may carry several `functionCalls`. Each runs once per `id`
   through `DirectSession.run()`. A sending tool with no new user words waits up
   to 2.5 s for a transcript, then is refused with `NOT SENT (no_user_turn)`.
@@ -110,14 +115,17 @@ events that feed it differ.
   sends nothing. A read that was cancelled is dropped. A send that already
   ran, or may have, is not undone: hanging up or interrupting never cancels ADE
   work. The model is told its result in a note so it can tell you, and the same
-  happens for a send that finishes while the connection is being renewed.
+  happens for a send that finishes while the connection is being renewed: each
+  function call remembers the connection it came on, and its result never goes
+  as a function response to a connection that did not ask for it.
 
 ## Limits of the provider
 
 - A connection lasts about ten minutes. The server keeps the session over a new
   connection with the latest resumption handle, up to 12 times per call, but
   only from a checkpoint Gemini marked resumable (not while it runs a function
-  or generates), so the conversation is never rolled back. After `goAway` it
+  or generates), so the conversation is never rolled back. A renewed connection
+  must report its own checkpoint before it can be renewed again. After `goAway` it
   waits for such a checkpoint until shortly before the deadline; if none comes,
   or the connection drops while the session is not resumable, the call ends
   with a notice rather than continuing without its history. Nothing is sent to
@@ -134,7 +142,7 @@ The engine is tested offline with simulated sockets
 ([test/gemini.test.mts](../test/gemini.test.mts)): setup content, history first,
 audio relay both ways, interruptions, transcripts, the send rule, duplicate
 call IDs, a late yes, late pieces of an utterance that already authorized a
-send, sends cancelled before and after dispatch, resumption only from a
+send (also after the pause), sends cancelled before and after dispatch, resumption only from a
 resumable checkpoint, no audio before a new connection's setup, results that
 finish during a reconnect, and hang-up. The
 socket route is tested for authentication and origin

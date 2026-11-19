@@ -137,14 +137,15 @@ test('a late piece of the same utterance, after the model spoke, does not author
   f.call('fake_send', 'fc1');
   await wait();
   assert.equal(f.runs.length, 1);
-  f.said('Sending it.'); f.heard(' send it please.');
+  // Later than the pause that separates utterances: still the words the send used.
+  f.said('Sending it.'); await wait(300); f.heard(' send it please.');
   f.call('fake_send', 'fc2');
   await wait(2800);
   assert.equal(f.runs.length, 1, 'the late words joined the utterance the first send used');
   assert.match(f.responses().at(-1)!.response.output, /NOT SENT \(no_user_turn\)/);
-  await wait(250);
+  // The model completes its turn after the result, the user pauses: a boundary.
+  f.done(); await wait(250);
   assert.deepEqual(f.published.filter(e => e.type === 'transcript' && e.data.role === 'user').map(e => e.data.text), ['Yes, send it please.']);
-  // After a pause, new words are a new turn.
   f.heard('And tell it to add docs.');
   f.call('fake_send', 'fc3');
   await wait();
@@ -224,10 +225,15 @@ test('goAway resumes the same session on a new connection with the last handle',
   assert.ok(f.gemini.sessions.has(session.id));
   f.browser.audio(Buffer.from([1, 0]));
   assert.ok(f.sockets[1].sent.at(-1)!.realtimeInput, 'audio goes to the new connection');
-  // A connection lost without goAway resumes too while a handle is known.
-  f.sockets[1].emit('close', 1011, Buffer.from(''));
+  // The new connection reports its own checkpoint; a drop then resumes from it.
+  f.sockets[1].server({ sessionResumptionUpdate: { resumable: true, newHandle: 'handle-2' } });
+  f.sockets[1].close(1011);
   await wait();
-  assert.equal(f.sockets.length, 3, 'a resumable handle is kept, so it resumes again');
+  assert.equal(f.sockets.length, 3); assert.equal(f.sockets[2].sent[0].setup.sessionResumption.handle, 'handle-2');
+  // A drop before the newest connection reported a checkpoint: no resume from an older one.
+  f.sockets[2].close(1011);
+  await wait();
+  assert.equal(f.sockets.length, 3); assert.equal(f.gemini.sessions.has(session.id), false);
 });
 
 test('a connection lost while the session is not resumable ends the call; goAway with no checkpoint ends it at the deadline', async t => {
@@ -263,7 +269,7 @@ test('no audio reaches a new connection before it confirms the setup', async t =
   assert.ok(next.sent.at(-1)!.realtimeInput);
 });
 
-test('a send that finishes while the connection is renewed runs once and its result still reaches the model', async t => {
+for (const confirmFirst of [false, true]) test(`a send that finishes while the connection is renewed (${confirmFirst ? 'after' : 'before'} the new one confirms) runs once and its result still reaches the model`, async t => {
   let release!: () => void;
   const f = fixture({ execute: () => new Promise(resolve => { release = () => resolve({ text: 'delivered' }); }) }); t.after(() => f.close());
   await f.start();
@@ -274,9 +280,12 @@ test('a send that finishes while the connection is renewed runs once and its res
   f.upstream().server({ sessionResumptionUpdate: { resumable: true, newHandle: 'h' } });
   f.upstream().server({ goAway: { timeLeft: '5s' } });
   await wait();
-  release(); await wait();
   const next = f.sockets[1];
-  next.confirm(); await wait(100);
+  if (confirmFirst) { next.confirm(); await wait(); }
+  release(); await wait();
+  if (!confirmFirst) next.confirm();
+  await wait(100);
+  assert.equal(next.sent.filter(m => m.toolResponse).length, 0, 'the new session never asked for fc1');
   assert.equal(f.runs.length, 1);
   const note = next.sent.find(m => m.clientContent?.turnComplete);
   assert.match(note!.clientContent.turns[0].parts[0].text, /renewed while fake_send was running[\s\S]*delivered/);

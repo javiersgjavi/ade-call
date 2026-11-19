@@ -67,6 +67,15 @@ interface ServerMessage {
 // A conversation item whose text streams in: the Message the send rule reads
 // is updated as each piece arrives, and published when the item ends.
 interface OpenItem { id: string; text: string; message: { text: string }; at: number; timer?: NodeJS.Timeout }
+// The utterance a send used. Every transcript piece that arrives while it is
+// held joins it, so a late piece of the same words is never a new turn. It is
+// released only at a clear boundary: the model has answered the send and
+// completed a turn, and the user has paused since; or the user starts speaking
+// again (the provider interrupts the model).
+interface Held {
+  callId: string; message: { text: string }; base: string; late: string; lastAt: number;
+  item?: OpenItem; responded?: boolean; completed?: boolean; timer?: NodeJS.Timeout;
+}
 export interface GeminiCall {
   id: string; backend?: string; conversationId?: string; seen: number; closed: boolean; closing?: boolean;
   // ready: the current upstream confirmed its setup; audio and messages wait for it.
@@ -76,7 +85,7 @@ export interface GeminiCall {
   handle?: string; resumable?: boolean; goAway?: NodeJS.Timeout;
   // Function results by call ID: answered again if the provider repeats the ID.
   results: Map<string, { name?: string; output: string }>;
-  direct?: DirectSession; items: number; user?: OpenItem; assistant?: OpenItem; order: Map<string, number>;
+  direct?: DirectSession; items: number; user?: OpenItem; assistant?: OpenItem; held?: Held; order: Map<string, number>;
   greeted?: boolean; responding?: boolean; userSpeaking?: boolean; lastUserAt?: number;
   toolsPending: Set<string>; cancelled: Set<string>;
   queue: { text: string; speak: boolean; reply?: boolean }[]; flushTimer?: NodeJS.Timeout;
@@ -245,6 +254,9 @@ export class GeminiCalls {
     const previous = call.upstream;
     let resumed = false;
     try { await this.open(call); resumed = true; } catch { /* Retried or ended below. */ } finally { call.reconnecting = false; }
+    // The handle just used belongs to the old connection: the new one must
+    // report its own checkpoint before it can be resumed in turn.
+    if (resumed) call.resumable = false;
     if (previous && previous !== call.upstream) try { previous.close(); } catch { /* Already closed. */ }
     if (call.closed || call.closing) { call.upstream?.close(); return; }
     if (resumed) this.flush(call); else this.lost(call);
@@ -276,7 +288,7 @@ export class GeminiCalls {
   event(call: GeminiCall, message: ServerMessage) {
     if (call.closed) return;
     for (const [key, value] of Object.entries(message.usageMetadata || {})) if (typeof value === 'number') call.usage[key] = (call.usage[key] || 0) + value;
-    if (message.voiceActivity?.type === 'ACTIVITY_START') { call.userSpeaking = true; call.greeted = true; }
+    if (message.voiceActivity?.type === 'ACTIVITY_START') { call.userSpeaking = true; call.greeted = true; this.release(call); }
     if (message.voiceActivity?.type === 'ACTIVITY_END') { call.userSpeaking = false; call.lastUserAt = Date.now(); this.later(call); }
     const update = message.sessionResumptionUpdate;
     if (update) {
@@ -288,6 +300,8 @@ export class GeminiCalls {
     if (message.goAway) this.goAway(call, message.goAway.timeLeft);
     const content = message.serverContent;
     if (content) {
+      // The user speaking again ends the utterance a send used.
+      if (content.interrupted) this.release(call);
       if (content.inputTranscription?.text) this.heard(call, content.inputTranscription.text);
       for (const part of content.modelTurn?.parts || []) {
         const audio = part.inlineData;
@@ -300,6 +314,7 @@ export class GeminiCalls {
       if (content.interrupted) { this.toBrowser(call, { type: 'interrupted' }); this.end(call, 'assistant'); call.responding = false; }
       if (content.turnComplete) {
         this.end(call, 'assistant');
+        if (call.held?.responded) { call.held.completed = true; this.releaseLater(call); }
         if (content.interactionStatus !== 'IN_PROGRESS') call.responding = false;
         this.toBrowser(call, { type: 'turn.done' });
         clearTimeout(call.flushTimer); call.flushTimer = undefined; this.later(call, this.replies(call) ? 50 : 300);
@@ -313,7 +328,7 @@ export class GeminiCalls {
       if (repeated.length) this.send(call, { toolResponse: { functionResponses: repeated.map(fc => ({ id: fc.id, name: call.results.get(fc.id!)!.name, response: { output: call.results.get(fc.id!)!.output } })) } });
       const calls = message.toolCall.functionCalls.filter(fc => !repeated.includes(fc));
       for (const fc of calls) if (fc.id) { call.toolsPending.add(fc.id); this.slot(call, `fn:${fc.id}`); }
-      if (calls.length) void this.tools(call, calls);
+      if (calls.length) void this.tools(call, calls, call.upstream);
     }
     for (const id of message.toolCallCancellation?.ids || []) call.cancelled.add(id);
   }
@@ -325,6 +340,14 @@ export class GeminiCalls {
     const now = Date.now();
     call.lastUserAt = now; call.greeted = true;
     if (call.assistant) this.end(call, 'assistant');
+    const held = call.held;
+    if (held) {
+      held.lastAt = now;
+      if (held.item && call.user === held.item) { held.item.text += text; held.item.message.text = held.item.text.trim(); held.item.at = now; }
+      else { held.late += text; held.message.text = `${held.base} ${held.late.trim()}`.trim(); }
+      if (held.completed) this.releaseLater(call);
+      return;
+    }
     if (call.user && now - call.user.at >= this.gap) this.end(call, 'user');
     if (!call.user) {
       const id = `u${++call.items}`;
@@ -355,6 +378,33 @@ export class GeminiCalls {
     call.direct?.fill(item.id, role, text);
     this.publish('transcript', { call: call.id, role, text, order: this.slot(call, item.id), item: item.id, backend: call.backend, conversationId: call.conversationId });
   }
+  // A send is about to use the latest user utterance: hold it (see Held).
+  hold(call: GeminiCall, callId: string) {
+    const direct = call.direct;
+    if (!direct || call.held) return;
+    const item = call.user;
+    const message = item?.message || direct.history.filter(m => m.role === 'user' && m.text).at(-1);
+    if (!message) return;
+    if (item) clearTimeout(item.timer);
+    call.held = { callId, message, base: message.text, late: '', lastAt: item?.at || Date.now(), item };
+  }
+  releaseLater(call: GeminiCall) {
+    const held = call.held;
+    if (!held) return;
+    clearTimeout(held.timer);
+    held.timer = setTimeout(() => { if (call.held === held) this.release(call); }, Math.max(0, this.gap - (Date.now() - held.lastAt)));
+    held.timer.unref?.();
+  }
+  release(call: GeminiCall) {
+    const held = call.held;
+    if (!held) return;
+    call.held = undefined; clearTimeout(held.timer);
+    if (held.item && call.user === held.item) { this.end(call, 'user'); return; }
+    // Late words of an utterance already in the panel are shown on their own;
+    // for the send rule they stay part of the utterance the send used.
+    const late = held.late.trim();
+    if (late) this.publish('transcript', { call: call.id, role: 'user', text: late, order: this.slot(call), item: `late:${held.callId}`, backend: call.backend, conversationId: call.conversationId });
+  }
   slot(call: GeminiCall, key = `anon:${call.order.size}`) {
     let n = call.order.get(key);
     if (n === undefined) { n = call.order.size + 1; call.order.set(key, n); }
@@ -362,18 +412,20 @@ export class GeminiCalls {
   }
   // The functions of one tool call run together; the provider gets their
   // results in one response, as the synchronous models expect.
-  async tools(call: GeminiCall, calls: FunctionCallPart[]) {
+  // origin: the connection that asked; a renewed one never waits for these results.
+  async tools(call: GeminiCall, calls: FunctionCallPart[], origin?: Socket) {
     const results = await Promise.all(calls.map(fc => this.tool(call, fc).catch(() => {
       const failure = toolFailure(this.ade, fc.name);
       return { callId: fc.id || '', name: fc.name || '', output: failure.output, status: failure.status } as Pick<ToolRun, 'callId' | 'name' | 'output' | 'status'>;
     })));
     const responses = [];
     // Renewing the connection meanwhile: the resumed session does not wait for these.
-    const sendable = this.sendable(call);
+    const sendable = call.upstream === origin && this.sendable(call);
     for (const [index, run] of results.entries()) {
       const fc = calls[index];
       if (!fc.id) continue;
       call.toolsPending.delete(fc.id);
+      if (call.held?.callId === fc.id) call.held.responded = true;
       if (!run) continue;
       call.results.set(fc.id, { name: fc.name, output: run.output });
       // A send that ran, or may have, is told to the model even when its call
@@ -399,6 +451,7 @@ export class GeminiCalls {
     if (!direct || !fc.id) return null;
     this.running++;
     let run;
+    const before = direct.submittedThrough;
     try {
       run = await direct.run({ name: fc.name, call_id: fc.id, arguments: JSON.stringify(fc.args ?? {}) }, {
         requestId: requestIdFor('voice', call.id, fc.id), signal: AbortSignal.timeout(90_000),
@@ -407,9 +460,16 @@ export class GeminiCalls {
         beforeSend: async () => {
           const cancelled = () => call.cancelled.has(fc.id!);
           for (let waited = 0; direct.sendRefusal() && waited < TRANSCRIPT_WAIT_MS && !call.closed && !cancelled(); waited += 100) await new Promise(resolve => setTimeout(resolve, 100));
-          return !call.closed && !call.closing && !cancelled() && this.isCurrent(call);
+          const go = !call.closed && !call.closing && !cancelled() && this.isCurrent(call);
+          // The send uses the utterance now, before it runs: hold it from this moment.
+          if (go && !direct.sendRefusal()) this.hold(call, fc.id!);
+          return go;
         } });
-    } finally { this.running--; }
+    } finally {
+      this.running--;
+      // Nothing was used after all (refused, or failed before dispatch): no hold.
+      if (call.held?.callId === fc.id && direct.submittedThrough === before) this.release(call);
+    }
     if (!run) return null;
     if (run.delivered) this.delivered?.(run.delivered, call.conversationId);
     if (run.read) this.read?.(run.read);
@@ -498,7 +558,7 @@ export class GeminiCalls {
     call.greeted = true; this.toBrowser(call, { type: 'interrupted' });
   }
   finish(call: GeminiCall) {
-    this.end(call, 'user'); this.end(call, 'assistant');
+    this.release(call); this.end(call, 'user'); this.end(call, 'assistant');
     this.context.rememberClose();
     call.closed = true; call.queue = []; call.direct = undefined; call.ready = false;
     clearTimeout(call.flushTimer); clearTimeout(call.goAway);
