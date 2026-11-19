@@ -115,7 +115,8 @@ export async function askService(pid: string, timeoutMs: number): Promise<Answer
   const address = verifiedAddress(pid, port, host);
   const at = `${isIP(address) === 6 ? `[${address}]` : address}:${port}`;
   let response: Response;
-  const signal = AbortSignal.timeout(Math.max(1, timeoutMs));
+  // Timers take whole milliseconds; the real clock gives fractions.
+  const signal = AbortSignal.timeout(Math.max(1, Math.ceil(timeoutMs)));
   try { response = await fetch(`http://${at}/api/status`, { headers: { Authorization: `Bearer ${token}` }, signal }); }
   catch { throw new Unknown(`no answer on ${at}`); }
   if (!response.ok) throw new Unknown(`HTTP ${response.status}`);
@@ -132,7 +133,7 @@ export async function askService(pid: string, timeoutMs: number): Promise<Answer
 export async function ask(service: string, timeoutMs: number, now: () => number = () => performance.now()): Promise<Answer> {
   try {
     const started = now();
-    const shown = spawnSync('systemctl', ['--user', 'show', '-p', 'MainPID', '--value', service], { encoding: 'utf8', timeout: Math.max(1, timeoutMs), killSignal: 'SIGKILL' });
+    const shown = spawnSync('systemctl', ['--user', 'show', '-p', 'MainPID', '--value', service], { encoding: 'utf8', timeout: Math.max(1, Math.ceil(timeoutMs)), killSignal: 'SIGKILL' });
     if (shown.error || shown.signal) throw new Unknown('systemctl did not answer in time');
     const pid = shown.stdout?.trim() || '';
     if (!/^[1-9][0-9]*$/.test(pid)) throw new Unknown('the main process of the running service is not known');

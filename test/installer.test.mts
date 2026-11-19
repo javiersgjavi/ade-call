@@ -8,7 +8,7 @@ import { once } from 'node:events';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { pathToFileURL } from 'node:url';
-import { waitWhileBusy, ask, BUSY, IDLE, UNKNOWN } from '../scripts/service-busy.mjs';
+import { waitWhileBusy, ask, askService, BUSY, IDLE, UNKNOWN } from '../scripts/service-busy.mjs';
 
 // The installer with simulated npm, systemctl and ADE CLIs, in a temporary
 // HOME: it never touches a real service. PATH has only the simulated tools
@@ -147,6 +147,15 @@ test('running again restarts an active service once it reports being idle, or an
     assert.equal(commands.match(new RegExp(restartPattern, 'g'))?.length, 1, label);
     assert.ok(commands.lastIndexOf('/sleep ') < commands.search(restartPattern), `${label}: it restarts after the last check`);
   }
+});
+
+test('a question with a fractional time left still reaches the service', async t => {
+  // The simulated clock above moves in whole milliseconds; performance.now()
+  // does not, and timers reject a fractional delay.
+  const { env } = sandbox(t, ['npm', 'systemctl', 't3']);
+  const requests = await service(t, env, [{ serviceBusy: false }]);
+  assert.equal(await askService(env.FAKE_PID!, 4980.625), IDLE);
+  assert.deepEqual(requests(), ['/api/status Bearer test-token']);
 });
 
 test('a service listening on IPv6, on a name or on every address is asked at its own socket', async t => {
