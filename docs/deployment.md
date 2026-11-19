@@ -16,7 +16,7 @@ flowchart LR
   end
 ```
 
-The phone only talks to two places: the proxy, for the page, pairing, API calls and the event stream, and OpenAI, for the call's audio. The proxy terminates TLS and forwards plain HTTP to ADE Call, which listens on loopback by default and is not reachable from the network on its own. ADE Call runs the ADE's CLI as the same user, so T3 or Orca must be installed and running on the same machine. It also needs outbound access to `api.openai.com` to create calls and run the voice's tool calls.
+The phone only talks to two places: the proxy, for the page, pairing, API calls and the event stream, and OpenAI, for the call's audio. The proxy terminates TLS and forwards plain HTTP to ADE Call, which listens on loopback by default and is not reachable from the network on its own. ADE Call runs the ADE's CLI as the same user, so T3 or Orca must be installed and running on the same machine. It also needs outbound access to `api.openai.com` to create calls and run the voice's tool calls, or to `generativelanguage.googleapis.com` with a [Gemini Live](gemini.md) model. With Gemini there is no WebRTC leg: the phone's audio goes through the proxy to ADE Call over a WebSocket (`/api/live/stream`). Caddy's `reverse_proxy` and Tailscale Serve forward WebSockets as they are; another proxy must allow the upgrade.
 
 ## Run as a systemd user service
 

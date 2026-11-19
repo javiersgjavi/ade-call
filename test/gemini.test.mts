@@ -451,6 +451,17 @@ for (const confirmFirst of [false, true]) test(`a send that finishes while the c
   assert.deepEqual(next.sent.filter(m => m.toolResponse).flatMap(m => m.toolResponse.functionResponses), [{ id: 'fc1', name: 'fake_send', response: { output: 'delivered' } }]);
 });
 
+test('a thread notice is not taken by a call whose provider socket is closing', async t => {
+  const f = fixture(); t.after(() => f.close());
+  const { session } = await f.start();
+  f.gemini.ready(session.id); f.said('Hi.'); f.done(); await wait(2600);
+  const notice = { kind: 'finished' as const, threadId: 't1', project: 'p', conversationId: 'current', title: 'T' };
+  f.upstream().readyState = 2;
+  assert.equal(f.gemini.threadNotice(notice), false, 'the watch keeps it');
+  f.upstream().readyState = 1;
+  assert.equal(f.gemini.threadNotice(notice), true);
+});
+
 test('hanging up closes both sockets and the heartbeat keeps the call alive', async t => {
   const f = fixture(); t.after(() => f.close());
   const { session } = await f.start();

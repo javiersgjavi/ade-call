@@ -12,13 +12,14 @@ t3 --help        # or: orca-ide --help
 
 - **Node 24+ and npm.** The server relies on Node's built-in SQLite and TypeScript support; older versions are not supported.
 - **An ADE on the same machine.** For T3, the `t3` CLI must be on `PATH` (or in `~/.local/bin/t3`) and have at least one project. If it lives elsewhere, set `T3_BIN` to its absolute path; if T3 keeps its data outside `~/.t3`, set `T3CODE_HOME`. The adapter is tested against T3 0.1.9; see [T3 compatibility](t3.md). For Orca, the `orca-ide` CLI must be on `PATH` or in `ORCA_BIN`, with its repositories registered (`orca-ide repo add --path /path/to/repo --json`). Do not point `ORCA_BIN` at `orca`, the Linux screen reader. One ADE is enough: on a machine with only Orca, T3 shows as unavailable.
+- **An API key for the voice.** OpenAI Realtime is the default; [Gemini Live](gemini.md) is an experimental alternative chosen in **Settings → Voice**. You need the key of the provider you use: for Gemini, a Gemini API key from Google AI Studio with billing, saved in **Settings → API keys** or set as `GEMINI_API_KEY`. The rest of this item and step 3 are about the OpenAI key.
 - **An OpenAI API key** with access to the Realtime model, on an account with billing set up and credit available. Create one following [OpenAI's quickstart](https://developers.openai.com/api/docs/quickstart). ADE Call only checks the key's format when you save it. Without credit, every call fails with `OpenAI Realtime could not create the call (429, …)` and OpenAI's quota message; a wrong key fails with `401`, and one without access to the model with `403`. See [Troubleshooting](troubleshooting.md#common-problems).
 
 Three different credentials are involved, and they do not replace each other:
 
 | Credential | Where it lives | What it is for |
 | --- | --- | --- |
-| OpenAI API key | `config.json` or `OPENAI_API_KEY` | The voice. Every call uses API quota. |
+| OpenAI or Gemini API key | `config.json`, `OPENAI_API_KEY` or `GEMINI_API_KEY` | The voice. Every call uses API quota. |
 | Your ADE's model providers | Inside T3 or Orca | The coding agents. ADE Call never sees them. |
 | Browser pairing | A cookie per browser | Access to this ADE Call. See [Access](access.md). |
 

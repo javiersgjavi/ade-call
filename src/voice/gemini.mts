@@ -570,7 +570,8 @@ export class GeminiCalls {
     return !call.conversationId || !this.context?.conversation || call.conversationId === this.context.conversation().id;
   }
   speakable(call: GeminiCall) {
-    return !call.closed && !call.closing && !!call.greeted && this.isCurrent(call) && !!call.ready && this.idle(call);
+    // A socket that is closing cannot take the notice: the watch keeps it for the next call.
+    return !call.closed && !call.closing && !!call.greeted && this.sendable(call) && this.idle(call);
   }
   ready(id: string) {
     const call = this.sessions.get(id);
