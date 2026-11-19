@@ -92,23 +92,36 @@ They never enter the send rule's history: only transcripts of your voice do.
 The rule is the one in [delivery-safety.md](delivery-safety.md); only the
 events that feed it differ.
 
-- Your words arrive as `inputTranscription` pieces. Each user turn is placed in
-  the conversation when its first piece arrives and its text grows with each
-  one, so a "yes" counts as a user turn as soon as it is transcribed.
+- Your words arrive as `inputTranscription` pieces, which Gemini sends
+  independently of the model's output. Pieces closer than 2 s belong to one
+  utterance, whatever the model says or finishes in between; only a pause
+  starts a new user turn. The utterance is placed in the conversation at its
+  first piece and its text grows with each one, so a "yes" counts as soon as it
+  is transcribed, and a late piece of the words a send already used never
+  authorizes another send. It is published to the conversation panel after the
+  pause.
 - A `toolCall` may carry several `functionCalls`. Each runs once per `id`
   through `DirectSession.run()`. A sending tool with no new user words waits up
   to 2.5 s for a transcript, then is refused with `NOT SENT (no_user_turn)`.
-  The results go back in one `toolResponse`.
+  The results go back in one `toolResponse`. A call ID the provider asks for
+  again gets the same result without running again.
 - If you speak over the model, Gemini may cancel calls (`toolCallCancellation`).
-  A read that was cancelled is dropped. A send that already ran, or may have,
-  is not undone: hanging up or interrupting never cancels ADE work. The model
-  is told its result in a note so it can tell you.
+  A send cancelled while it still waits for its transcript is abandoned and
+  sends nothing. A read that was cancelled is dropped. A send that already
+  ran, or may have, is not undone: hanging up or interrupting never cancels ADE
+  work. The model is told its result in a note so it can tell you, and the same
+  happens for a send that finishes while the connection is being renewed.
 
 ## Limits of the provider
 
 - A connection lasts about ten minutes. The server keeps the session over a new
-  connection with the latest resumption handle when Gemini sends `goAway` or
-  the connection drops (up to 12 times per call). Audio you send during the
+  connection with the latest resumption handle, up to 12 times per call, but
+  only from a checkpoint Gemini marked resumable (not while it runs a function
+  or generates), so the conversation is never rolled back. After `goAway` it
+  waits for such a checkpoint until shortly before the deadline; if none comes,
+  or the connection drops while the session is not resumable, the call ends
+  with a notice rather than continuing without its history. Nothing is sent to
+  a new connection before it confirms its setup; audio you speak during the
   switch is lost.
 - There is no request to cancel a response: barge-in is Gemini's own voice
   activity detection. **Interrupt** only empties the page's playback.
@@ -120,7 +133,10 @@ events that feed it differ.
 The engine is tested offline with simulated sockets
 ([test/gemini.test.mts](../test/gemini.test.mts)): setup content, history first,
 audio relay both ways, interruptions, transcripts, the send rule, duplicate
-call IDs, a late yes, cancelled sends, session resumption and hang-up. The
+call IDs, a late yes, late pieces of an utterance that already authorized a
+send, sends cancelled before and after dispatch, resumption only from a
+resumable checkpoint, no audio before a new connection's setup, results that
+finish during a reconnect, and hang-up. The
 socket route is tested for authentication and origin
 ([test/settings-http.test.mts](../test/settings-http.test.mts)).
 
