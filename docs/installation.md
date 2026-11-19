@@ -31,7 +31,7 @@ npm ci
 npm test
 ```
 
-Clone into a permanent folder, such as `~/ade-call`. The [systemd service](deployment.md#run-as-a-systemd-user-service) runs the server from this checkout (its `WorkingDirectory` and `ExecStart` point into it), so do not clone into a temporary directory and do not delete or move it afterwards. To update, `git pull` in the same folder; see [Updating](deployment.md#updating).
+Clone into a permanent folder, such as `~/ade-call`. The [systemd service](deployment.md#run-as-a-systemd-user-service) runs the server from this checkout (its `WorkingDirectory` and `ExecStart` point into it), so do not clone into a temporary directory and do not delete or move it afterwards. The folder's path must not contain a line break: systemd cannot use it, and the installer refuses it. To update, `git pull` in the same folder; see [Updating](deployment.md#updating).
 
 `npm test` compiles the TypeScript sources into `dist/` and runs the test suite against simulated providers. It needs no keys and does not touch your ADE. `npm ci` installs development dependencies, which the build needs; if `NODE_ENV=production` is set, use `npm ci --include=dev`.
 

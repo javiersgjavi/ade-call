@@ -5,6 +5,20 @@ const env = process.env as NodeJS.ProcessEnv & Record<'NODE_BIN' | 'T3CODE_HOME'
 // Quote systemd values, including specifiers and ExecStart variable expansion.
 const quote = (value: string) => '"' + value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%').replaceAll('\n', '\\n').replaceAll('\r', '\\r') + '"';
 const execQuote = (value: string) => quote(value.replaceAll('$', '$$'));
+// WorkingDirectory takes the path as is: systemd does not remove quotes there
+// (it would read them as part of the path) and has no escape for a line
+// break. Only specifiers are escaped. A path ending in a space or tab would
+// be trimmed, and one ending in a backslash would continue onto the next
+// line, so those end in "/." (the same directory).
+const workingDirectory = (path: string) => {
+  if (/[\r\n]/.test(path)) {
+    console.error(`Cannot install from ${JSON.stringify(path)}: systemd cannot use a working directory with a line break in its path. Move or rename the checkout.`);
+    process.exit(1);
+  }
+  const escaped = path.replaceAll('%', '%%');
+  return /[\\ \t]$/.test(escaped) ? `${escaped}/.` : escaped;
+};
+const cwd = workingDirectory(process.cwd());
 const settings: Record<string, string> = {
   PATH: `${dirname(env.NODE_BIN)}:${env.PATH}`,
   T3CODE_HOME: env.T3CODE_HOME,
@@ -22,7 +36,7 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-WorkingDirectory=${quote(process.cwd())}
+WorkingDirectory=${cwd}
 ExecStart=${execQuote(env.NODE_BIN)} ${execQuote(join(process.cwd(), 'dist/src/server.mjs'))}
 ${Object.entries(settings).map(([key, value]) => `Environment=${quote(`${key}=${value}`)}`).join('\n')}
 Restart=on-failure

@@ -5,7 +5,6 @@ if [[ "$(uname -s)" != Linux ]] || ! command -v systemctl >/dev/null; then
   exit 1
 fi
 systemctl --user show-environment >/dev/null
-project_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 export NODE_BIN="${NODE_BIN:-$(command -v node || true)}"
 if [[ -z "$NODE_BIN" ]] || ! command -v "$NODE_BIN" >/dev/null; then
   printf 'Install Node 24+, or set NODE_BIN.\n' >&2
@@ -36,7 +35,9 @@ export T3CODE_HOME="${T3CODE_HOME:-$HOME/.t3}"
 "$NODE_BIN" -e 'if (Number(process.versions.node.split(".")[0]) < 24) throw new Error("Node 24+ required")'
 mkdir -p "$ADE_CALL_STATE" "$ADE_CALL_CONFIG" "$HOME/.config/systemd/user"
 chmod 700 "$ADE_CALL_STATE" "$ADE_CALL_CONFIG"
-cd "$project_dir"
+# Not through $(pwd): command substitution drops trailing line breaks, which
+# could name another folder. CDPATH could too, for a relative path.
+CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 npm ci --include=dev --no-audit --no-fund
 npm run build
 "$NODE_BIN" dist/scripts/write-service.mjs
