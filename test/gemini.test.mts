@@ -175,6 +175,72 @@ test('a repeat of a call ID still running neither runs nor releases the utteranc
   assert.equal(f.runs.length, 1, 'the late words are still the utterance fc1 used');
 });
 
+// Moves the call to a new provider connection; hold: that connection waits for confirm().
+async function renew(f: ReturnType<typeof fixture>, hold = false) {
+  f.options.hold = hold;
+  f.upstream().server({ sessionResumptionUpdate: { resumable: true, newHandle: `h${f.sockets.length}` } });
+  f.upstream().server({ goAway: { timeLeft: '5s' } });
+  await wait();
+  return f.upstream();
+}
+
+test('a call cancelled before it started answers a later request for its ID with that outcome, without running', async t => {
+  const f = fixture(); t.after(() => f.close());
+  await f.start();
+  f.call('fake_send', 'fc1');
+  await wait(100);
+  f.upstream().server({ toolCallCancellation: { ids: ['fc1'] } });
+  await wait(200);
+  assert.deepEqual(f.responses(), [], 'the connection that cancelled it does not wait for it');
+  const next = await renew(f);
+  next.server({ toolCall: { functionCalls: [{ id: 'fc1', name: 'fake_send', args: {} }] } });
+  await wait();
+  const [response] = next.sent.filter(m => m.toolResponse).flatMap(m => m.toolResponse.functionResponses);
+  assert.equal(response.id, 'fc1'); assert.match(response.response.output, /^NOT RUN/);
+  assert.equal(f.runs.length, 0);
+});
+
+test('a renewed connection that asks again for a call the old one cancelled after dispatch gets its result', async t => {
+  let release!: () => void;
+  const f = fixture({ execute: () => new Promise(resolve => { release = () => resolve({ text: 'delivered' }); }) }); t.after(() => f.close());
+  await f.start();
+  f.heard('Yes.');
+  f.call('fake_send', 'fc1');
+  await wait();
+  f.upstream().server({ toolCallCancellation: { ids: ['fc1'] } });
+  const next = await renew(f);
+  next.server({ toolCall: { functionCalls: [{ id: 'fc1', name: 'fake_send', args: {} }] } });
+  release(); await wait(100);
+  assert.deepEqual(next.sent.filter(m => m.toolResponse).flatMap(m => m.toolResponse.functionResponses), [{ id: 'fc1', name: 'fake_send', response: { output: 'delivered' } }]);
+  assert.equal(next.sent.filter(m => m.clientContent?.turnComplete).length, 0, 'no note as well');
+  assert.equal(f.runs.length, 1);
+});
+
+test('replaying a cached result answers the held utterance and drops its queued note', async t => {
+  let release!: () => void;
+  const f = fixture({ execute: () => new Promise(resolve => { release = () => resolve({ text: 'delivered' }); }) }); t.after(() => f.close());
+  await f.start();
+  f.heard('Yes.');
+  f.call('fake_send', 'fc1');
+  await wait();
+  const next = await renew(f, true);
+  release(); await wait();
+  // In one read: setup confirmed, the model already speaking, and a request for fc1 again.
+  next.confirm();
+  next.server({ serverContent: { modelTurn: { parts: [{ inlineData: { mimeType: 'audio/pcm;rate=24000', data: Buffer.from([1, 1]).toString('base64') } }] } } });
+  next.server({ toolCall: { functionCalls: [{ id: 'fc1', name: 'fake_send', args: {} }] } });
+  await wait();
+  assert.deepEqual(next.sent.filter(m => m.toolResponse).flatMap(m => m.toolResponse.functionResponses), [{ id: 'fc1', name: 'fake_send', response: { output: 'delivered' } }]);
+  next.server({ serverContent: { outputTranscription: { text: 'Sent.' } } });
+  next.server({ serverContent: { turnComplete: true } });
+  await wait(300);
+  assert.equal(next.sent.filter(m => m.clientContent?.turnComplete && /renewed/.test(JSON.stringify(m))).length, 0, 'the result is not announced twice');
+  f.heard('Now tell it to add docs.');
+  f.call('fake_send', 'fc2');
+  await wait();
+  assert.equal(f.runs.length, 2, 'the answered utterance was released: a new request authorizes');
+});
+
 test('a result note still queued does not let the end of other speech release the utterance', async t => {
   let release!: () => void;
   const f = fixture({ execute: () => new Promise(resolve => { release = () => resolve({ text: 'delivered' }); }) }); t.after(() => f.close());

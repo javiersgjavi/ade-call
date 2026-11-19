@@ -112,7 +112,9 @@ events that feed it differ.
   The results go back in one `toolResponse`. A call ID the provider asks for
   again never runs again: if it already finished it gets the same result, and
   if it is still running the result goes, when it ends, to the connection that
-  asked last.
+  asked last; if it was abandoned before it started, it gets `NOT RUN`. A
+  cancellation counts only for the connection that sent it: a renewed
+  connection that asks for the call again still gets its result.
 - If you speak over the model, Gemini may cancel calls (`toolCallCancellation`).
   A send cancelled while it still waits for its transcript is abandoned and
   sends nothing. A read that was cancelled is dropped. A send that already

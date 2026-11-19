@@ -38,7 +38,7 @@ export function voiceLanguageText(key: VoiceLanguageText, vars: Vars = {}) {
 // greeting request, the wrapper of a server note where the provider has no
 // system role (Gemini Live), the result of a tool call the provider cancelled
 // or that finished while the connection was renewed, and an agent's message in a notice.
-export type VoiceNote = 'greeting' | 'note' | 'cancelled' | 'reconnected' | 'agentMessage';
+export type VoiceNote = 'greeting' | 'note' | 'cancelled' | 'reconnected' | 'abandoned' | 'agentMessage';
 let voiceNotes: Record<VoiceNote, string> | undefined;
 export function voiceNoteText(key: VoiceNote, vars: Vars = {}) {
   voiceNotes ??= json<Record<VoiceNote, string>>('voice_notes.json');

@@ -93,7 +93,9 @@ export interface GeminiCall {
   requested: Map<string, Socket | undefined>;
   direct?: DirectSession; items: number; user?: OpenItem; assistant?: OpenItem; held?: Held; order: Map<string, number>;
   greeted?: boolean; responding?: boolean; userSpeaking?: boolean; lastUserAt?: number;
-  toolsPending: Set<string>; cancelled: Set<string>;
+  // The connection that cancelled each call ID: a cancellation counts only
+  // while that connection is still the one waiting for the call.
+  toolsPending: Set<string>; cancelled: Map<string, Socket | undefined>;
   // callId: the note carries the result of that function call.
   queue: { text: string; speak: boolean; reply?: boolean; callId?: string }[]; flushTimer?: NodeJS.Timeout;
   usage: Record<string, number>; diagnosticsAt?: number; setup: Record<string, unknown>;
@@ -167,7 +169,7 @@ export class GeminiCalls {
     this.creating = true;
     const id = `gem_${randomUUID()}`, spoken = callLanguage(language, languages);
     const call: GeminiCall = { id, backend: this.context.snapshot?.backend, conversationId: this.context.conversation?.().id, seen: Date.now(), closed: false,
-      resumes: 0, items: 0, order: new Map(), toolsPending: new Set(), cancelled: new Set(), results: new Map(), requested: new Map(), queue: [], usage: {}, setup: this.setup(spoken) };
+      resumes: 0, items: 0, order: new Map(), toolsPending: new Set(), cancelled: new Map(), results: new Map(), requested: new Map(), queue: [], usage: {}, setup: this.setup(spoken) };
     this.sessions.set(id, call);
     try {
       const direct = call.direct = new DirectSession(this.ade);
@@ -346,13 +348,13 @@ export class GeminiCalls {
       // that asked last.
       const functionCalls = message.toolCall.functionCalls.filter(fc => fc.id);
       const answered = functionCalls.filter(fc => call.results.has(fc.id!));
-      if (answered.length) this.send(call, { toolResponse: { functionResponses: answered.map(fc => ({ id: fc.id, name: call.results.get(fc.id!)!.name, response: { output: call.results.get(fc.id!)!.output } })) } });
+      if (answered.length) this.answer(call, answered.map(fc => ({ id: fc.id!, name: call.results.get(fc.id!)!.name, response: { output: call.results.get(fc.id!)!.output } })));
       for (const fc of functionCalls) if (call.requested.has(fc.id!)) call.requested.set(fc.id!, call.upstream);
       const calls = functionCalls.filter(fc => !call.results.has(fc.id!) && !call.requested.has(fc.id!) && !call.direct?.toolIds.has(fc.id!));
       for (const fc of calls) { call.toolsPending.add(fc.id!); call.requested.set(fc.id!, call.upstream); this.slot(call, `fn:${fc.id}`); }
       if (calls.length) void this.tools(call, calls);
     }
-    for (const id of message.toolCallCancellation?.ids || []) call.cancelled.add(id);
+    for (const id of message.toolCallCancellation?.ids || []) call.cancelled.set(id, call.upstream);
   }
   // A piece of the user's transcript. The send rule reads it as it arrives:
   // a yes is a user turn as soon as its first words are transcribed. Pieces
@@ -446,26 +448,45 @@ export class GeminiCalls {
       call.toolsPending.delete(fc.id);
       // A renewed connection that did not ask for this call does not wait for it.
       const sendable = call.requested.get(fc.id) === call.upstream && this.sendable(call);
+      const cancelled = this.isCancelled(call, fc.id);
       call.requested.delete(fc.id);
-      if (!run) continue;
+      // Abandoned before it started (cancelled, or the call ended): nothing ran,
+      // and a repeat of the ID gets this outcome instead of waiting forever.
+      if (!run) {
+        const output = voiceNoteText('abandoned');
+        call.results.set(fc.id, { name: fc.name, output });
+        if (sendable && !cancelled) responses.push({ id: fc.id, name: fc.name, response: { output } });
+        continue;
+      }
       call.results.set(fc.id, { name: fc.name, output: run.output });
       // A send that ran, or may have, is told to the model even when its call
       // was dropped; reads are not.
       const tool = this.ade.tools.find(t => t.name === fc.name);
       const told = tool?.sends && (run.status === 'completed' || run.status === 'unknown');
-      if (call.cancelled.has(fc.id) || !sendable) {
-        if (told) this.system(call, voiceNoteText(call.cancelled.has(fc.id) ? 'cancelled' : 'reconnected', { tool: run.name, output: run.output }), true, true, fc.id);
+      if (cancelled || !sendable) {
+        if (told) this.system(call, voiceNoteText(cancelled ? 'cancelled' : 'reconnected', { tool: run.name, output: run.output }), true, true, fc.id);
         // Nothing reaches the model for this call: its utterance stays held until the user speaks again.
         continue;
       }
       responses.push({ id: fc.id, name: fc.name, response: { output: run.output } });
     }
     if (call.closed || call.closing) return;
-    if (responses.length) {
-      this.send(call, { toolResponse: { functionResponses: responses } });
-      if (call.held && responses.some(response => response.id === call.held!.callId)) call.held.responded = true;
-    }
+    if (responses.length) this.answer(call, responses);
     this.flush(call);
+  }
+  // Writes function responses. A held utterance whose result is among them is
+  // answered now, and a note still queued with the same result is dropped.
+  answer(call: GeminiCall, responses: { id: string; name?: string; response: { output: string } }[]) {
+    if (!this.sendable(call)) return;
+    this.send(call, { toolResponse: { functionResponses: responses } });
+    const ids = new Set(responses.map(response => response.id));
+    call.queue = call.queue.filter(item => !item.callId || !ids.has(item.callId));
+    if (call.held && ids.has(call.held.callId)) call.held.responded = true;
+  }
+  // Cancelled for the connection that is waiting for it now; a renewed
+  // connection that asked for the call again still wants it.
+  isCancelled(call: GeminiCall, id: string) {
+    return call.cancelled.has(id) && call.cancelled.get(id) === call.requested.get(id);
   }
   async tool(call: GeminiCall, fc: FunctionCallPart) {
     const direct = call.direct;
@@ -479,7 +500,7 @@ export class GeminiCalls {
         // The transcript of a yes can arrive after the call it authorizes.
         // A call the provider cancelled meanwhile is abandoned: nothing is sent.
         beforeSend: async () => {
-          const cancelled = () => call.cancelled.has(fc.id!);
+          const cancelled = () => this.isCancelled(call, fc.id!);
           for (let waited = 0; direct.sendRefusal() && waited < TRANSCRIPT_WAIT_MS && !call.closed && !cancelled(); waited += 100) await new Promise(resolve => setTimeout(resolve, 100));
           const go = !call.closed && !call.closing && !cancelled() && this.isCurrent(call);
           // The send uses the utterance now, before it runs: hold it from this moment.
