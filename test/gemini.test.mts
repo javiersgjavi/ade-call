@@ -103,6 +103,17 @@ test('a refused setup is a provider error with its reason, and leaves no call be
   await assert.rejects(missing.gemini.create(), (error: Error) => error instanceof StatusError && error.status === 503);
 });
 
+test('a failure while preparing a call leaves the engine free for the next one', async t => {
+  const f = fixture(); t.after(() => f.close());
+  const conversation = f.gemini.context.conversation!;
+  f.gemini.context.conversation = () => { throw new Error('store unavailable'); };
+  await assert.rejects(f.gemini.create(), /store unavailable/);
+  assert.equal(f.gemini.busy, false); assert.equal(f.gemini.sessions.size, 0);
+  f.gemini.context.conversation = conversation;
+  await f.start();
+  assert.equal(f.gemini.sessions.size, 1);
+});
+
 test('audio is relayed both ways and an interruption empties the page\'s playback', async t => {
   const f = fixture(); t.after(() => f.close());
   await f.start();

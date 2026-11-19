@@ -166,10 +166,11 @@ export class GeminiCalls {
     if (!this.key) throw new StatusError(503, 'The Gemini key is missing on the server.');
     if (this.creating || this.sessions.size) throw new StatusError(409, 'There is already a call active or connecting.');
     if (this.stopping) throw new StatusError(503, 'The service is stopping.');
-    this.creating = true;
     const id = `gem_${randomUUID()}`, spoken = callLanguage(language, languages);
+    // Built before the engine counts as busy: a failure here leaves nothing behind.
     const call: GeminiCall = { id, backend: this.context.snapshot?.backend, conversationId: this.context.conversation?.().id, seen: Date.now(), closed: false,
       resumes: 0, items: 0, order: new Map(), toolsPending: new Set(), cancelled: new Map(), results: new Map(), requested: new Map(), queue: [], usage: {}, setup: this.setup(spoken) };
+    this.creating = true;
     this.sessions.set(id, call);
     try {
       const direct = call.direct = new DirectSession(this.ade);
