@@ -36,8 +36,8 @@ export T3CODE_HOME="${T3CODE_HOME:-$HOME/.t3}"
 mkdir -p "$ADE_CALL_STATE" "$ADE_CALL_CONFIG" "$HOME/.config/systemd/user"
 chmod 700 "$ADE_CALL_STATE" "$ADE_CALL_CONFIG"
 # Not through $(pwd): command substitution drops trailing line breaks, which
-# could name another folder.
-cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
+# could name another folder. CDPATH could too, for a relative path.
+CDPATH='' cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.."
 npm ci --include=dev --no-audit --no-fund
 npm run build
 "$NODE_BIN" dist/scripts/write-service.mjs

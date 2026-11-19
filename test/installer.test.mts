@@ -110,7 +110,7 @@ test('service installer generates isolated configuration with simulated npm/syst
   assert.equal(result.status, 0, result.stderr);
   const unit = unitOf(home);
   assert.equal(unit.split('\n').find(line => line.startsWith('WorkingDirectory=')),
-    `WorkingDirectory=${resolve('.').replaceAll('%', '%%')}`);
+    `WorkingDirectory=${resolve('.').replaceAll('%', '%%')}${/[\\ \t]$/.test(resolve('.')) ? '/.' : ''}`);
   assert.ok(unit.includes(`T3CODE_HOME=${env.T3CODE_HOME}`));
   assert.ok(unit.includes(`T3_BIN=${env.T3_BIN}`));
   assert.ok(unit.includes('ADE_CALL_TIME_ZONE=Europe/Madrid'));
@@ -162,22 +162,39 @@ for (const [label, ending] of [['space', ' '], ['tab', '\t'], ['backslash', '\\'
   });
 }
 
-test('the installer does not drop a line break at the end of its checkout path', async t => {
+// A checkout with only the installer and the unit writer, and an npm that
+// records, NUL-separated, the folders it runs in.
+function bareCheckout(home: string, bin: string, name: string) {
+  writeFileSync(join(bin, 'npm'), '#!/bin/sh\nprintf "%s\\0" "$PWD" >> "$HOME/npm-dirs"\n', { mode: 0o755 });
+  const checkout = join(home, name);
+  mkdirSync(join(checkout, 'dist/scripts'), { recursive: true });
+  mkdirSync(join(checkout, 'scripts'));
+  writeFileSync(join(checkout, 'scripts/install-user.sh'), readFileSync('scripts/install-user.sh'));
+  writeFileSync(join(checkout, 'dist/scripts/write-service.mjs'), readFileSync('dist/scripts/write-service.mjs'));
+  return { checkout, npmDirs: () => readFileSync(join(home, 'npm-dirs'), 'utf8').split('\0').filter(Boolean) };
+}
+
+test('the installer does not drop a line break at the end of its checkout path', t => {
   // $(pwd) would turn "checkout\n" into "checkout", a sibling folder.
   const { home, bin, env } = sandbox(t, ['systemctl']);
-  writeFileSync(join(bin, 'npm'), '#!/bin/sh\nprintf "%s\\0" "$PWD" >> "$HOME/npm-dirs"\n', { mode: 0o755 });
-  const checkout = join(home, 'checkout\n'), sibling = join(home, 'checkout');
-  for (const dir of [checkout, sibling]) mkdirSync(join(dir, 'scripts'), { recursive: true });
-  writeFileSync(join(checkout, 'scripts/install-user.sh'), readFileSync('scripts/install-user.sh'));
-  mkdirSync(join(checkout, 'dist/scripts'), { recursive: true });
-  writeFileSync(join(checkout, 'dist/scripts/write-service.mjs'), readFileSync('dist/scripts/write-service.mjs'));
+  const { checkout, npmDirs } = bareCheckout(home, bin, 'checkout\n');
+  mkdirSync(join(home, 'checkout/scripts'), { recursive: true });
   const child = spawnSync('bash', [join(checkout, 'scripts/install-user.sh')], { env: { ...env, T3_BIN: process.execPath }, encoding: 'utf8' });
   assert.notEqual(child.status, 0);
   assert.match(child.stderr, /line break/);
   assert.equal(existsSync(join(home, '.config/systemd/user/ade-call.service')), false);
-  // NUL-separated: the checkout's own name ends in a line break.
-  const npmDirs = readFileSync(join(home, 'npm-dirs'), 'utf8').split('\0');
-  assert.ok(npmDirs.includes(checkout) && !npmDirs.includes(sibling), JSON.stringify(npmDirs));
+  assert.deepEqual(npmDirs(), [checkout, checkout]);
+});
+
+test('the installer run by a relative path ignores CDPATH', t => {
+  const { home, bin, env } = sandbox(t, ['systemctl']);
+  const { checkout, npmDirs } = bareCheckout(home, bin, 'checkout');
+  const other = join(home, 'other');
+  mkdirSync(join(other, 'scripts'), { recursive: true });
+  const child = spawnSync('bash', ['scripts/install-user.sh'], { cwd: checkout, env: { ...env, T3_BIN: process.execPath, CDPATH: other }, encoding: 'utf8' });
+  assert.equal(child.status, 0, child.stderr);
+  assert.deepEqual(npmDirs(), [checkout, checkout]);
+  assert.ok(unitOf(home).split('\n').includes(`WorkingDirectory=${checkout}`), unitOf(home));
 });
 
 test('systemd-analyze verifies the generated service settings', t => {
