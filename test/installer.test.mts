@@ -8,7 +8,7 @@ import { once } from 'node:events';
 import http from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { pathToFileURL } from 'node:url';
-import { waitWhileBusy, ask, BUSY, IDLE, UNKNOWN } from '../scripts/service-busy.mjs';
+import { waitWhileBusy, ask, askService, BUSY, IDLE, UNKNOWN } from '../scripts/service-busy.mjs';
 
 // The installer with simulated npm, systemctl and ADE CLIs, in a temporary
 // HOME: it never touches a real service. PATH has only the simulated tools
@@ -147,6 +147,20 @@ test('running again restarts an active service once it reports being idle, or an
     assert.equal(commands.match(new RegExp(restartPattern, 'g'))?.length, 1, label);
     assert.ok(commands.lastIndexOf('/sleep ') < commands.search(restartPattern), `${label}: it restarts after the last check`);
   }
+});
+
+test('a question with a fractional time left still reaches the service', async t => {
+  // The simulated clock above moves in whole milliseconds; performance.now()
+  // does not, and timers reject a fractional delay.
+  const { env } = sandbox(t, ['npm', 'systemctl', 't3']);
+  const requests = await service(t, env, [{ serviceBusy: false }]);
+  assert.equal(await askService(env.FAKE_PID!, 4980.625), IDLE);
+  // The whole question, including the systemctl lookup of the main process.
+  const saved = { HOME: process.env.HOME, PATH: process.env.PATH, FAKE_PID: process.env.FAKE_PID };
+  Object.assign(process.env, { HOME: env.HOME, PATH: env.PATH, FAKE_PID: env.FAKE_PID });
+  try { assert.equal(await ask('ade-call.service', 4980.625), IDLE); }
+  finally { for (const [key, value] of Object.entries(saved)) { if (value === undefined) delete process.env[key]; else process.env[key] = value; } }
+  assert.deepEqual(requests(), ['/api/status Bearer test-token', '/api/status Bearer test-token']);
 });
 
 test('a service listening on IPv6, on a name or on every address is asked at its own socket', async t => {
