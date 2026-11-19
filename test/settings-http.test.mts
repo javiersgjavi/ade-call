@@ -7,6 +7,7 @@ import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import net from 'node:net';
 import http from 'node:http';
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Settings → Voice and OpenAI API key, against an isolated server with no
 // provider: nothing here reaches OpenAI. The keys are invented.
@@ -113,7 +114,21 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
 
   // Gemini Live: the model picks the provider, and its own key decides whether voice is ready.
   assert.equal((await post('/api/settings/key', { provider: 'other', key: geminiKey })).status, 400);
+  // A call request still arriving while Settings switches the provider is refused, not opened on the old one.
+  const prefix = '{"provider":"realtime","backend":"t3","sdp":"v=0';
+  let finishLive!: () => void;
+  const pending = new Promise<{ status: number; body: string }>(resolve => {
+    const request = http.request(base + '/api/live', { method: 'POST', headers: { ...bearer, 'Content-Length': '200' } }, response => {
+      let text = ''; response.on('data', chunk => { text += chunk; }); response.on('end', () => resolve({ status: response.statusCode || 0, body: text }));
+    });
+    request.write(prefix);
+    finishLive = () => request.end('"'.padEnd(200 - prefix.length - 1, ' ') + '}');
+  });
+  await wait(100);
   const gemini = await post('/api/settings/voice', { model: 'gemini-3.8-live', geminiVoice: 'Puck' });
+  finishLive();
+  const late = await pending;
+  assert.equal(late.status, 409, late.body); assert.match(late.body, /voice model has changed/);
   assert.equal(gemini.status, 200); assert.equal(gemini.body.provider, 'gemini');
   let geminiStatus = (await call('/api/status', { headers: bearer })).body;
   assert.equal(geminiStatus.voiceReady, false, 'no Gemini key yet'); assert.equal(geminiStatus.voiceModel.provider, 'gemini'); assert.equal(geminiStatus.voiceModel.voice, 'Puck');

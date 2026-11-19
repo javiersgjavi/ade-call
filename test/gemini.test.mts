@@ -184,6 +184,36 @@ async function renew(f: ReturnType<typeof fixture>, hold = false) {
   return f.upstream();
 }
 
+test('an ID repeated in one message runs once, and every later request for it gets the same result', async t => {
+  const f = fixture({ execute: async () => ({ text: 'delivered' }) }); t.after(() => f.close());
+  await f.start();
+  f.heard('Yes.');
+  f.upstream().server({ toolCall: { functionCalls: [{ id: 'fc1', name: 'fake_send', args: {} }, { id: 'fc1', name: 'fake_send', args: {} }] } });
+  await wait();
+  f.call('fake_send', 'fc1');
+  await wait();
+  assert.equal(f.runs.length, 1);
+  assert.deepEqual(f.responses().map(r => r.response.output), ['delivered', 'delivered']);
+});
+
+test('a result note is kept while the provider socket is closing and reaches the renewed connection once', async t => {
+  let release!: () => void;
+  const f = fixture({ execute: () => new Promise(resolve => { release = () => resolve({ text: 'delivered' }); }) }); t.after(() => f.close());
+  await f.start();
+  f.heard('Yes.');
+  f.call('fake_send', 'fc1');
+  await wait();
+  const old = f.upstream();
+  old.server({ sessionResumptionUpdate: { resumable: true, newHandle: 'h1' } });
+  old.server({ toolCallCancellation: { ids: ['fc1'] } });
+  old.readyState = 2; // CLOSING: no close event yet.
+  release(); await wait();
+  assert.equal(old.sent.filter(m => m.clientContent?.turnComplete && /fake_send/.test(JSON.stringify(m))).length, 0, 'not written to a closing socket');
+  old.close(1011); await wait(100);
+  const notes = f.upstream().sent.filter(m => m.clientContent?.turnComplete && /fake_send/.test(JSON.stringify(m)));
+  assert.notEqual(f.upstream(), old); assert.equal(notes.length, 1);
+});
+
 test('a call cancelled before it started answers a later request for its ID with that outcome, without running', async t => {
   const f = fixture(); t.after(() => f.close());
   await f.start();

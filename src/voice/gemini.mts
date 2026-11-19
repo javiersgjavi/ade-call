@@ -346,7 +346,8 @@ export class GeminiCalls {
       // A call ID never runs twice. One already answered gets the same result
       // again; one still running is answered, when it ends, to the connection
       // that asked last.
-      const functionCalls = message.toolCall.functionCalls.filter(fc => fc.id);
+      // An ID repeated within the same message counts once.
+      const functionCalls = message.toolCall.functionCalls.filter((fc, index, all) => fc.id && all.findIndex(other => other.id === fc.id) === index);
       const answered = functionCalls.filter(fc => call.results.has(fc.id!));
       if (answered.length) this.answer(call, answered.map(fc => ({ id: fc.id!, name: call.results.get(fc.id!)!.name, response: { output: call.results.get(fc.id!)!.output } })));
       for (const fc of functionCalls) if (call.requested.has(fc.id!)) call.requested.set(fc.id!, call.upstream);
@@ -534,7 +535,8 @@ export class GeminiCalls {
   }
   replies(call: GeminiCall) { return call.queue.every(item => !item.speak || item.reply); }
   flush(call: GeminiCall) {
-    if (call.closed || call.closing || !call.ready || !call.queue.length) return;
+    // Nothing leaves the queue unless it can be written now (a closing socket keeps it for the next one).
+    if (call.closed || call.closing || !this.sendable(call) || !call.queue.length) return;
     const reply = this.replies(call);
     if (!this.idle(call, reply)) return this.later(call, reply ? 100 : 500);
     const items = call.queue.splice(0);

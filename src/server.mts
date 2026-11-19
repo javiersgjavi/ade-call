@@ -353,6 +353,8 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'POST' && url.pathname === '/api/live') {
       const data = await body(req);
+      // Chosen after the body arrives: Settings may have changed the provider meanwhile.
+      const voice = activeEngine(current);
       if (!voice) return json(res, 409, { error: unavailable(adapter) });
       if (voiceBusy() || shuttingDown || (data.conversationId && data.conversationId !== store.conversation(backend).id) || (data.backend && data.backend !== backend)) return json(res, 409, { error: 'There is another call or the destination has changed. Reload the page.' });
       // The page names the provider it prepared audio for; a change in Settings since then needs a reload.
