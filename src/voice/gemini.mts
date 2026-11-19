@@ -615,11 +615,11 @@ export class GeminiCalls {
     call.greeted = true; this.toBrowser(call, { type: 'interrupted' });
   }
   finish(call: GeminiCall) {
-    this.release(call); this.end(call, 'user'); this.end(call, 'assistant');
-    this.context.rememberClose();
+    // The call ends even if recording it fails: persistence here is best effort.
+    try { this.release(call); this.end(call, 'user'); this.end(call, 'assistant'); this.context.rememberClose(); } catch { /* Kept as far as it got. */ }
     call.closed = true; call.queue = []; call.direct = undefined; call.ready = false;
     clearTimeout(call.flushTimer); clearTimeout(call.goAway);
-    this.store.meta(`usage:${call.id}`, call.usage);
+    try { this.store.meta(`usage:${call.id}`, call.usage); } catch { /* Usage is diagnostic only. */ }
   }
   close(id: string, reason = 'the user hung up.') {
     const call = this.sessions.get(id);
