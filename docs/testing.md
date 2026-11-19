@@ -1,6 +1,6 @@
 # Testing
 
-The test suite runs offline. It simulates the OpenAI Realtime API, the WebSockets,
+The test suite runs offline. It simulates the OpenAI Realtime and Gemini Live APIs, the WebSockets,
 the T3 and Orca CLIs and T3's SQLite database, so it needs no API key and no ADE
 installed. It proves that the server enforces its rules; it cannot prove how a model
 behaves in a real call, including whether it sends only after the user accepts
@@ -27,6 +27,7 @@ Python test `test/project-sync_test.py`. Shared doubles live in `test/fixtures.m
 | --- | --- | --- |
 | HTTP and access | `http`, `browser-http`, `browser-access` | Authentication on every route, origin and CSRF checks, single-use expiring pairing codes stored as hashes, session renewal and revocation, codes created from the page (`POST /api/browsers/pair`: authorization, Origin, names, no address taken from `Host`, single redemption, the pending cap), origin changes revoking old sessions, attempt throttling, MIME types and the page's CSP. |
 | Settings | `settings-http`, `voice-settings`, `realtime` | Voice settings and key endpoints with bearer and cookie authentication and Origin, strict validation of every field and of the key format, values applied without a restart to `/api/status`, every ADE and the next call, refused while a call is active or connecting, `config.json` replaced atomically with mode `0600` keeping unknown fields and never overwritten when invalid, a saved key over `OPENAI_API_KEY`, and no key or key fragment in any response or log. |
+| Gemini Live | `gemini`, `settings-http` | Setup with the ADE tools declared `BLOCKING` (none on 3.1), history and catalog as client content first, the key only on the server, audio relayed both ways, interruptions, streamed transcripts, the send rule and one execution per call ID, a late yes, cancelled sends told to the model, session resumption on `goAway`, hang-up, and the audio socket's authentication and origin checks. Not a real call: see [gemini.md](gemini.md#what-has-been-verified). |
 | Voice engine | `realtime`, `live-events`, `call-lifecycle`, `interruptions`, `voice-result` | WebRTC session setup with an invented ADE, turn-taking settings, the send rule, one execution per call ID, waiting for the transcript that authorizes a send, interruptions before and after dispatch, oversized answers. Also checks the engine imports no T3 or Orca code. |
 | Send authorization | `intent`, `tool-guidance` | Authorization comes only from the latest user turn; distinct call IDs give distinct request IDs; a reused request ID with other content is rejected. |
 | Delivery safety | `t3`, `uncertain-delivery`, `tool-failure` | Deduplication across reconnects and restarts, a pending row blocking concurrent duplicates, uncertain deliveries never retried, verification by the reference line only in a user message of the right thread, release by user decision, replacing an archived main thread. |

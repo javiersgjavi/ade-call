@@ -61,7 +61,7 @@ Keep the key out of chats, shell history and command lines. Two ways do this:
 
   `printf` is a shell builtin, so the key never appears in the process list. If `config.json` exists but is not valid JSON, the script stops and leaves it untouched.
 
-- **From the page.** Start the server and pair the browser first (steps 4 and 5), then open **Settings → API key** and press **Save key**. The server writes the same field with the same permissions; the page never shows the key again. See [Settings](configuration.md#settings).
+- **From the page.** Start the server and pair the browser first (steps 4 and 5), then open **Settings → API keys** and press **Save key**. The server writes the same field with the same permissions; the page never shows the key again. See [Settings](configuration.md#settings).
 
 `openaiKey` is the only required field. The voice model, voice, reasoning effort, turn detection and noise reduction are optional and listed in [Configuration](configuration.md). As an alternative to the file, export `OPENAI_API_KEY` in the environment of the server; the file takes priority. `.env` files are not read.
 

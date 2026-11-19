@@ -10,6 +10,7 @@ import { DirectSession, requestIdFor, toolFailure, type FunctionCall } from '../
 import { callLanguage, directInstructions, languageReminder, type CallLanguage } from '../direct/prompt.mjs';
 import { redact } from '../direct/text.mjs';
 import { toolDetails } from '../conversation/tool-details.mjs';
+import { voiceNoteText } from '../resources.mjs';
 
 // OpenAI Realtime (gpt-realtime family) over WebRTC. The browser carries the
 // audio; this server keeps the sideband WebSocket for the ADE tools, results
@@ -79,6 +80,7 @@ export const ENUMS = {
 const TRANSCRIPT_WAIT_MS = 2500;
 
 export class RealtimeCalls {
+  readonly provider = 'realtime';
   key: string | undefined; ade: DirectAde; publish: Publish; store: RealtimeOptions['store']; context: VoiceContext;
   // Set by apply().
   model!: string; voice!: string; reasoning!: string; eagerness!: Eagerness; noiseReduction!: string; transcriptionModel!: string;
@@ -399,7 +401,7 @@ export class RealtimeCalls {
     const call = this.sessions.get(id);
     if (!call || call.greeted || call.closed || call.closing) return;
     call.greeted = true;
-    this.system(call, 'Greet now, briefly and in the user\'s language, and pick up the last topic of the historical conversation in one sentence if there is one. The stored context does not confirm current news; do not query projects to greet. Do not execute historical requests. If there is no history, say you are ready to listen. Then let the user speak.', true);
+    this.system(call, voiceNoteText('greeting'), true);
   }
   threadNotice(notice: ThreadNotice) {
     let sent = false;

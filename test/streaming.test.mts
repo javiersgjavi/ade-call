@@ -97,7 +97,7 @@ test('a channel send failure still releases audio and reports the actual close c
 test('keepalives do not wait for stats, overlap requests, or let a late response close a newer call', async () => {
   const { readFileSync } = await import('node:fs'); const { runInNewContext } = await import('node:vm');
   const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
-  const source = app.slice(app.indexOf('const liveId = callId;'), app.indexOf('await currentPeer.setRemoteDescription'));
+  const source = app.slice(app.indexOf('function startHeartbeat('), app.indexOf('// The language fields of POST /api/live.')) + '\nstartHeartbeat(generation, callId, health);';
   for (const stale of [false, true]) {
     let tick!: () => void; const requests: { id: string }[] = [], closes: string[] = [];
     let resolve!: (data: { active: boolean }) => void;
@@ -117,7 +117,7 @@ test('keepalives do not wait for stats, overlap requests, or let a late response
 test('heartbeat deadlines abort and release the pending flag without AbortSignal.timeout', async () => {
   const { readFileSync } = await import('node:fs'); const { runInNewContext } = await import('node:vm');
   const app = readFileSync(new URL('../public/app.js', import.meta.url), 'utf8');
-  const source = app.slice(app.indexOf('const liveId = callId;'), app.indexOf('await currentPeer.setRemoteDescription'));
+  const source = app.slice(app.indexOf('function startHeartbeat('), app.indexOf('// The language fields of POST /api/live.')) + '\nstartHeartbeat(generation, callId, health);';
   let tick!: () => void, expire!: () => void, requests = 0, cleared = 0;
   const notices: string[] = [];
   const scope = { recordings: { current: null }, callId: 'call', languageChanged: false, callGeneration: 1, generation: 1, heartbeat: undefined,

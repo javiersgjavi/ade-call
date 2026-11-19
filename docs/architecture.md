@@ -59,6 +59,12 @@ browser has no part in this channel, the page cannot run a tool or bypass the
 server's send checks; tool calls are executed only from what the server
 receives on the sideband.
 
+With a Gemini model the call runs on [Gemini Live](gemini.md), which has no
+WebRTC leg and no sideband. The server opens the provider WebSocket itself and
+relays the audio over a second, authenticated WebSocket to the page
+(`/api/live/stream`): audio does pass through the server then, and tool calls
+still arrive only on the server's socket.
+
 **Application traffic** between the page and the server is plain HTTPS: JSON
 requests for status, projects and call lifecycle, and one Server-Sent Events
 stream (`/api/events`) for transcripts, tool runs and notices. Every request is

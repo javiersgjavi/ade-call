@@ -1,0 +1,131 @@
+# Gemini Live
+
+ADE Call can run a call on Google's Gemini Live API instead of OpenAI
+Realtime. You choose it by picking a Gemini model in **Settings → Voice**; the
+model decides the provider. Everything above the provider stays the same: the
+same instructions, the same ADE tools, the same [send rule](delivery-safety.md#the-send-rule),
+the same conversation panel and thread notices. The code is in
+[src/voice/gemini.mts](../src/voice/gemini.mts) (server) and
+[public/relayed-call.ts](../public/relayed-call.ts) with
+[public/pcm-capture.ts](../public/pcm-capture.ts) (page).
+
+The voice model calls the ADE tools itself, through Gemini Live's function
+calling. No other model or agent sits between the voice and the tools.
+
+## Models
+
+| Model | Function calling | Notes |
+| --- | --- | --- |
+| `gemini-3.8-live` (default Gemini choice) | Synchronous: the tools are declared `BLOCKING`, so the model waits for each result before it speaks about it, as with Realtime. | Interleaved reasoning built in; no reasoning setting. |
+| `gemini-3.1-flash-live-preview` | Always synchronous; the declarations carry no `behavior`. | Legacy preview. |
+
+`gemini-3.8-live-extended-thinking` is not offered: it only supports
+asynchronous function calling.
+
+## How a call works
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant B as Browser
+  participant S as Server
+  participant G as Gemini Live
+  participant A as ADE CLI
+  B->>S: POST /api/live (provider gemini)
+  S->>G: WebSocket + setup (instructions, tools, voice)
+  G-->>S: setupComplete
+  S->>G: clientContent: history, catalog
+  S-->>B: 201 (call id, stream path)
+  B->>S: WebSocket /api/live/stream
+  B->>S: POST /api/live/ready
+  S->>G: clientContent: greet
+  G-->>S: audio, transcripts
+  S-->>B: audio
+  B->>S: microphone PCM
+  S->>G: realtimeInput audio
+  G->>S: toolCall
+  S->>A: tool via DirectAde
+  S->>G: toolResponse
+```
+
+Gemini Live has no WebRTC leg and no sideband: whoever holds its socket
+receives the tool calls. So the server holds it, with the key, and relays the
+audio. This keeps the [architecture's](architecture.md) rule that the page
+cannot run a tool or bypass the send checks, at the cost of the audio passing
+through the server (about 32 KB/s up and 48 KB/s down).
+
+- **Up:** an AudioWorklet downsamples the microphone to 16 kHz mono 16-bit PCM
+  and sends 100 ms binary frames. Muting stops the frames and sends
+  `audio.end`, which the server forwards as `audioStreamEnd`.
+- **Down:** the model's 24 kHz PCM is played back to back through a
+  `MediaStream` on the page's `<audio>` element, so the browser's echo
+  cancellation, the speech indicator and diagnostic recordings treat it as
+  they treat a WebRTC track. On `interrupted` (the user spoke over the model)
+  the page drops the audio it has queued.
+- **Control:** the browser socket only carries audio, `session.started`,
+  `interrupted`, `turn.done` and `audio.end`. Transcripts, tool runs and notices
+  reach the page through the usual `/api/events` stream.
+
+The audio socket uses the API's authentication: a paired browser's cookie or
+the bearer token, the configured `Origin`, and only the browser (or token) that
+created the call, once. See [access.md](access.md).
+
+## Setup
+
+The `setup` message carries the instructions built by
+[`directInstructions()`](../src/direct/prompt.mts), the ADE's tools as
+`functionDeclarations` with the schemas from
+[resources/tools.json](../resources/tools.json), the prebuilt voice, input and
+output transcription (with your project names as `customVocabulary` on 3.8),
+`historyConfig.initialHistoryInClientContent`, sliding-window context
+compression and session resumption. The language is not set in the setup:
+native audio models follow the instructions and the user.
+
+Gemini Live has no system role. The resume of the conversation, the catalog,
+the greeting request, notices and the language reminder enter as `user`
+client content wrapped in a fixed header that says they are server notes and
+never authorize a send ([resources/voice_notes.json](../resources/voice_notes.json)).
+They never enter the send rule's history: only transcripts of your voice do.
+
+## The send rule with Gemini
+
+The rule is the one in [delivery-safety.md](delivery-safety.md); only the
+events that feed it differ.
+
+- Your words arrive as `inputTranscription` pieces. Each user turn is placed in
+  the conversation when its first piece arrives and its text grows with each
+  one, so a "yes" counts as a user turn as soon as it is transcribed.
+- A `toolCall` may carry several `functionCalls`. Each runs once per `id`
+  through `DirectSession.run()`. A sending tool with no new user words waits up
+  to 2.5 s for a transcript, then is refused with `NOT SENT (no_user_turn)`.
+  The results go back in one `toolResponse`.
+- If you speak over the model, Gemini may cancel calls (`toolCallCancellation`).
+  A read that was cancelled is dropped. A send that already ran, or may have,
+  is not undone: hanging up or interrupting never cancels ADE work. The model
+  is told its result in a note so it can tell you.
+
+## Limits of the provider
+
+- A connection lasts about ten minutes. The server keeps the session over a new
+  connection with the latest resumption handle when Gemini sends `goAway` or
+  the connection drops (up to 12 times per call). Audio you send during the
+  switch is lost.
+- There is no request to cancel a response: barge-in is Gemini's own voice
+  activity detection. **Interrupt** only empties the page's playback.
+- Turn taking, noise reduction, reasoning and the transcription model are
+  OpenAI settings; Settings hides them while a Gemini model is chosen.
+
+## What has been verified
+
+The engine is tested offline with simulated sockets
+([test/gemini.test.mts](../test/gemini.test.mts)): setup content, history first,
+audio relay both ways, interruptions, transcripts, the send rule, duplicate
+call IDs, a late yes, cancelled sends, session resumption and hang-up. The
+socket route is tested for authentication and origin
+([test/settings-http.test.mts](../test/settings-http.test.mts)).
+
+Not yet verified against the real service: a live call end to end, the audio
+quality and echo cancellation of the relay on phones, whether silent notes sent
+without `turnComplete` ever delay a reply, and the `x-goog-api-key` header on
+the WebSocket handshake. Treat Gemini as experimental until a real call has
+been made.
