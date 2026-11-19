@@ -7,7 +7,7 @@ browser carries the audio straight to OpenAI Realtime; the server owns
 everything that touches your projects: it builds the session, runs the tools
 the model calls, enforces the send rule and keeps the records.
 
-The [system design diagram in the README](../README.md#how-it-works) shows the
+The [diagram in How it works](how-it-works.md) shows the
 whole path at a glance. This page is the entry point for contributors. The
 details live in:
 

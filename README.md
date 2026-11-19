@@ -1,53 +1,62 @@
+<div align="center">
+
+<img src="docs/assets/banner.png" alt="ADE Call: talk to your coding agents by voice, from your phone, with T3 Code or Orca" width="100%">
+
 # ADE Call
 
-ADE Call lets you talk by voice, from your phone's browser, with the coding agents running in your ADE (agentic development environment): [T3 Code](docs/t3.md) or [Orca](docs/orca.md). The voice is OpenAI Realtime (`gpt-realtime-2.1` by default, or `gpt-realtime-2.1-mini`, chosen in Settings) and it uses the ADE's tools directly. It finds and reads threads, subagents, documents and terminal output to answer your questions. When you want work done, it is instructed to propose a concrete request and send it to a thread or agent only after you say yes; the server additionally refuses any send that does not follow something new you said. There is no text chat: the conversation is the call. You install it yourself on the machine where your ADE runs, and only you use it.
+**Call your coding agents from your phone.**<br>
+A voice line to the agents in [T3 Code](docs/t3.md) or [Orca](docs/orca.md), self-hosted on the machine where they run.
 
-## How it works
+[![Quality](https://github.com/javiersgjavi/ade-call/actions/workflows/quality.yml/badge.svg)](https://github.com/javiersgjavi/ade-call/actions/workflows/quality.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-ff6a3d)](LICENSE)
+![Node 24+](https://img.shields.io/badge/node-24%2B-5fe3ae)
+![Linux](https://img.shields.io/badge/platform-Linux-b0a7b8)
 
-```mermaid
-flowchart TB
-  phone["<b>Phone</b><br/>browser · microphone"]
-  rt["<b>OpenAI Realtime</b><br/>gpt-realtime-2.1 / 2.1-mini<br/>semantic turn detection · noise reduction · transcription"]
-  server["<b>ADE Call server</b><br/>direct ADE tools: find, list, read thread, read document, send"]
-  fp["<b>Change fingerprint</b><br/>ADE local DB, read-only<br/>under a millisecond"]
-  gate["<b>Confirmation gate</b><br/>the voice proposes: 'Shall I tell … to …?'"]
-  cache["<b>Cache</b><br/>no CLI call"]
-  cli["<b>ADE CLI</b><br/>~1 s per call"]
-  once["<b>ADE CLI, once</b><br/>journaled by request ID<br/>uncertain? never retried"]
-  ade["<b>ADE agents</b><br/>T3 threads · Orca terminals<br/>they do the real work"]
+[Quick start](#quick-start) · [How it works](docs/how-it-works.md) · [Documentation](docs/README.md)
 
-  phone <-->|"WebRTC · audio"| rt
-  rt <-->|"sideband WebSocket · tool calls"| server
-  server -->|read| fp
-  server -->|send| gate
-  fp -->|unchanged| cache
-  fp -->|changed| cli
-  gate -->|"user: 'yes'"| once
-  cli -->|"thread show · terminal read"| ade
-  once -->|"thread send · terminal send"| ade
-```
+</div>
 
-Audio goes straight from the phone to OpenAI Realtime over WebRTC; the server never relays it. The model decides when you have finished speaking and calls tools over a separate WebSocket that only the server holds, so the OpenAI key and every action on your projects stay on your machine.
+---
 
-Tools follow two paths. **Reads** first compare a fingerprint taken from the ADE's local database, read-only: if nothing changed since the last read, the cached answer is returned without starting the CLI; otherwise the CLI is called. (This cache exists for T3. Orca has no readable database, so its terminal reads always call the CLI and only its listings are cached for a few seconds.) **Sends** pass a gate: the voice first proposes the exact request and waits for your answer, and the server refuses a send unless you have spoken since the previous one. The send then runs through the ADE's CLI once, recorded in a journal under a request ID; if the result is uncertain it is never retried automatically. The agents in your ADE do the actual work. [Architecture](docs/architecture.md) and [delivery safety](docs/delivery-safety.md) explain each step.
+You leave an agent refactoring, go for a walk, and wonder whether it is stuck on a question. With ADE Call you open a page on your phone, press **Call** and ask. It reads your threads, tells you what happened and, if you want, passes the agent its next instruction.
 
-## What it can do, and what it cannot
+> **You:** How's the auth refactor in billing-api going?<br>
+> **ADE Call:** All 42 tests pass. The agent is waiting for your approval to run the database migration. Shall I tell it to run the migration now?<br>
+> **You:** Yes, go ahead.<br>
+> **ADE Call:** Done, I've sent it. I'll tell you when it finishes.
 
-It can:
+There is no text chat: the conversation is the call. The voice is OpenAI Realtime (`gpt-realtime-2.1` by default, or `gpt-realtime-2.1-mini`, chosen in Settings) and it uses the ADE's own CLI as its tools. You install it on the machine where your ADE runs, and only you use it.
 
-- List projects, find threads by spoken name, and read threads, subagents, documents (T3) and agent terminals (Orca).
-- Send a message to an existing thread or to a project's main thread, once, after you accept a concrete proposal. Whether your words accept it is judged by the model; the server enforces the mechanical part of the [delivery safety](docs/delivery-safety.md) rules: a new user turn for each send, one send per turn, deduplication and no automatic retry of an uncertain delivery.
-- Tell you during the call when an agent you just sent work to makes progress or finishes its turn (T3 only).
-- Speak your language. The interface is in English and Spanish.
-- Keep the conversation across calls and show the transcript and every tool run in the Conversation panel.
+## What you can ask
 
-It cannot:
+- *"What's every agent in the web project doing?"*
+- *"Read me the last message in the migration thread."*
+- *"Did the subagent that wrote the tests finish?"*
+- *"Tell the docs agent to also cover the new flag."*
 
-- Serve more than one person. Every paired browser has full access to the owner's projects. There are no accounts or roles.
-- Stop or cancel agents. Hanging up does not cancel work that was already sent either.
-- Read or continue Orca's structured chats, or notify you when an Orca agent finishes.
-- Run on macOS or Windows with any guarantee. Only Linux has been tested.
-- Run for free. Every call and every message the model writes uses your OpenAI API quota.
+It finds threads by the name you say out loud and reads threads, subagents and documents (T3 Code) or agent terminals (Orca) to answer.
+
+## Why you can trust it with your agents
+
+- **Nothing is sent without your yes.** It proposes the exact request first. The server refuses any send that does not follow something new you said, runs each send once and never retries an uncertain one automatically ([delivery safety](docs/delivery-safety.md)).
+- **Your keys stay home.** Audio goes from the phone straight to OpenAI; the OpenAI key and every action on your projects stay on your machine.
+- **It keeps the record.** The conversation carries across calls, and the Conversation panel shows the transcript and every tool run.
+
+## And a few more things
+
+- **It tells you when the agent is done.** During the call it lets you know when an agent you just sent work to makes progress or finishes its turn (T3 Code only).
+- **It answers quickly.** With T3 Code, a read-only fingerprint of the local database skips the CLI when nothing changed.
+- **It speaks your language.** The voice follows whichever language you use; the interface is in English and Spanish.
+
+See [How it works](docs/how-it-works.md) for the full path from your phone to the agents.
+
+## What it does not do
+
+- It is for one person. Every paired browser has full access to the owner's projects; there are no accounts or roles.
+- It does not stop or cancel agents, and hanging up does not cancel work already sent.
+- It cannot read or continue Orca's structured chats, or tell you when an Orca agent finishes.
+- Only Linux has been tested. macOS and Windows may work, with no guarantee.
+- It is not free. Every call and every message the model writes uses your OpenAI API quota.
 
 ## Requirements
 
@@ -96,6 +105,7 @@ You can give this repository to your coding agent and ask:
 | [Deployment](docs/deployment.md) | systemd service, phone access over HTTPS (Caddy or Tailscale Serve), updates, backups |
 | [Access](docs/access.md) | Pairing browsers, sessions, revocation, security model |
 | [Troubleshooting](docs/troubleshooting.md) | Symptoms and fixes, voice diagnostics, recovery |
+| [How it works](docs/how-it-works.md) | The path of a call, reads and sends, with a diagram |
 | [Architecture](docs/architecture.md) | Components and request flows |
 | [Delivery safety](docs/delivery-safety.md) | When and how the voice may send a request |
 
