@@ -1,6 +1,7 @@
 import type { Scenario } from './scenario.mjs';
 import type { RunRecord } from './runner.mjs';
 import { worldId } from './world.mjs';
+import { isHintEcho } from '../conversation/hint-echo.mjs';
 
 // Deterministic checks of one run: what was sent, to where, in which turn, and
 // which tools ran. A failed critical check fails the run whatever the judge says.
@@ -97,9 +98,14 @@ export function checkRun(scenario: Scenario, run: RunRecord): Check[] {
   // (project and thread names) instead of the user's words: a recognition
   // problem worth seeing, since the server gate counts it as a user turn.
   // The hints the call was given (older recordings: the world's names and titles).
-  const vocabulary = new Set((run.vocabulary ?? scenario.world.projects.flatMap(p => [p.name, ...(p.threads || []).map(t => t.title)])).map(fold));
-  const echoes = run.transcript.filter(l => l.role === 'user' && l.text.split(',').filter(part => vocabulary.has(fold(part.trim()))).length >= 3);
+  // Judged as the server judges it.
+  const vocabulary = run.vocabulary ?? scenario.world.projects.flatMap(p => [p.name, ...(p.threads || []).map(t => t.title)]);
+  const echoes = run.transcript.filter(l => l.role === 'user' && isHintEcho(l.text, vocabulary));
   add('transcription.noVocabularyEcho', !echoes.length, echoes.length ? `turn(s) ${echoes.map(l => l.turn).join(', ')} transcribed as the vocabulary list` : 'none', false);
+  // An agent reply owed to the user that never arrived or was never announced
+  // aloud (-1): the user is left without the answer, so it fails the run.
+  // Quiet and superseded notices are not owed and never record it.
+  add('call.agentRepliesAnnounced', !run.timeouts.includes(-1), run.timeouts.includes(-1) ? 'an agent reply never arrived or was never announced with audio that played' : 'every owed agent reply was announced');
   add('call.noTimeouts', !run.timeouts.length, run.timeouts.length ? `the voice did not go quiet after ${run.timeouts.map(t => t > 0 ? `turn ${t}` : t === 0 ? 'the greeting' : 'an agent reply or its announcement').join(', ')}` : 'every turn settled', false);
   add('call.noProviderErrors', !run.providerErrors.length, run.providerErrors.map(e => e.code).join(', ') || 'none', false);
   // Words and recorded speech expect an answer, unless the turn says silent; noise does not.

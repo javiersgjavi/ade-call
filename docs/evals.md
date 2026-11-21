@@ -54,12 +54,14 @@ each phrase is spoken: audio is cached. Nothing reaches a real ADE.
    forbidden tools, tool budget, timeouts, provider errors, unanswered turns,
    latency and transcriptions that recite the vocabulary given to speech recognition. A failed check on sends is **critical** and fails the run whatever the
    judges say; so is a forbidden tool, a scripted interruption or silence that did not
-   happen, a required call marked `critical`, a tool budget of zero (`maxCalls: 0`), and a scenario's own `maxMedianLatencyMs`.
+   happen, a required call marked `critical`, a tool budget of zero (`maxCalls: 0`), an agent reply owed to the user that never arrived or was never announced with played audio (quiet and superseded notices are not owed), and a scenario's own `maxMedianLatencyMs`.
 5. **Judges** (`src/eval/judge.mts`): one or more OpenAI models read the world and the
    chronological log of the call, which includes what the user said, what speech
    recognition heard, the voice's answers, tools with their results, sends and notices.
    An answer the user interrupted is marked with how much of its audio was heard, so a
-   later "yes" is not taken as acceptance of words never played. The voice model hears the
+   later "yes" is not taken as acceptance of words never played (except, as in the
+   production prompt, a yes that cuts off a proposal of exactly what the user asked
+   for). The voice model hears the
    user's audio itself, so the judges grade it against what the user said or the noise
    played; the transcript is shown as a separate, fallible record. They answer with
    strict JSON, and a verdict must grade every criterion exactly
@@ -105,7 +107,7 @@ Shared worlds go in a subfolder. The repository's generic examples are in
 | Option of `run` | Effect |
 | --- | --- |
 | `--model`, `--transcription`, `--reasoning`, `--eagerness`, `--noise-reduction`, `--voice` | Realtime settings. They default to the configuration and then to the server's defaults. |
-| `--label NAME` | Name of the run folder. It defaults to the model plus a timestamp. |
+| `--label NAME` | Name of the run folder: one folder name of letters, digits, `.`, `_` and `-`. It defaults to the model plus a timestamp. |
 | `--repeat N` | Run each scenario N times. Models are not deterministic, so compare pass rates. |
 | `--parallel N` | Concurrent calls. |
 | `--only id1,id2`, `--tag TAG` | Select scenarios. An empty value or an unknown ID is refused. |

@@ -23,6 +23,7 @@ import { runScenario, type RunRecord } from '../src/eval/runner.mjs';
 import { ENUMS, pick } from '../src/voice/realtime.mjs';
 import { checkRun, latencySummary, median, type Check } from '../src/eval/checks.mjs';
 import { judge, judgementPasses, type Judgement } from '../src/eval/judge.mjs';
+import { redactEvidence, redactText } from '../src/eval/redact.mjs';
 
 const [command, ...rest] = process.argv.slice(2);
 // The options of each command. Switches never take the next argument, so
@@ -71,6 +72,9 @@ const config = (() => { try { return JSON.parse(readFileSync(join(configDir, 'co
 const cleanKey = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : undefined;
 const openaiKey = () => cleanKey(config.openaiKey || process.env.OPENAI_API_KEY) || fail('The OpenAI key is missing (openaiKey in config.json or OPENAI_API_KEY).');
 const elevenKey = () => cleanKey(config.elevenlabsKey || process.env.ELEVENLABS_API_KEY);
+// What is saved or printed is masked as the judges' copy is: transcripts, sends
+// and provider messages can repeat a credential the call came across.
+const secrets = () => [cleanKey(config.openaiKey || process.env.OPENAI_API_KEY), elevenKey()].filter((k): k is string => !!k);
 function fail(message: string): never { console.error(message); process.exit(2); }
 // Written aside and renamed into place: a reader never sees half a file, even if the process stops.
 const write = (file: string, data: unknown) => {
@@ -271,6 +275,8 @@ async function run() {
   const v = voices(list), s = speech();
   const repeat = count('repeat', '1'), parallel = count('parallel', '1'), gate = minPass();
   const label = flag('label', `${settings.model || 'default'}-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 23)}`)!;
+  // One folder inside runs/: no separators, no "." or "..".
+  if (!/^[\w.-]+$/.test(label) || /^\.+$/.test(label)) fail(`--label must be a single folder name (letters, digits, ".", "_", "-"): ${JSON.stringify(label)}.`);
   const target = resolve(flag('out', join(dataDir, 'runs', label))!);
   // All selected phrases must be possible before any job can incur API charges.
   if (!s.options.key && list.some(sc => sc.turns.some(t => t.say !== undefined && !s.has(t.say, v.all[t.voice || v.default], sc.language))))
@@ -303,17 +309,18 @@ async function run() {
       write(join(dir, 'scenario.json'), { ...sc, file: undefined });
       // Anything that fails in a job, from the call to the judges, is a failed run with a result.
       try {
-        const record = await runScenario(sc, { key, settings, speech: s, voices: v.all, defaultVoice: v.default, log: parallel > 1 ? undefined : line => console.log(line) });
-        const { audio, ...plain } = record;
+        const { audio, ...raw } = await runScenario(sc, { key, settings, speech: s, voices: v.all, defaultVoice: v.default, log: parallel > 1 ? undefined : line => console.log(line) });
+        // Checked and judged as saved, so grading again sees the same record.
+        const plain = redactEvidence(raw, secrets());
         write(join(dir, 'run.json'), plain);
         if (audio) write(join(dir, 'audio.wav'), wav(audio, 2));
-        const res = result(sc, r, record, await judgeAll(sc, plain, judges));
+        const res = redactEvidence(result(sc, r, plain, await judgeAll(sc, plain, judges)), secrets());
         write(join(dir, 'result.json'), res);
         results.push(res);
         const failed = [...res.checks.filter(c => !c.pass).map(c => `${c.critical ? '!' : ''}${c.id}`), ...res.judgements.flatMap(j => j.error ? [`${j.model}: ${j.error}`] : j.criteria.filter(c => !c.pass).map(c => `${j.model}:${c.id}(${c.severity})`))];
         console.log(`  ${res.pass ? '✓' : '✗'} ${sc.id} #${r} · score ${res.score?.toFixed(1) ?? 'n/a'} · median latency ${res.latency.median ?? 'n/a'} ms${failed.length ? ` · failed: ${failed.join(', ')}` : ''}`);
       } catch (error) {
-        const message = String((error as Error)?.message || error).slice(0, 300);
+        const message = redactText(String((error as Error)?.message || error), secrets()).slice(0, 300);
         console.log(`  ✗ ${sc.id} #${r}: the run failed: ${message}`);
         const failed: RunResult = { error: message, scenario: sc.id, repeat: r, checks: [], judgements: [], pass: false, checksPass: true, judgePass: null, score: null, latency: { median: null, max: null }, usage: {}, durationMs: 0 };
         write(join(dir, 'result.json'), failed); results.push(failed);
@@ -385,13 +392,13 @@ async function rejudge() {
   const graded: RunResult[] = [...current.filter(x => !runs.some(j => j.id === x.scenario && j.r === String(x.repeat)))];
   for (const { id, r, record, graded: sc } of runs) {
     const res = result(sc, Number(r), record, await judgeAll(sc, record, judges));
-    if (res.error) fail(`${id} #${r}: ${res.error}. Nothing was replaced; grade again later.`);
+    if (res.error) fail(`${id} #${r}: ${redactText(res.error, secrets())}. Nothing was replaced; grade again later.`);
     graded.push(res);
     console.log(`${res.pass ? '✓' : '✗'} ${id} #${r} · score ${res.score?.toFixed(1) ?? 'n/a'}`);
   }
   // The panel and effort travel with the grades they produced: the next regrade defaults to them.
   const staged = join(dir, `grades.${process.pid}.${Date.now()}.partial`);
-  writeFileSync(staged, JSON.stringify({ judges, judgeReasoning: judgeReasoning(), results: graded }, null, 2), { mode: 0o600 });
+  writeFileSync(staged, JSON.stringify(redactEvidence({ judges, judgeReasoning: judgeReasoning(), results: graded }, secrets()), null, 2), { mode: 0o600 });
   renameSync(staged, join(dir, 'grades.json'));
   process.exit(report([dir], gate));
 }

@@ -10,7 +10,7 @@ import { loadScenarios, validateScenario, type Scenario } from '../src/eval/scen
 import { SimulatedT3, worldId } from '../src/eval/world.mjs';
 import { checkRun, median } from '../src/eval/checks.mjs';
 import { callLog, expectedCriteria, judge, judgeInput, judgementPasses, worldText } from '../src/eval/judge.mjs';
-import { redactText } from '../src/eval/redact.mjs';
+import { looksLikeCredential, redactEvidence, redactText } from '../src/eval/redact.mjs';
 import { finalKind } from '../src/conversation/thread-watch.mjs';
 import { distinctiveWords, vocabularyHints } from '../src/conversation/context.mjs';
 import { DirectSession, requestIdFor } from '../src/direct/session.mjs';
@@ -21,6 +21,8 @@ import { resourceText } from '../src/resources.mjs';
 
 const root = new URL('../../', import.meta.url).pathname;
 const examples = () => loadScenarios(join(root, 'evals/scenarios/examples.json'));
+// The phone line and recorded clips decode with ffmpeg; without it those tests are skipped.
+const noFfmpeg = spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status !== 0 && 'ffmpeg is not installed';
 const context = (state: DirectCallState) => ({ requestId: 'voice:test:call_1', signal: new AbortController().signal, state });
 
 test('example scenarios load, share a world file and validate', () => {
@@ -586,6 +588,8 @@ for (const mode of ['nothing', 'silent', 'cut', 'vad', 'read-silent', 'read', 's
     assert.equal(run.notices.length, 1);
     assert.deepEqual(run.timeouts, mode === 'speak' || mode === 'read' ? [] : [-1]);
     if (mode !== 'speak' && mode !== 'read') assert.match(checkRun(scenario, run).find(c => c.id === 'call.noTimeouts')!.detail, /an agent reply or its announcement/);
+    const owed = checkRun(scenario, run).find(c => c.id === 'call.agentRepliesAnnounced')!;
+    assert.equal(owed.pass, mode === 'speak' || mode === 'read'); assert.equal(owed.critical, true);
   });
 }
 
@@ -651,7 +655,7 @@ test('forbidden tools can name a target, and a thread argument also names its pr
   assert.equal(after['tools.forbidden.t3_read_thread:billing'].critical, true);
 });
 
-test('the phone channel keeps the length, the judge hears words without audio tags, and the world shows archived and uncertain threads', () => {
+test('the phone channel keeps the length, the judge hears words without audio tags, and the world shows archived and uncertain threads', { skip: noFfmpeg }, () => {
   const clean = noise('pink', 500, 3, 0.05), line = phone(clean, 1);
   assert.equal(line.length, clean.length);
   assert.notDeepEqual(line, clean);
@@ -815,7 +819,7 @@ test('the judge gets each tool output as the model got it, whole and redacted', 
   assert.equal(line.result, outputs.get(line.callId!));
 });
 
-test('a recorded turn gives the judge its reference words, and the simulated release needs a project', () => {
+test('a recorded turn gives the judge its reference words, and the simulated release needs a project', async () => {
   const base = examples()[0];
   const scenario = { ...base, expect: {}, turns: [{ audio: 'clip.wav', transcript: 'No, no lo mandes.' }, { audio: 'other.wav' }] } as Scenario;
   // A clip without its words cannot be graded: validation refuses it.
@@ -828,7 +832,13 @@ test('a recorded turn gives the judge its reference words, and the simulated rel
   assert.match(log, /No, no lo mandes\./);
   assert.match(log, /cannot be graded/);
   const sim = new SimulatedT3(base.world);
-  try { assert.throws(() => sim.coordinator().release(' '), /projectId/); } finally { sim.close(); }
+  try {
+    assert.throws(() => sim.coordinator().release(' '), /projectId/);
+    // An unknown project with a real thread: refused as T3 Coordinator does, naming the owner.
+    await assert.rejects(sim.coordinator().dispatch({ requestId: 'voice:test:call_x', projectId: worldId('project', 'nowhere'), project: 'nowhere', message: 'x', threadId: worldId('thread', 'dark-mode') }),
+      (error: Error) => error.name === 'NotDispatchedError' && /belongs to project "recipe-app"/.test(error.message));
+    assert.equal(sim.sends.length, 0);
+  } finally { sim.close(); }
 });
 
 test('interruptions are checked from the script, voice lines carry their turn and play time, and audio words come from the run', () => {
@@ -1253,7 +1263,7 @@ test('a scripted interruption waits for the answer, not an announcement played b
   assert.deepEqual(run.turns[1].bargeIn, { overVoice: true, cut: true });
 });
 
-test('an empty recorded turn is refused before the call, a check read must start after the send, and labels match what happened', async () => {
+test('an empty recorded turn is refused before the call, a check read must start after the send, and labels match what happened', { skip: noFfmpeg }, async () => {
   const base = examples()[2];
   const dir = mkdtempSync(join(tmpdir(), 'eval-empty-'));
   writeFileSync(join(dir, 'empty.wav'), wav(Buffer.alloc(0)));
@@ -1409,7 +1419,7 @@ class SplitStops extends TurnProvider {
   }
 }
 
-test('an answer is timed from the speech item it answers, drafts never run, and a reply timed past the script is refused', { timeout: 60_000 }, async () => {
+test('an answer is timed from the speech item it answers, drafts never run, and a reply timed past the script is refused', { timeout: 60_000, skip: noFfmpeg }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'eval-split-'));
   writeFileSync(join(dir, 'split.wav'), wav(Buffer.concat([noise('pink', 300, 1, 0.05), noise('silence', 1500), noise('pink', 300, 2, 0.05)])));
   const scenario = { ...examples()[2], file: join(dir, 'x.json'), turns: [{ audio: 'split.wav' }] };
@@ -1685,11 +1695,17 @@ test('redaction masks whole authorization headers and standalone keys but keeps 
   assert.equal(redactText('A basic idea: Basic support is fine.'), 'A basic idea: Basic support is fine.');
   const ids = redactText('Please close task-123, not task-456. Key sk-abcdef123456.');
   assert.match(ids, /task-123/); assert.match(ids, /task-456/); assert.doesNotMatch(ids, /sk-abcdef/);
+  // Session cookies carry no recognizable prefix: the whole header value goes.
+  for (const header of ['Cookie: sessionid=abc123def; theme=dark', 'set-cookie: sid=xyz789; HttpOnly', '{"cookie": "sessionid=abc123def"}']) {
+    assert.doesNotMatch(redactText(header), /abc123def|xyz789/); assert.ok(looksLikeCredential(header));
+  }
+  // Saved evidence keeps its usage counters, whose names contain "token".
+  assert.deepEqual(redactEvidence({ usage: { input_tokens: 12 }, token: 'x', text: 'Cookie: sid=1' }), { usage: { input_tokens: 12 }, token: '[credential]', text: 'Cookie: [credential]' });
   const run = { tools: [], sends: [], notices: [], timeouts: [], providerErrors: [], transcript: [], turns: [{ index: 1, kind: 'say', text: 'hola', words: 'hola', startMs: 1000, endMs: 6000 }] } as unknown as RunRecord;
   assert.match(callLog(examples()[0], run), /USER TURN 1 \(the user speaks until 6\.0s\)/);
 });
 
-test('a recording that does not decode is refused before any paid work', () => {
+test('a recording that does not decode is refused before any paid work', { skip: noFfmpeg }, () => {
   const data = mkdtempSync(join(tmpdir(), 'ade-call-eval-clip-'));
   writeFileSync(join(data, 'bad.wav'), 'not audio');
   const file = join(data, 's.json');
@@ -2176,4 +2192,13 @@ test('a user transcript keeps its turn when the provider dates its speech before
   const run = await runScenario(scenario, { key: 'k', settings: {}, speech: new Speech({ cacheDir: mkdtempSync(join(tmpdir(), 'eval-run-')) }), voices: {}, defaultVoice: '', noResponseMs: 500,
     connect: () => new EarlyStart() as never });
   assert.deepEqual(run.transcript.filter(l => l.role === 'user').map(l => [l.text, l.turn]), [['words 1', 1], ['words 2', 2]]);
+});
+
+test('a run label must be one folder name inside runs/', () => {
+  const data = mkdtempSync(join(tmpdir(), 'ade-call-eval-label-'));
+  for (const label of ['../x', 'a/b', '..']) {
+    const out = spawnSync(process.execPath, ['--no-warnings', join(root, 'dist/scripts/eval.mjs'), 'run', '--no-judge', '--label', label, join(root, 'evals/scenarios/examples.json'), '--data', data], { encoding: 'utf8', env: { ...process.env, ADE_CALL_CONFIG: data, OPENAI_API_KEY: '', ELEVENLABS_API_KEY: '' } });
+    assert.equal(out.status, 2, label); assert.match(out.stderr, /--label must be a single folder name/);
+  }
+  assert.equal(existsSync(join(data, 'runs')), false);
 });

@@ -40,7 +40,6 @@
   "sim_thread_not_found": "T3 CLI failed: thread not found.",
   "sim_cli_failed": "T3 CLI failed (exit code 1).",
   "sim_not_implemented": "T3 CLI failed: the simulation does not implement {{command}}.",
-  "sim_project_not_found": "T3 CLI failed: project not found. Nothing was sent.",
   "sim_send_thread_not_found": "T3 CLI failed: thread not found. Nothing was sent.",
   "sim_send_read_failed": "T3 CLI failed (exit code 1) reading the destination before the send. Nothing was sent.",
   "sim_send_timeout": "T3 CLI timed out after 30 s: no receipt.",

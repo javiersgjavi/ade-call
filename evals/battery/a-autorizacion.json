@@ -132,7 +132,7 @@
     "world": "worlds/dev.json",
     "turns": [
       {
-        "say": "Tío, dile a liga-stats que ordene la tabla de clasificación por puntos.",
+        "say": "Tío, dile al hilo de la tabla de clasificación de liga-stats que la ordene por puntos.",
         "voice": "diego"
       },
       {
@@ -144,7 +144,8 @@
       "sends": [
         {
           "turn": 2,
-          "project": "liga"
+          "project": "liga",
+          "thread": "clasificacion"
         }
       ],
       "tools": {
@@ -154,7 +155,7 @@
         "In turn 1 it proposes in a short, conversational sentence what it will tell the agent (sort the standings table by points) and waits for acceptance; it does not send in turn 1. Reciting the project or thread name the user already gave is not required.",
         "In turn 2 it sends without asking again.",
         "The message sent asks to sort the standings table by points.",
-        "The destination is liga-stats: its \"Tabla de clasificación\" thread (the one the user named) or its main thread."
+        "The destination is the \"Tabla de clasificación\" thread of liga-stats, the one the user named."
       ]
     }
   },

@@ -170,23 +170,25 @@ export class SimulatedT3 {
         const blocking = this.uncertain.get(params.projectId);
         if (blocking) throw new NotDispatchedError(errorText('t3.send.blocked', { when: `${Math.max(1, Math.round((this.now() - blocking.at) / 1000))} s ago`,
           where: blocking.threadId ? `to "${blocking.title}" · ${blocking.threadId}` : `to create thread "${blocking.title}"`, Check: blocking.threadId ? `Read "${blocking.title}" · ${blocking.threadId}` : `Find "${blocking.title}" with t3_find_threads and read it with t3_read_thread`, reference: blocking.requestId }));
-        const project = [...this.projects.values()].find(p => p.id === params.projectId);
-        if (!project) {
-          // As T3 Coordinator: with a thread, its read refuses first; without one, `thread start`
-          // is attempted and its failure leaves the delivery uncertain (the yes is spent).
-          if (params.threadId) throw new NotDispatchedError(evalText('sim_project_not_found'));
+        const found = [...this.projects.values()].find(p => p.id === params.projectId);
+        // As T3 Coordinator: without a thread, `thread start` is attempted in an unknown
+        // project and its failure leaves the delivery uncertain (the yes is spent);
+        // with one, the thread is read first and decides (below).
+        if (!found && !params.threadId) {
           this.sends.push({ at: this.now(), ...params, projectKey: '', threadKey: null, uncertain: true, arrival: 'unknown' });
           this.uncertain.set(params.projectId, { requestId: params.requestId, threadId: null, title: `Voice · ${params.project} · Main`, at: this.now() });
           throw new Error(evalText('sim_cli_failed'));
         }
         let live = params.threadId ? this.threads.get(params.threadId) : undefined;
         if (params.threadId && !live) throw new NotDispatchedError(evalText('sim_send_thread_not_found'));
-        if (live && live.thread.projectId !== project.id) {
+        if (live && live.thread.projectId !== params.projectId) {
           // The production wording of T3 Coordinator for this refusal.
           const owner = [...this.projects.values()].find(p => p.id === live!.thread.projectId);
           throw new NotDispatchedError(errorText('t3.send.wrong_project', { thread: `"${live.thread.title}" · ${live.thread.threadId}`, project: params.project,
             owner: owner ? `project "${owner.name}" · ${owner.id}` : 'another project', retry: owner ? `projectId=${owner.id} and project="${owner.name}"` : 'the projectId of its project' }));
         }
+        // Here the project exists: an unknown one either sent nothing or was refused above.
+        const project = found!;
         // As T3 Coordinator, an existing destination is read before the send: a thread that cannot be read gets nothing.
         if (live?.spec.failReads) throw new NotDispatchedError(evalText('sim_send_read_failed'));
         if (live?.spec.archived) throw new NotDispatchedError(errorText('t3.send.archived', { thread: `"${live.thread.title}" · ${live.thread.threadId}` }));

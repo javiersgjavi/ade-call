@@ -12,6 +12,8 @@ export function redactText(text: string, secrets: string[] = []) {
     .replace(/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)/g, '[credential]')
     // A whole authorization value (Basic, Bearer, Digest with parameters) to the end of its line.
     .replace(/(\b[\w-]*authorization["']?\s*[:=]\s*)[^\n]+/gi, '$1[credential]')
+    // A whole Cookie or Set-Cookie header value: session IDs carry no recognizable prefix.
+    .replace(/(\b(?:set-)?cookie["']?\s*:\s*)[^\n]+/gi, '$1[credential]')
     .replace(/\b(?:sk-[\w-]{6,}|AIza[\w-]{10,})|\bBearer\s+[\w.=/+~-]+/g, '[credential]')
     // A user:password in a URI.
     .replace(/(\/\/[^\s/:@]*:)[^\s/@]+@/g, '$1[credential]@')
@@ -20,12 +22,13 @@ export function redactText(text: string, secrets: string[] = []) {
 
 export const looksLikeCredential = (text: string) => redactText(text) !== text;
 
-// Every string of a value masked, and the value of every credential-named key.
+// Every string of a value masked, and the value of every credential-named key
+// (numbers excepted: usage counters such as input_tokens are not secrets).
 export function redactEvidence<T>(value: T, secrets: string[] = []): T {
   const visit = (item: unknown): unknown => {
     if (typeof item === 'string') return redactText(item, secrets);
     if (Array.isArray(item)) return item.map(visit);
-    if (item && typeof item === 'object') return Object.fromEntries(Object.entries(item).map(([key, child]) => [key, isSensitiveKey(key) ? '[credential]' : visit(child)]));
+    if (item && typeof item === 'object') return Object.fromEntries(Object.entries(item).map(([key, child]) => [key, isSensitiveKey(key) && typeof child !== 'number' ? '[credential]' : visit(child)]));
     return item;
   };
   return visit(value) as T;

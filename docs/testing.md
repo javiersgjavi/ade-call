@@ -20,6 +20,8 @@ Tests run against the compiled output in `dist/`, so rebuild after editing sourc
 `npm run check` adds the static checks (types, ESLint, Ruff, `bash -n`, Markdown
 links and `json` blocks), the Git hook tests in `scripts/verify-hooks.mts` and the
 Python test `test/project-sync_test.py`. Shared doubles live in `test/fixtures.mts`.
+The few evaluation tests that decode the phone line or recorded clips need `ffmpeg`;
+without it on `PATH` they are skipped, and the rest of the suite still runs.
 
 ## What the suite covers
 
