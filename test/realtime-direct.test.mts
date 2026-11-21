@@ -215,8 +215,8 @@ test('T3 voice instructions keep every rule area and stay compact', () => {
   assert.match(voice, /name the thread or project only if the user did not name it or to tell candidates apart/);
   // Only a yes to the voice's proposal authorizes (also one that cuts it off); lone words and wrong matches do not.
   assert.match(voice, /of your proposal authorizes a send/);
-  assert.match(voice, /a lone word, number or name \(often a transcription artifact\)/);
-  assert.match(voice, /A yes that cuts your proposal off accepts it when the message is what the user asked for/);
+  assert.match(voice, /a lone word, number or name that accepts no proposal \(often a transcription artifact\)/);
+  assert.match(voice, /A yes that cuts your proposal off accepts it if message and recipient are what the user asked for; otherwise ask/);
   assert.match(voice, /never pick one silently/);
   assert.match(voice, /never present another project or thread as the one asked for/);
   assert.match(voice, /completed means the agent finished its turn/);
