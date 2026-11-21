@@ -34,6 +34,23 @@ test('real speech, even with several project names, is not an echo', () => {
   assert.equal(isHintEcho('Claude, Codex, README', []), false, 'without hints nothing is an echo');
 });
 
+test('the exact transcription prompt is an echo, even with a comma inside a name', () => {
+  const named = vocabularyHints('t3', ['Red, Green', 'pagos-api']);
+  assert.equal(isHintEcho(named.join(', '), named), true);
+  assert.equal(isHintEcho('T3, ADE Call, Claude, Red, Green', named), true);
+});
+
+test('one name repeated is not an echo, so a project named like a yes cannot hide it', () => {
+  const yes = vocabularyHints('t3', ['Yes', 'Vale']);
+  for (const speech of ['Yes, yes, yes.', 'vale, vale, vale', 'Yes.']) assert.equal(isHintEcho(speech, yes), false, speech);
+});
+
+test('a long run of hint words is classified quickly', () => {
+  const started = performance.now();
+  assert.equal(isHintEcho(Array(2000).fill('Git').join(' '), hints), false);
+  assert.ok(performance.now() - started < 200, 'bounded by the longest hint');
+});
+
 const sender: DirectTool = { name: 'fake_send', description: 'Send', parameters: { type: 'object' }, sends: true, execute: async () => ({ text: 'SEND ACCEPTED' }) };
 
 test('the send gate: after a proposal, an echo does not authorize a send; a real yes does', async () => {

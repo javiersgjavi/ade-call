@@ -9,37 +9,44 @@ function normalize(text: string) {
     .replace(/[-_]+/g, ' ').replace(/[^\p{L}\p{N}\s]+/gu, ' ').replace(/\s+/g, ' ').trim();
 }
 
-// How many hints a part is made of, when it is only hints ("t3 ADE Call" is
-// two); null when any word is not part of a hint. The last part of the
-// transcript may end inside a hint (a cut prompt).
-function hintCount(part: string, hints: Set<string>, prefixes: Set<string>, last: boolean) {
+// The hints a part is made of, when it is only hints ("t3 ADE Call" is two);
+// null when any word is not part of a hint. The last part of the transcript
+// may end inside a hint (a cut prompt). Spans are bounded by the longest hint.
+function hintsIn(part: string, hints: Set<string>, prefixes: Set<string>, longest: number, last: boolean) {
   const words = part.split(' ');
-  const best: (number | null)[] = [0, ...words.map(() => null)];
+  const best: (string[] | null)[] = [[], ...words.map(() => null)];
   for (let end = 1; end <= words.length; end++)
-    for (let start = 0; start < end; start++) {
-      if (best[start] === null) continue;
+    for (let start = Math.max(0, end - longest); start < end; start++) {
+      const before = best[start];
+      if (!before) continue;
       const phrase = words.slice(start, end).join(' ');
       // A cut hint is allowed but does not count towards the three.
-      const gain = hints.has(phrase) ? 1 : last && end === words.length && prefixes.has(phrase) ? 0 : null;
-      if (gain !== null) best[end] = Math.max(best[end] ?? 0, best[start]! + gain);
+      const found = hints.has(phrase) ? [...before, phrase] : last && end === words.length && prefixes.has(phrase) ? before : null;
+      if (found && found.length >= (best[end]?.length ?? -1)) best[end] = found;
     }
   return best[words.length];
 }
 
-// True when the transcript only recites hints: at least three of them, and no
-// other word anywhere. Speech with any word of its own ("send it to pagos-api
-// and pagos-web", "sí") is never an echo; a bare list of three or more names is.
+// The separators the hints are joined with in the transcription prompt.
+const SEPARATORS = /[,;\n、，]+/;
+
+// True when the transcript only recites hints: at least three different ones,
+// and no other word anywhere. Speech with any word of its own ("send it to
+// pagos-api and pagos-web", "sí") is never an echo, nor is one name repeated
+// ("yes, yes, yes" with a project named Yes); a bare list of names is.
 export function isHintEcho(transcript: string, hints: readonly string[]) {
-  const known = new Set(hints.map(normalize).filter(Boolean));
+  // A hint with a comma in it reaches the transcriber as several.
+  const known = new Set(hints.flatMap(h => h.split(SEPARATORS)).map(normalize).filter(Boolean));
   if (!known.size) return false;
   const prefixes = new Set<string>();
   for (const hint of known) for (let i = 3; i < hint.length; i++) prefixes.add(hint.slice(0, i).trim());
-  const parts = transcript.split(/[,;\n、，]+/).map(normalize).filter(Boolean);
-  let total = 0;
+  const longest = Math.max(...[...known].map(h => h.split(' ').length));
+  const parts = transcript.split(SEPARATORS).map(normalize).filter(Boolean);
+  const recited = new Set<string>();
   for (const [i, part] of parts.entries()) {
-    const count = hintCount(part, known, prefixes, i === parts.length - 1);
-    if (count === null) return false;
-    total += count;
+    const found = hintsIn(part, known, prefixes, longest, i === parts.length - 1);
+    if (!found) return false;
+    for (const hint of found) recited.add(hint);
   }
-  return total >= 3;
+  return recited.size >= 3;
 }
