@@ -12,6 +12,6 @@
     "noEmitOnError": true,
     "sourceMap": true
   },
-  "include": ["src/**/*.mts", "scripts/**/*.mts", "test/**/*.mts", "public/**/*.ts", "*.mts"],
+  "include": ["src/**/*.mts", "scripts/**/*.mts", "test/**/*.mts", "public/**/*.ts", "skills/**/*.mts", "*.mts"],
   "exclude": ["dist", "node_modules"]
 }
