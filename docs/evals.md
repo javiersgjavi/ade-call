@@ -11,6 +11,9 @@ They are paid and are not part of `npm run check`. A run uses OpenAI Realtime ti
 and the judges' tokens. It also uses ElevenLabs characters, but only the first time
 each phrase is spoken: audio is cached. Nothing reaches a real ADE.
 
+Agents running them follow the [conversation-evals skill](../skills/conversation-evals/SKILL.md):
+how to run the battery without wasting calls and how to read the results.
+
 ## How a run works
 
 1. **World.** Each scenario describes the projects and threads the voice can see, with
