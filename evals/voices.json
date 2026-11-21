@@ -1,0 +1,62 @@
+{
+  "ana": {
+    "id": "OvG3ld31AQ6IRXW4ojTa",
+    "name": "Spanish woman, neutral, normal pace (baseline)",
+    "model": "eleven_multilingual_v2"
+  },
+  "ana-prisa": {
+    "id": "OvG3ld31AQ6IRXW4ojTa",
+    "name": "The same voice in a hurry",
+    "model": "eleven_multilingual_v2",
+    "speed": 1.2,
+    "stability": 0.3
+  },
+  "luis": {
+    "id": "ZCh4e9eZSUf41K4cmCEL",
+    "name": "Spanish man, deep, slow and hesitant",
+    "model": "eleven_multilingual_v2",
+    "speed": 0.85,
+    "stability": 0.6
+  },
+  "diego": {
+    "id": "svj03RH3i7SeP6ikII3q",
+    "name": "Young Andalusian man, informal and impatient (v3 audio tags)",
+    "model": "eleven_v3",
+    "stability": 0
+  },
+  "carmen": {
+    "id": "yUdDEHhLHqO1mgoIOV5o",
+    "name": "Mexican woman, normal pace",
+    "model": "eleven_multilingual_v2"
+  },
+  "marta-baja": {
+    "id": "F85f2z6OiMoDXtGx8TxR",
+    "name": "Spanish woman, tired and low (v3 audio tags)",
+    "model": "eleven_v3",
+    "stability": 0.5,
+    "speed": 0.9
+  },
+  "tom": {
+    "id": "CwhRBWXzGAHq8TQ4Fs17",
+    "name": "English man, casual",
+    "model": "eleven_multilingual_v2"
+  },
+  "sarah": {
+    "id": "EXAVITQu4vr4xnSDxMaL",
+    "name": "American woman, neutral, normal pace (English baseline)",
+    "model": "eleven_multilingual_v2"
+  },
+  "liam-prisa": {
+    "id": "TX3LPaxmHKxFdv7VOQHJ",
+    "name": "Young American man, energetic and fast",
+    "model": "eleven_multilingual_v2",
+    "speed": 1.15,
+    "stability": 0.3
+  },
+  "will-lento": {
+    "id": "bIHbv24MWmeRgasZH58o",
+    "name": "American man, relaxed, slow with fillers",
+    "model": "eleven_multilingual_v2",
+    "speed": 0.85
+  }
+}

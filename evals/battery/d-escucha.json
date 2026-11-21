@@ -1,0 +1,148 @@
+[
+  {
+    "id": "d1-interrupcion-nueva-pregunta",
+    "description": "Objetivo: cuando el usuario interrumpe con otra pregunta, la voz responde a la nueva y no retoma la anterior. El usuario pregunta por el blog y, a los dos segundos de respuesta, pregunta por el backup de Nextcloud.",
+    "tags": [
+      "escucha",
+      "listening"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Cuéntame cómo va el blog.",
+        "voice": "ana"
+      },
+      {
+        "say": "Espera, mejor dime cómo ha ido el backup de Nextcloud.",
+        "bargeInMs": 2000,
+        "voice": "ana"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "required": [
+          {
+            "name": "t3_read_thread",
+            "thread": "backup",
+            "byTurn": 2
+          }
+        ],
+        "maxCalls": 8
+      },
+      "rubric": [
+        "After turn 2 it answers about the Nextcloud backup and does not resume the interrupted answer about the blog."
+      ]
+    }
+  },
+  {
+    "id": "d2-frase-partida",
+    "description": "Objetivo: una frase que queda a medias («cómo va lo de…») no se contesta hasta que el usuario la termina. Un usuario lento hace una pausa y luego dice «la migración de Expo».",
+    "tags": [
+      "escucha",
+      "listening"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Oye, quería saber… eh… cómo va lo de",
+        "silent": true,
+        "voice": "luis"
+      },
+      {
+        "say": "la migración de Expo.",
+        "pauseMs": 1500,
+        "voice": "luis",
+        "continues": true
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "required": [
+          {
+            "name": "t3_read_thread",
+            "thread": "expo",
+            "byTurn": 2
+          }
+        ],
+        "maxCalls": 6
+      },
+      "rubric": [
+        "It answers about the Expo migration (still in progress) and does not answer or guess a topic before the sentence is complete."
+      ]
+    }
+  },
+  {
+    "id": "d3-pregunta-doble-rapida",
+    "description": "Objetivo: una pregunta doble dicha deprisa (Expo y el crash de Android) hace que la voz lea y responda ambas partes. Una usuaria rápida pregunta las dos cosas a la vez.",
+    "tags": [
+      "escucha",
+      "listening"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "¿Cómo va la migración a Expo y qué pasó con el crash de Android catorce?",
+        "voice": "ana-prisa"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "required": [
+          {
+            "name": "t3_read_thread",
+            "thread": "expo",
+            "byTurn": 1
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "crash-android",
+            "byTurn": 1
+          }
+        ],
+        "maxCalls": 8
+      },
+      "rubric": [
+        "It answers both parts: the Expo migration is in progress, and the Android 14 crash is fixed."
+      ]
+    }
+  },
+  {
+    "id": "d4-voz-baja-cansada",
+    "description": "Objetivo: una pregunta dicha en voz baja y cansada se entiende y lleva a leer el hilo del backup. Una usuaria cansada pregunta por el backup de Nextcloud.",
+    "tags": [
+      "escucha",
+      "listening"
+    ],
+    "language": "es-ES",
+    "channel": "phone",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "[tired] Oye… ¿cómo ha ido el backup de Nextcloud?",
+        "voice": "marta-baja"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "required": [
+          {
+            "name": "t3_read_thread",
+            "thread": "backup",
+            "byTurn": 1
+          }
+        ],
+        "maxCalls": 6
+      },
+      "rubric": [
+        "It reports that the backup works and warns that the disk is at 91 percent."
+      ]
+    }
+  }
+]

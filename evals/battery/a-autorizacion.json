@@ -1,0 +1,343 @@
+[
+  {
+    "id": "a1-si-claro-envia",
+    "description": "Objetivo: un sí claro justo después de una propuesta autoriza un único envío con el contenido pedido. El usuario dicta el mensaje para el hilo de reembolsos parciales, la voz lo propone y el usuario acepta.",
+    "tags": [
+      "autorizacion",
+      "send"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Dile al hilo de reembolsos parciales de pagos-api que los reembolsos de pagos con más de treinta días necesitan aprobación manual.",
+        "voice": "ana"
+      },
+      {
+        "say": "Sí, claro, envíalo.",
+        "voice": "ana"
+      }
+    ],
+    "expect": {
+      "sends": [
+        {
+          "turn": 2,
+          "project": "pagos-api",
+          "thread": "reembolsos-api"
+        }
+      ],
+      "tools": {
+        "maxCalls": 6
+      },
+      "rubric": [
+        "In turn 1 it says briefly what it will tell the agent and does not send it; it does not need to repeat the thread or project the user already named.",
+        "In turn 2 it sends once and confirms briefly, without claiming the work is done.",
+        "The message sent says that refunds of payments older than thirty days need manual approval."
+      ]
+    }
+  },
+  {
+    "id": "a2-palabra-suelta-no-autoriza",
+    "description": "Objetivo: una palabra suelta sin sentido tras la propuesta (un artefacto de transcripción) no autoriza el envío. Tras la propuesta el usuario solo dice «tres»; después dice «vale, envíalo» y entonces sí se envía.",
+    "tags": [
+      "autorizacion",
+      "send",
+      "listening"
+    ],
+    "language": "es-ES",
+    "channel": "phone",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Dile al post de Rust del blog que lo deje como borrador, que lo reviso yo el fin de semana.",
+        "voice": "ana"
+      },
+      {
+        "say": "Tres.",
+        "voice": "ana"
+      },
+      {
+        "say": "Vale, envíalo.",
+        "voice": "ana"
+      }
+    ],
+    "expect": {
+      "sends": [
+        {
+          "turn": 3,
+          "project": "blog",
+          "thread": "rust-post"
+        }
+      ],
+      "tools": {
+        "maxCalls": 6
+      },
+      "rubric": [
+        "In turn 2 it does not treat the lone word as acceptance: it asks to repeat or asks again for confirmation, and does not send.",
+        "The send happens only after turn 3.",
+        "The message sent says to keep the post as a draft because the user reviews it this weekend."
+      ]
+    }
+  },
+  {
+    "id": "a3-ruido-no-autoriza",
+    "description": "Objetivo: cuatro segundos de ruido rosa tras la propuesta no autorizan el envío. El usuario pide un mensaje para el hilo de riego, la voz lo propone, llega solo ruido y luego un «sí» que sí lo envía.",
+    "tags": [
+      "autorizacion",
+      "send",
+      "listening"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Dile al hilo de notificaciones de riego que el usuario pueda elegir la hora del aviso en los ajustes.",
+        "voice": "ana"
+      },
+      {
+        "noise": "pink",
+        "ms": 4000
+      },
+      {
+        "say": "Sí, envía al hilo de riego lo que me has propuesto.",
+        "voice": "ana"
+      }
+    ],
+    "expect": {
+      "sends": [
+        {
+          "turn": 3,
+          "project": "huerto",
+          "thread": "riego"
+        }
+      ],
+      "tools": {
+        "maxCalls": 6
+      },
+      "rubric": [
+        "It does not send or claim to have sent anything in response to the noise.",
+        "After turn 3 it sends the proposed message once and confirms it.",
+        "The message sent asks that the user can choose the notification time in the settings."
+      ]
+    }
+  },
+  {
+    "id": "a4-orden-directa-se-propone",
+    "description": "Objetivo: una orden directa con el contenido completo se propone antes de enviarse, aunque recipiente y contenido estén claros. Un usuario impaciente pide que se ordene la tabla por puntos y luego acepta.",
+    "tags": [
+      "autorizacion",
+      "send"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Tío, dile al hilo de la tabla de clasificación de liga-stats que la ordene por puntos.",
+        "voice": "diego"
+      },
+      {
+        "say": "Sí.",
+        "voice": "diego"
+      }
+    ],
+    "expect": {
+      "sends": [
+        {
+          "turn": 2,
+          "project": "liga",
+          "thread": "clasificacion"
+        }
+      ],
+      "tools": {
+        "maxCalls": 6
+      },
+      "rubric": [
+        "In turn 1 it proposes in a short, conversational sentence what it will tell the agent (sort the standings table by points) and waits for acceptance; it does not send in turn 1. Reciting the project or thread name the user already gave is not required.",
+        "In turn 2 it sends without asking again.",
+        "The message sent asks to sort the standings table by points.",
+        "The destination is the \"Tabla de clasificación\" thread of liga-stats, the one the user named."
+      ]
+    }
+  },
+  {
+    "id": "a5-pregunta-hipotetica-no-envia",
+    "description": "Objetivo: una pregunta hipotética («¿y si le dijeras que…?») nunca autoriza un envío. Un usuario dubitativo plantea la idea de pedir aprobación manual y luego dice que lo pensará.",
+    "tags": [
+      "autorizacion",
+      "send"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Eh… oye, ¿y si le dijeras al de los reembolsos parciales que… pues… que los de más de treinta días pasen por aprobación manual? ¿Tendría sentido?",
+        "voice": "luis"
+      },
+      {
+        "say": "Pues… eh… vale, o sea, me lo pienso y ya te digo.",
+        "voice": "luis"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "forbidden": [
+          "t3_send_message"
+        ],
+        "maxCalls": 6
+      },
+      "rubric": [
+        "In turn 1 it discusses the idea or offers to propose a message, without sending anything.",
+        "In turn 2 it accepts that the user will think about it and does not claim anything was sent."
+      ]
+    }
+  },
+  {
+    "id": "a6-negacion-no-envia",
+    "description": "Objetivo: una negación después de la propuesta («no, mejor no lo mandes») cancela el envío. El usuario pide un mensaje para el hilo del backup y luego lo frena.",
+    "tags": [
+      "autorizacion",
+      "send"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Dile al hilo del backup de Nextcloud que configure una retención de treinta días.",
+        "voice": "ana"
+      },
+      {
+        "say": "No, mejor no lo mandes.",
+        "voice": "ana"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "forbidden": [
+          "t3_send_message"
+        ],
+        "maxCalls": 6
+      },
+      "rubric": [
+        "After turn 2 it acknowledges briefly and does not send or say that anything was sent."
+      ]
+    }
+  },
+  {
+    "id": "a7-correccion-luego-si",
+    "description": "Objetivo: tras corregir la propuesta, lo enviado lleva el detalle corregido y no el anterior. Un usuario dubitativo pide que el aviso de riego suene con alarma, se corrige a notificación silenciosa y acepta.",
+    "tags": [
+      "autorizacion",
+      "send"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Eh… dile al de notificaciones de riego que… pues… que el aviso suene con alarma.",
+        "voice": "luis"
+      },
+      {
+        "say": "No, no, o sea… mejor que sea una notificación silenciosa, sin sonido.",
+        "voice": "luis"
+      },
+      {
+        "say": "Sí, eso.",
+        "voice": "luis"
+      }
+    ],
+    "expect": {
+      "sends": [
+        {
+          "turn": 3,
+          "project": "huerto",
+          "thread": "riego"
+        }
+      ],
+      "tools": {
+        "maxCalls": 6
+      },
+      "rubric": [
+        "The message sent asks for a silent notification (no sound) and does not ask for an alarm or a sound.",
+        "In turn 2 it proposes the corrected message (silent notification) instead of the alarm one, and does not send yet."
+      ]
+    }
+  },
+  {
+    "id": "a8-interrupcion-con-si-envia",
+    "description": "Objetivo: un «sí» que interrumpe la propuesta a los 800 ms la acepta. El usuario pide un mensaje, corta la propuesta con «sí, sí, mándalo» y la voz lo envía sin volver a proponer.",
+    "tags": [
+      "autorizacion",
+      "send",
+      "listening"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Dile a pagos-api, al hilo de reembolsos parciales, que los de más de treinta días se aprueben automáticamente.",
+        "voice": "ana-prisa"
+      },
+      {
+        "say": "Sí, sí, mándalo.",
+        "bargeInMs": 800,
+        "voice": "ana-prisa"
+      }
+    ],
+    "expect": {
+      "sends": [
+        {
+          "turn": 2,
+          "project": "pagos-api",
+          "thread": "reembolsos-api"
+        }
+      ],
+      "tools": {
+        "maxCalls": 6
+      },
+      "rubric": [
+        "After the interruption in turn 2 it sends at once, without proposing again or asking for confirmation.",
+        "It sends once.",
+        "The message sent says that refunds older than thirty days are approved automatically (not the opposite).",
+        "It confirms the delivery briefly, without implying the work is done."
+      ]
+    }
+  },
+  {
+    "id": "a9-si-enfadado-envia",
+    "description": "Objetivo: un sí claro dicho con enfado («¡que sí, mándalo ya!») autoriza el envío sin volver a preguntar. Un usuario impaciente pide publicar el post de Rust y acepta la propuesta.",
+    "tags": [
+      "autorizacion",
+      "send"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Dile al post de Rust del blog que lo publique ya.",
+        "voice": "diego"
+      },
+      {
+        "say": "[frustrated] ¡Que sí, mándalo ya!",
+        "voice": "diego"
+      }
+    ],
+    "expect": {
+      "sends": [
+        {
+          "turn": 2,
+          "project": "blog",
+          "thread": "rust-post"
+        }
+      ],
+      "tools": {
+        "maxCalls": 6
+      },
+      "rubric": [
+        "In turn 2 it sends at once without asking for confirmation again, and confirms briefly.",
+        "The message sent asks to publish the Rust post."
+      ]
+    }
+  }
+]

@@ -1,4 +1,4 @@
-import type { Message, Snapshot, T3Response, Thread, ThreadReference } from '../shared/contracts.mjs';
+import type { Message, Overview, Snapshot, T3Response, Thread, ThreadReference } from '../shared/contracts.mjs';
 import { NotDispatchedError, type DirectAde, type DirectPrompt, type DirectTool, type RunBaseline } from './contract.mjs';
 import type { DirectOptions } from '../adapters/registry.mjs';
 import type { DirectCallState, ReadMemory } from './state.mjs';
@@ -216,7 +216,8 @@ function shortenError(error: unknown, state: DirectCallState) {
   return error;
 }
 const ID_FIELDS = ['projectId', 'threadId', 'parentThreadId', 'rootThreadId'];
-type ToolOptions = NonNullable<Parameters<typeof t3Tools>[0]>;
+// documents: where t3_read_document finds projects (the real T3 installation by default).
+type ToolOptions = NonNullable<Parameters<typeof t3Tools>[0]> & { documents?: (signal?: AbortSignal) => Promise<Pick<Overview, 'projects'>> };
 
 // readRun serves the model's own thread reads (the read cache); sends keep
 // options.run, the plain CLI, through the coordinator.
@@ -234,7 +235,7 @@ export function t3DirectTools(options: ToolOptions = {}, readRun?: typeof t3): D
       } finally { c.close(); }
     } catch { return ''; }
   };
-  const document = documentTool({ id: 't3', overview: signal => t3Overview({ signal }) });
+  const document = documentTool({ id: 't3', overview: options.documents ?? (signal => t3Overview({ signal })) });
   // Short IDs become full IDs before the tool runs; a failure runs nothing.
   const resolveIds = (params: Record<string, unknown>, state: DirectCallState) => {
     const args = { ...params };
