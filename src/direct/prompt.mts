@@ -1,5 +1,5 @@
 import type { DirectAde } from './contract.mjs';
-import { render, systemPrompt, voiceLanguageText } from '../resources.mjs';
+import { customInstructionsText, render, systemPrompt, voiceLanguageText } from '../resources.mjs';
 
 // Names of the tools that change the ADE, as the instructions mention them.
 export const sendingTools = (ade: Pick<DirectAde, 'tools'>) => ade.tools.filter(t => t.sends && !t.keepsAuthorization).map(t => t.name).join(' or ') || 'the sending tool';
@@ -37,16 +37,19 @@ export const languageReminder = () => voiceLanguageText('reminder');
 
 // Values known only when a session opens: the time context of a call, the
 // ADE with its capabilities and the language the call starts in.
-export interface SessionValues { callStart?: unknown; capabilities?: unknown; language?: CallLanguage }
+// custom: the owner's instructions from Settings; appended last, and only when not blank.
+export interface SessionValues { callStart?: unknown; capabilities?: unknown; language?: CallLanguage; custom?: string }
 
 // The instructions of a voice call: resources/system_prompt_voice.txt
 // filled with the ADE's own parts (resources/ade_prompts.json). The server
 // checks remain the boundary; this only guides.
 export function directInstructions(ade: Pick<DirectAde, 'name' | 'tools' | 'prompt'>, session: SessionValues = {}) {
   const p = ade.prompt, target = p.target;
-  return render(systemPrompt(), {
+  const text = render(systemPrompt(), {
     ade: ade.name, role: p.role, target, Target: target[0].toUpperCase() + target.slice(1), source: p.source || `the ${target}`,
     sending: sendingTools(ade), destination: p.destination, evidence: p.evidence, limits: p.limits, ids: p.ids, search: p.search ? ` ${p.search}` : '',
     spoken_language: spokenLanguage(session.language), call_start: JSON.stringify(session.callStart || {}), ade_capabilities: JSON.stringify(session.capabilities || {})
   }, 'system_prompt_voice.txt');
+  const custom = session.custom?.trim();
+  return custom ? `${text}\n\n${customInstructionsText(custom)}` : text;
 }

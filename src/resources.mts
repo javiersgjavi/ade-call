@@ -21,6 +21,11 @@ export function render(template: string, vars: Vars = {}, source = 'template') {
 // --- Prompts -----------------------------------------------------------------
 let prompt: string | undefined;
 export const systemPrompt = () => prompt ??= resourceText('system_prompt_voice.txt').trimEnd();
+// The owner's custom instructions from Settings, under a fixed header
+// (resources/custom_instructions.txt). The text is a value: it is not scanned for placeholders.
+let customHeader: string | undefined;
+export const customInstructionsText = (instructions: string) =>
+  render(customHeader ??= resourceText('custom_instructions.txt').trimEnd(), { instructions }, 'custom_instructions.txt');
 
 // The language and accent a call starts in (resources/voice_language.json):
 // the one chosen in the settings, the browser's, or unknown; and the short
