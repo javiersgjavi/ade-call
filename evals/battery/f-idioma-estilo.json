@@ -1,0 +1,173 @@
+[
+  {
+    "id": "f1-cambio-de-idioma",
+    "description": "Objetivo: sin idioma fijado, la voz contesta en inglés a quien habla inglés y cambia a español cuando el usuario hace una petición completa en español. Un hablante inglés saluda y después una hablante española pregunta por el blog.",
+    "tags": [
+      "idioma-estilo",
+      "language"
+    ],
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Hey there! How's it going today?",
+        "voice": "tom"
+      },
+      {
+        "say": "¿Cómo va el post sobre Rust del blog?",
+        "voice": "ana"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "maxCalls": 6
+      },
+      "rubric": [
+        "In turn 1 it answers briefly in English without using tools or reporting on projects.",
+        "In turn 2 it answers in Spanish about the Rust post."
+      ]
+    }
+  },
+  {
+    "id": "f2-se-me-oye",
+    "description": "Objetivo: una pregunta sobre la llamada («¿se me oye bien?») se contesta brevemente sin herramientas. Una usuaria cansada pregunta si se la oye.",
+    "tags": [
+      "idioma-estilo"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "[sighs] ¿Se me oye bien?",
+        "voice": "marta-baja"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "maxCalls": 0
+      },
+      "rubric": [
+        "It answers briefly that it hears her, without reporting on projects or threads."
+      ]
+    }
+  },
+  {
+    "id": "f3-respuesta-breve",
+    "description": "Objetivo: una pregunta de sí o no («¿está terminado el post de Rust?») recibe una respuesta corta y rápida. La usuaria pregunta por el estado del post.",
+    "tags": [
+      "idioma-estilo"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "¿Está terminado el post de Rust?",
+        "voice": "ana"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "required": [
+          {
+            "name": "t3_read_thread",
+            "thread": "rust-post",
+            "byTurn": 1
+          }
+        ],
+        "maxCalls": 6
+      },
+      "maxMedianLatencyMs": 2500,
+      "rubric": [
+        "It answers in at most two or three short sentences, leading with the result: the draft is ready and the agent asks whether to publish it."
+      ]
+    }
+  },
+  {
+    "id": "f4-hilo-unico-responde-directo",
+    "description": "Objetivo: cuando la pregunta lleva a un proyecto con un único hilo («el proyecto de las tiendas»), la voz lo lee y responde directamente, sin preguntar qué hilo ni confirmar lo obvio. Ejemplo del dueño, dicho de forma coloquial.",
+    "tags": [
+      "idioma-estilo",
+      "navigation",
+      "style"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Oye, ¿cómo va el proyecto de las tiendas?",
+        "voice": "ana"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "required": [
+          {
+            "name": "t3_read_thread",
+            "thread": "catalogo",
+            "byTurn": 1
+          }
+        ],
+        "forbidden": [
+          "t3_send_message"
+        ],
+        "maxCalls": 4
+      },
+      "rubric": [
+        "In turn 1 it answers with the status of the catalog thread (the catalog is done with 340 products, 85 products still have no photo, and the agent asks whether prices include VAT) without asking which thread or project is meant and without asking the user to confirm before answering.",
+        "The answer is two to four short spoken sentences that lead with the status; it does not open with a formal preface reciting the full thread title and project name, and does not read out test counts or file details as a list."
+      ]
+    }
+  },
+  {
+    "id": "f5-seguimiento-natural-envia",
+    "description": "Objetivo: tras hablar del único hilo de un proyecto, un encargo coloquial («pues dile que siga con las fotos») recibe una propuesta corta y natural, sin recitar proyecto ni hilo, y solo el «sí» posterior lo envía a ese hilo. Un usuario dubitativo pregunta por las tiendas y luego da el encargo.",
+    "tags": [
+      "idioma-estilo",
+      "send",
+      "style"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Oye, ¿cómo va el proyecto de las tiendas?",
+        "voice": "luis"
+      },
+      {
+        "say": "Pues… dile que siga con las fotos.",
+        "voice": "luis"
+      },
+      {
+        "say": "Sí.",
+        "voice": "luis"
+      }
+    ],
+    "expect": {
+      "sends": [
+        {
+          "turn": 3,
+          "project": "tiendas",
+          "thread": "catalogo"
+        }
+      ],
+      "tools": {
+        "required": [
+          {
+            "name": "t3_read_thread",
+            "thread": "catalogo",
+            "byTurn": 1
+          }
+        ],
+        "maxCalls": 6
+      },
+      "rubric": [
+        "In turn 2 it does not send: it proposes in one short, conversational question what it will tell the agent (to go on with the missing product photos); reciting the project or thread name is not needed, since the only thread discussed is the destination.",
+        "In turn 3 it sends once and confirms in a few words, without restating the whole proposal and without claiming the photos are done.",
+        "The message sent asks the agent to continue with the product photos, without adding other requests (for example it does not answer the VAT question on the user's behalf)."
+      ]
+    }
+  }
+]

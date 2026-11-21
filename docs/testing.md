@@ -36,6 +36,7 @@ Python test `test/project-sync_test.py`. Shared doubles live in `test/fixtures.m
 | Conversation and notices | `core`, `continuity`, `call-events`, `thread-watch`, `time-context`, `tool-details` | A conversation created on first use, resuming after restart without replaying old work, greeting language, stored call events per ADE and conversation, end-of-turn notices for followed threads, calendar and DST handling, secret redaction in stored tool records. |
 | Browser code | `frontend`, `streaming`, `playback-control`, `speech-gate`, `call-recording`, `recordings` | The compiled UI run in a VM: element IDs, ADE switch, i18n dictionaries, New session ordering, WebRTC health stats, local speech detection, recording limits and recovery. |
 | Resources | `resources` | Every placeholder filled, every error key used and defined, `tools.json` schemas and examples valid. |
+| Evaluation harness | `eval` | Scenario validation, the simulated T3 behind the production tools (catalog, search, reads, failing reads, sends, delayed replies), send and tool checks, the judge request and verdict parsing, the speech cache and noise, and one closed-loop run against a simulated provider. No model is graded here. |
 | Installer and sync | `installer`, `project-sync_test.py` | `install-user.sh` with simulated `npm`, `systemctl`, T3, Orca and running service: fresh install, restart after waiting for the running service to be idle (asked at its own address, only when its main process owns the listening socket), the 2-minute wait on a simulated clock, Orca-only; the T3 project sync script. |
 
 File names are relative to `test/` and omit `.test.mts`.
@@ -44,7 +45,8 @@ File names are relative to `test/` and omit `.test.mts`.
 
 - **Model behavior.** Whether the voice waits for a finished sentence, accepts a
   corrected name, keeps the user's language or proposes before sending depends on the
-  model. Only a real call shows it.
+  model. The paid [conversation evaluations](evals.md) measure it with synthetic calls;
+  only a real call proves it.
 - **Real CLIs.** The simulated T3 and Orca CLIs follow the documented output. A new
   CLI version that changes its output is caught only against a real installation.
 - **Real deliveries.** That a message actually reaches an agent and starts a run is
@@ -62,6 +64,7 @@ Build first (`npm run build`). The browser scripts need Playwright's Chromium
 | --- | --- | --- |
 | `dist/scripts/verify-recording-browser.mjs` | Chromium with synthetic tones; intercepted HTTP; temporary archive. | Free, no provider, no personal state. |
 | `dist/scripts/smoke-browser.mjs` | A running server, its access token, Chromium. Loads the UI and lists projects. | Free without `TEST_VOICE`. With `TEST_VOICE=1` it places a real call: paid. |
+| `dist/scripts/eval.mjs` | Scripted conversations spoken by ElevenLabs voices, run against GPT Realtime over a simulated T3, checked by code and graded by LLM judges ([evals](evals.md)). | Paid. |
 | `dist/scripts/replay-realtime.mjs` | A diagnostic recording, `ffmpeg`, the configured `openaiKey`, real read-only T3 CLI. Sends are simulated. | Paid. |
 | `dist/scripts/measure-startup.mjs` | An isolated server with a simulated CLI. `--real` reads the local T3. | Free. |
 | `dist/scripts/measure-projects.mjs` | Adapter discovery timing. `--real` reads the local T3 and Orca; `--http` goes through an isolated server. | Free. |

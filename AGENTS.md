@@ -17,6 +17,7 @@ keep the code free of personal names, machines, domains and networks.
 - [docs/access.md](docs/access.md): pairing, sessions, origin checks.
 - [CONTRIBUTING.md](CONTRIBUTING.md): setup, conventions, PR process.
 - [docs/testing.md](docs/testing.md): what the tests prove and what they do not.
+- [docs/evals.md](docs/evals.md): paid conversation evaluations of the voice model.
 
 ## Code map
 
@@ -31,6 +32,7 @@ keep the code free of personal names, machines, domains and networks.
 | `src/adapters/orca/` | Orca CLI client, terminal reads, sends and launches. |
 | `src/conversation/` | Context, persistence (`store.mts`), thread watch, time context. |
 | `src/access/browsers.mts` | Pairing codes and browser sessions. |
+| `src/eval/`, `scripts/eval.mts`, `evals/` | Paid conversation evaluations: simulated T3 world, ElevenLabs speech, closed-loop Realtime runner, checks, LLM judges ([docs/evals.md](docs/evals.md)). |
 | `src/resources.mts`, `resources/` | Model-facing text and its loader ([resources/README.md](resources/README.md)). |
 | `public/` | Browser UI and audio; `public/i18n.ts` holds the interface dictionaries. |
 | `scripts/`, `deploy/` | Build, checks, installer, access CLI, integration scripts, systemd units, proxy example. |

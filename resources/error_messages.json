@@ -4,14 +4,12 @@
   "ids.unknown": "{{field}} \"{{value}}\" does not match any ID shown in this session. Nothing was executed: find the thread or project with the search tool.",
   "ids.ambiguous": "{{field}} \"{{value}}\" is ambiguous: it matches {{matches}}. Nothing was executed: use one of those IDs.",
   "ids.invalid_cli": "\"{{value}}\" is not a valid ID: IDs never start with \"-\" or contain spaces. Nothing was executed: use the ID shown in the catalog or by a tool.",
-
   "send.missing_request_id": "The server's request identifier is missing (internal failure). Nothing was sent; tell the user.",
   "send.journal_unavailable": "ADE Call's send journal could not be opened ({{code}}). Nothing was sent; tell the user: the service needs checking.",
   "send.released_while_preparing": "The record of this send was released while it was being prepared. Nothing was sent; tell the user.",
   "release.missing_project_id": "projectId is missing: the short ID of the blocked project. Nothing was changed.",
   "release.journal_unavailable": "ADE Call's send journal could not be opened or updated. Nothing was changed; tell the user: the service needs checking.",
   "release.in_flight": "The send to this project ({{when}}, {{where}}) is in progress right now: it cannot be released. Nothing was changed; wait for its result.",
-
   "document.not_allowed": "Document not allowed: use a relative .md or .txt path of the project and a non-negative integer offset. Private files are not allowed; do not try to get around this restriction.",
   "document.project_unavailable": "Project not available in this ADE. Check the projectId in the catalog; do not use another ADE's.",
   "document.out_of_scope": "Document out of scope: it must be allowed text inside the project, up to 1 MB. Do not try to get around this restriction.",
@@ -19,7 +17,6 @@
   "document.not_found": "Project document or folder not found. Check the relative path in the catalog; do not invent its content.",
   "document.no_permission": "No permission to read the document. Report the limit; do not try to get around the permissions.",
   "document.unreadable": "The project file could not be read. Check its availability; there is no verifiable content.",
-
   "t3.find.missing_query": "query is missing: the name the user said, with at least one word or figure. Nothing was searched.",
   "t3.find.invalid_variants": "variants must be a list of up to 5 texts (e.g. [\"Whisper\"]). Nothing was searched.",
   "t3.find.invalid_flag": "{{field}} must be the boolean true or false, not text or a number. Nothing was searched.",
@@ -45,7 +42,10 @@
   "t3.send.unconfirmed_thread": "T3 answered the send without confirming the destination thread: the message may have reached thread {{thread}}. Do not repeat it; read that thread now with t3_read_thread and tell the user what you see.",
   "t3.send.unconfirmed_new_thread": "T3 answered without returning the ID of the new thread: \"{{title}}\" may have been created with the message. Do not repeat it; find it now with t3_find_threads, read it and tell the user what you see.",
   "t3.release.unread": "Before releasing it has to be checked: read thread {{thread}} now with t3_read_thread and tell the user whether their message is there. Nothing was changed.",
-
+  "t3.release.not_blocked": "NOT BLOCKED: no uncertain send is blocking this project. Nothing was changed or sent.",
+  "t3.release.done": "RELEASED: the uncertain send ({{when}}, {{where}}) stays unchecked, released by the user's decision. Nothing was sent. {{next}}",
+  "t3.release.more": "Another uncertain send remains in this project: check it too.",
+  "t3.release.open": "The project accepts sends again: if the user asked to resend it, use t3_send_message with the request they accepted.",
   "orca.unknown_project": "That projectId is not among the Orca projects. Use an ID from the catalog or find it with orca_list_projects; do not use IDs from another ADE.",
   "orca.unknown_project_not_listed": "That projectId is not among the Orca projects. Use an ID from the catalog or find it with orca_list_projects; do not use IDs from another ADE. Nothing was queried.",
   "orca.schema": "Orca: its CLI's answer does not have the format ADE Call expects (incompatible Orca version). Nothing was read or sent. Do not repeat it: tell the user; ADE Call or Orca needs updating.",

@@ -27,7 +27,8 @@
     "benchmark:startup": "npm run build && node dist/scripts/measure-startup.mjs",
     "build": "node scripts/build.mts",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.browser.json",
-    "access": "node dist/scripts/access.mjs"
+    "access": "node dist/scripts/access.mjs",
+    "eval": "npm run build && node dist/scripts/eval.mjs"
   },
   "dependencies": {
     "ws": "^8.18.3"
