@@ -133,7 +133,9 @@ the send rule depends on, is less accurate. For `gpt-4o*` transcription models
 the server also passes a hint prompt made only of names: up to 80 project
 names, distinctive words from thread titles, workspace names and a few fixed
 terms. Whole titles are not passed, because the transcriber may emit a
-sentence from the hint on noise.
+sentence from the hint on noise. On a short or unclear utterance it may also return the
+hint list itself; such a transcript is shown but is not a user turn for the
+send rule ([delivery-safety.md](delivery-safety.md#the-send-rule)).
 
 Messages sent to an agent are written in the user's language, or in the
 thread's language when continuing one in another language. The T3 delivery
