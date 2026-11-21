@@ -47,6 +47,8 @@ export function isHintEcho(transcript: string, hints: readonly string[]) {
     const found = hintsIn(part, known, prefixes, longest, i === parts.length - 1);
     if (!found) return false;
     for (const hint of found) recited.add(hint);
+    // A hint made of other hints ("Claude Codex") still counts as itself.
+    if (known.has(part)) recited.add(part);
   }
   return recited.size >= 3;
 }

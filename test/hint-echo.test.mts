@@ -40,6 +40,11 @@ test('the exact transcription prompt is an echo, even with a comma inside a name
   assert.equal(isHintEcho('T3, ADE Call, Claude, Red, Green', named), true);
 });
 
+test('a hint made of other hints counts as one more name', () => {
+  const joined = vocabularyHints('t3', ['Claude Codex']);
+  assert.equal(isHintEcho('Claude, Codex, Claude Codex', joined), true);
+});
+
 test('one name repeated is not an echo, so a project named like a yes cannot hide it', () => {
   const yes = vocabularyHints('t3', ['Yes', 'Vale']);
   for (const speech of ['Yes, yes, yes.', 'vale, vale, vale', 'Yes.']) assert.equal(isHintEcho(speech, yes), false, speech);
