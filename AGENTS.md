@@ -64,7 +64,8 @@ change.
 - Keep authentication and origin validation on every API route.
 - Never write to T3's database. Read it read-only; mutate only through the T3 CLI.
 - The server runs a send only after a new transcribed user turn since the previous
-  send, once per turn; it does not check that the turn accepts a proposal. That
+  send, once per turn (a transcript that only recites the recognition hints is not
+  a turn); it does not check that the turn accepts a proposal. That
   judgment is the model's, guided by the prompt: asking, designing or reading does
   not authorize sending. Do not describe the server gate as a confirmation check
   ([docs/delivery-safety.md](docs/delivery-safety.md#the-send-rule)).

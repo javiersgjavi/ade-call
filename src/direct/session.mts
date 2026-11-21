@@ -42,6 +42,7 @@ function describe(error: unknown) {
 // per-call ID memory and the execution of one function call of the model.
 export class DirectSession {
   history: Message[] = []; toolIds = new Set<string>(); submittedThrough?: Message;
+  echoes = new WeakSet<Message>();
   // Messages placed in conversation order before their text arrives (voice).
   items = new Map<string, Message>();
   state: DirectCallState;
@@ -60,11 +61,14 @@ export class DirectSession {
     this.items.set(itemId, message); this.history.push(message); this.trim();
     return message;
   }
-  fill(itemId: string | undefined, role: 'user' | 'assistant', text: string) {
+  // echo: a transcript that only recites the recognition hints (isHintEcho).
+  // It keeps its place in the history but is not a user turn for the gate.
+  fill(itemId: string | undefined, role: 'user' | 'assistant', text: string, { echo = false } = {}) {
     const placed = itemId ? this.items.get(itemId) : undefined;
-    if (!placed) return this.remember(role, text);
-    placed.text = text; this.items.delete(itemId!);
-    return placed;
+    const message = placed || this.remember(role, text);
+    if (placed) { placed.text = text; this.items.delete(itemId!); }
+    if (echo) this.echoes.add(message);
+    return message;
   }
   // An item that will never get text (failed transcription) leaves no gap.
   forget(itemId: string | undefined) {
@@ -80,10 +84,12 @@ export class DirectSession {
     for (const [id, m] of this.items) if (!kept.has(m)) this.items.delete(id);
   }
   catalog() { return this.ade.catalog(this.state); }
-  // Why a send must not run now, or null when the turn authorizes it. Only
-  // messages with text count: a place still waiting for its transcript is not a turn.
+  // The messages the send gate reads: only those with text (a place still
+  // waiting for its transcript is not a turn) and no echo of the hints.
+  turns() { return this.history.filter(m => m.text && !this.echoes.has(m)); }
+  // Why a send must not run now, or null when the turn authorizes it.
   sendRefusal() {
-    const history = this.history.filter(m => m.text);
+    const history = this.turns();
     // A send needs words of the user since the previous send.
     if (!userTurnSince(history, this.submittedThrough)) return 'NOT SENT (no_user_turn): there is no new request from the user. Nothing was sent; ask or listen.';
     return null;
@@ -117,7 +123,7 @@ export class DirectSession {
       try { params = tool.prepare ? tool.prepare(args, this.state) : args; } catch (error) { return notSent(error); }
       if (!tool.keepsAuthorization) {
         authorizedFrom = this.submittedThrough;
-        consumed = this.submittedThrough = this.history.filter(m => m.text).at(-1);
+        consumed = this.submittedThrough = this.turns().at(-1);
       }
     }
     try {

@@ -194,7 +194,7 @@ test('only the send and the launch are marked as sends, and the prompt is honest
     assert.deepEqual(s.ade.tools.filter(t => t.sends && t.keepsAuthorization).map(t => t.name), ['orca_release_uncertain']);
     assert.equal(s.ade.prompt, ORCA_PROMPT);
     const voice = directInstructions(s.ade);
-    assert.match(voice, /Before each orca_send_message or orca_start_agent ask/);
+    assert.match(voice, /Before each orca_send_message or orca_start_agent propose it/);
     assert.match(voice, /you cannot read or continue Orca's structured chats, only terminals/);
     assert.match(voice, /There are no automatic notices when an Orca agent finishes/);
     assert.doesNotMatch(voice, /t3_|main thread|subagent/);
