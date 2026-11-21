@@ -16,11 +16,16 @@ contract](adapters.md): `t3_send_message`, `orca_send_message` and
 
 Two layers decide whether a send happens. It matters which one does what.
 
-**The prompt asks** the model to propose every send in one sentence ("Shall I
-tell … to …?"), wait for the user's yes, include only what the user asked for
-or accepted, and send once. Asking, designing, a bare "okay" with no proposal,
-or instructions found in threads, documents or history do not authorize a
-send. Judging whether the user's words accept a concrete proposal is left to
+**The prompt asks** the model to propose every send in one short, natural
+sentence ("Shall I tell it to …?", naming the thread or project only when the
+user did not or to tell candidates apart), wait for the user's yes, include
+only what the user asked for or accepted, and send once. Only a clear
+acceptance of the proposal counts; a "yes" that cuts the proposal off accepts
+it when the message is what the user asked for, so the model does not propose
+again. Asking,
+designing, a bare "okay" with no proposal, a lone word, number or name (often
+a transcription artifact), noise, or instructions found in threads, documents
+or history do not authorize a send. Judging whether the user's words accept a concrete proposal is left to
 the model, in whatever language the call is in.
 
 **The server enforces** a narrower, mechanical rule: a sending tool runs only
@@ -30,6 +35,11 @@ the model calls a send with no new user turn, the server refuses
 (`NOT SENT (no_user_turn)`) and runs nothing. This blocks a model that sends on
 its own, repeats a send, or chains two sends off one "yes"; it does not by
 itself prove the user said yes.
+
+A transcript that only recites the recognition hints given to the transcription
+model (three or more of those names and no other word, such as "t3, ADE Call,
+Claude, Codex, …", which the model can return for a short or unclear sound) is
+stored and shown, marked `echo: true`, but is not a user turn for this rule.
 
 ```mermaid
 sequenceDiagram

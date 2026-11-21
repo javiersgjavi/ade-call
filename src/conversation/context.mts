@@ -48,6 +48,11 @@ function languageName(tag: string) {
 }
 
 interface ContextOptions { state: string; store: Store; publish: Publish; readOverview?: () => Promise<Overview>; readThread?: typeof t3 | null; backend?: string; capabilities?: Capabilities; readCatalog?: () => Project[]; readCatalogThreads?: (projectIds: string[]) => ThreadReference[] }
+// The recognition hints given to speech transcription: fixed names, then the
+// ones found, deduplicated, at most 80. Shared with the evaluations.
+export function vocabularyHints(backend: string, names: string[]) {
+  return [...new Set([backend, 'ADE Call', 'Claude', 'Codex', 'README', 'Git', ...names].map(n => String(n).trim().slice(0, 100)).filter(Boolean))].slice(0, 80);
+}
 export class ProjectContext {
   backend: string; capabilities: Capabilities; readThread: typeof t3 | null; state: string; store: Store; publish: Publish;
   snapshot: Snapshot; refreshing: Promise<boolean> | null; signature: string; readOverview: () => Promise<Overview>;
@@ -73,7 +78,7 @@ export class ProjectContext {
     // noise as if the user had said it. Only their distinctive words go in.
     const names = [...catalog.projects.map(p => p.name), ...this.snapshot.projects.map(p => p.name), ...catalog.threads.filter(t => t.relationshipToParent !== 'subagent').flatMap(t => distinctiveWords(t.title)),
       ...(this.snapshot.workspaces || []).map(w => w.name || ''), ...(saved?.projects || []).map(p => p.name), ...(saved?.workspaces || []).map(w => w.name || '')];
-    return [...new Set([this.backend, 'ADE Call', 'Claude', 'Codex', 'README', 'Git', ...names].map(n => String(n).trim().slice(0, 100)).filter(Boolean))].slice(0, 80);
+    return vocabularyHints(this.backend, names);
   }
   // Transcript of the last call of this conversation that heard the user.
   lastCall(bytes: number) {

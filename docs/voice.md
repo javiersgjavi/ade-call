@@ -59,7 +59,8 @@ local time, time zone from `ADE_CALL_TIME_ZONE` or the system, and when
 the previous call of this conversation ended) and the ADE's capabilities.
 Rendering fails if a placeholder is left unfilled; `npm test` checks every
 template renders. The rules cover language, speech style, turns, name
-recognition, evidence, the send proposal, limits and notices. They guide the
+recognition, matching a request to one, several or no projects, evidence, the
+send proposal and what accepts it, limits and notices. They guide the
 model; the enforcement is on the server ([delivery-safety.md](delivery-safety.md)).
 
 **Tools.** Each tool's description and parameter schema come from

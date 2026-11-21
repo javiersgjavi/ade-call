@@ -59,7 +59,7 @@ test('creates a WebRTC call with the ADE tools, its instructions and configurabl
   assert.equal(session.audio.input.transcription.language, undefined, 'without any language the provider detects it'); assert.equal(session.audio.input.transcription.prompt, 'Faro', 'only the names, no words around them');
   assert.deepEqual(session.tools.map((tool: { name: string }) => tool.name), ['fake_send', 'fake_read']);
   assert.ok(session.instructions.startsWith(directInstructions(f.ade)));
-  assert.match(session.instructions, /Before each fake_send ask/);
+  assert.match(session.instructions, /Before each fake_send propose it/);
   const system = f.socket.sent.filter(e => e.item?.role === 'system').map(e => e.item!.content![0].text);
   assert.deepEqual(system, ['Earlier history.', 'fake CATALOG · p1'], 'history and catalog are silent context, not user turns');
   assert.equal(f.published.find(e => e.type === 'voice')!.data.provider, 'realtime');
