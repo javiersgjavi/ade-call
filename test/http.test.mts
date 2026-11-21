@@ -82,7 +82,7 @@ test('HTTP authentication, CSRF protection, single voice design and ADE availabi
     assert.equal(JSON.stringify(status).includes(token), false);
     assert.equal(status.voiceReady, false, 'no openaiKey');
     assert.equal(status.voiceModel.model, 'gpt-realtime-2.1');
-    assert.deepEqual(status.voiceModel, { model: 'gpt-realtime-2.1', reasoning: 'low', eagerness: 'low', noiseReduction: 'near_field', voice: 'marin' }, 'the server-wide voice settings; their options are in /api/settings/voice');
+    assert.deepEqual(status.voiceModel, { provider: 'realtime', model: 'gpt-realtime-2.1', reasoning: 'low', eagerness: 'low', noiseReduction: 'near_field', voice: 'marin' }, 'the server-wide voice settings; their options are in /api/settings/voice');
     assert.deepEqual(status.ades.map((ade: { id: string; direct: boolean }) => [ade.id, ade.direct]), [['t3', true], ['orca', true]]);
     assert.equal(status.backend, 't3'); assert.equal(status.conversation.id, current);
 

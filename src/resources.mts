@@ -34,6 +34,20 @@ export function voiceLanguageText(key: VoiceLanguageText, vars: Vars = {}) {
   return render(template, vars, `voice_language.json ${key}`);
 }
 
+// Notes the voice engines add to a call (resources/voice_notes.json): the
+// greeting request, the wrapper of a server note where the provider has no
+// system role (Gemini Live), the result of a tool call the provider cancelled
+// or that finished while the connection was renewed, and an agent's message in a notice.
+export type VoiceNote = 'greeting' | 'note' | 'cancelled' | 'reconnected' | 'abandoned' | 'agentMessage';
+let voiceNotes: Record<VoiceNote, string> | undefined;
+export function voiceNoteText(key: VoiceNote, vars: Vars = {}) {
+  voiceNotes ??= json<Record<VoiceNote, string>>('voice_notes.json');
+  const template = voiceNotes[key];
+  if (template === undefined) throw new Error(`voice_notes.json: missing text ${key}.`);
+  // Values are data: a {{name}} inside them is not a placeholder.
+  return render(template, vars, `voice_notes.json ${key}`);
+}
+
 // ADE-specific parts of the system prompt, keyed by ADE id.
 export interface AdePrompt { role: string; target: string; source: string; destination: string; evidence: string; limits: string; ids: string; search?: string }
 export const adePrompt = (id: 't3' | 'orca') => json<Record<string, AdePrompt>>('ade_prompts.json')[id];

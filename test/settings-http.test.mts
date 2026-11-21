@@ -6,6 +6,8 @@ import { join } from 'node:path';
 import { spawn, execFileSync, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import net from 'node:net';
+import http from 'node:http';
+const wait = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Settings → Voice and OpenAI API key, against an isolated server with no
 // provider: nothing here reaches OpenAI. The keys are invented.
@@ -14,12 +16,12 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
   const listener = net.createServer(); listener.listen(0, '127.0.0.1'); await once(listener, 'listening');
   const port = (listener.address() as net.AddressInfo).port; await new Promise(resolve => listener.close(resolve));
   const base = `http://127.0.0.1:${port}`;
-  const envKey = 'sk-test-environment-0123456789abcdef', savedKey = 'sk-test-saved-key-ABCDEFGHIJ0123456789';
+  const envKey = 'sk-test-environment-0123456789abcdef', savedKey = 'sk-test-saved-key-ABCDEFGHIJ0123456789', geminiKey = 'AIzaTestGeminiKey-0123456789abcdefghijk';
   const configDir = join(tmp, 'config'), configPath = join(configDir, 'config.json');
   mkdirSync(configDir, { recursive: true, mode: 0o700 });
   // Hand-written fields the page does not know stay as they are.
-  writeFileSync(configPath, JSON.stringify({ realtimeModel: 'gpt-realtime-2', realtimeReasoning: 'medium', geminiKey: 'legacy-value', custom: { nested: [1, 2] } }), { mode: 0o644 });
-  const env = { ...process.env, PORT: String(port), ADE_CALL_HOST: '127.0.0.1', ADE_CALL_CONFIG: configDir, ADE_CALL_STATE: join(tmp, 'state'), T3CODE_HOME: join(tmp, 't3'), T3_BIN: join(tmp, 'missing-t3'), ORCA_BIN: join(tmp, 'missing-orca'), OPENAI_API_KEY: envKey };
+  writeFileSync(configPath, JSON.stringify({ realtimeModel: 'gpt-realtime-2', realtimeReasoning: 'medium', otherTool: 'legacy-value', custom: { nested: [1, 2] } }), { mode: 0o644 });
+  const env = { ...process.env, PORT: String(port), ADE_CALL_HOST: '127.0.0.1', ADE_CALL_CONFIG: configDir, ADE_CALL_STATE: join(tmp, 'state'), T3CODE_HOME: join(tmp, 't3'), T3_BIN: join(tmp, 'missing-t3'), ORCA_BIN: join(tmp, 'missing-orca'), OPENAI_API_KEY: envKey, GEMINI_API_KEY: '', GOOGLE_API_KEY: '' };
   let child: ChildProcess | undefined, output = '';
   const stop = async () => { if (child && child.exitCode === null) { child.kill(); await once(child, 'exit'); } };
   const start = async (extra: Record<string, string> = {}) => {
@@ -56,12 +58,13 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
   // Current values, the options of each one and where the key comes from.
   const initial = await call('/api/settings/voice', { headers: bearer });
   assert.equal(initial.status, 200);
-  assert.deepEqual(initial.body.settings, { model: 'gpt-realtime-2', voice: 'marin', reasoning: 'medium', eagerness: 'low', noiseReduction: 'near_field', transcriptionModel: 'gpt-4o-transcribe' });
-  assert.deepEqual(initial.body.options.model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gpt-realtime-2'], 'a hand-configured model stays offered');
+  assert.deepEqual(initial.body.settings, { model: 'gpt-realtime-2', voice: 'marin', reasoning: 'medium', eagerness: 'low', noiseReduction: 'near_field', transcriptionModel: 'gpt-4o-transcribe', geminiVoice: 'Kore' });
+  assert.deepEqual(initial.body.options.model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live', 'gemini-3.1-flash-live-preview', 'gpt-realtime-2'], 'a hand-configured model stays offered');
   assert.deepEqual(initial.body.options.voice, ['marin', 'cedar']);
   assert.deepEqual(initial.body.options.transcriptionModel, ['gpt-4o-transcribe', 'gpt-4o-mini-transcribe']);
   assert.deepEqual(initial.body.options.reasoning, ['minimal', 'low', 'medium', 'high', 'xhigh']);
   assert.deepEqual(initial.body.key, { set: true, source: 'env' });
+  assert.deepEqual(initial.body.geminiKey, { set: false, source: null }); assert.equal(initial.body.provider, 'realtime');
   assert.equal(initial.body.busy, false);
   assert.equal((await call('/api/status', { headers: bearer })).body.voiceReady, true, 'OPENAI_API_KEY from the environment');
 
@@ -72,12 +75,12 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
 
   const saved = await post('/api/settings/voice', { model: 'gpt-realtime-2.1-mini', reasoning: 'high', voice: 'cedar', eagerness: 'medium', noiseReduction: 'far_field', transcriptionModel: 'gpt-4o-mini-transcribe' });
   assert.equal(saved.status, 200);
-  assert.deepEqual(saved.body.settings, { model: 'gpt-realtime-2.1-mini', voice: 'cedar', reasoning: 'high', eagerness: 'medium', noiseReduction: 'far_field', transcriptionModel: 'gpt-4o-mini-transcribe' });
-  assert.deepEqual(saved.body.options.model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini'], 'the earlier hand-configured model is no longer current');
+  assert.deepEqual(saved.body.settings, { model: 'gpt-realtime-2.1-mini', voice: 'cedar', reasoning: 'high', eagerness: 'medium', noiseReduction: 'far_field', transcriptionModel: 'gpt-4o-mini-transcribe', geminiVoice: 'Kore' });
+  assert.deepEqual(saved.body.options.model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live', 'gemini-3.1-flash-live-preview'], 'the earlier hand-configured model is no longer current');
   const status = (await call('/api/status', { headers: bearer })).body;
-  assert.deepEqual(status.voiceModel, { model: 'gpt-realtime-2.1-mini', reasoning: 'high', eagerness: 'medium', noiseReduction: 'far_field', voice: 'cedar' }, 'applied without a restart');
+  assert.deepEqual(status.voiceModel, { provider: 'realtime', model: 'gpt-realtime-2.1-mini', reasoning: 'high', eagerness: 'medium', noiseReduction: 'far_field', voice: 'cedar' }, 'applied without a restart');
   assert.deepEqual((await call('/api/status?backend=orca', { headers: bearer })).body.voiceModel.model, 'gpt-realtime-2.1-mini', 'the same for every ADE');
-  assert.deepEqual(config(), { realtimeModel: 'gpt-realtime-2.1-mini', realtimeReasoning: 'high', geminiKey: 'legacy-value', custom: { nested: [1, 2] }, realtimeVoice: 'cedar', realtimeEagerness: 'medium', realtimeNoiseReduction: 'far_field', realtimeTranscriptionModel: 'gpt-4o-mini-transcribe' });
+  assert.deepEqual(config(), { realtimeModel: 'gpt-realtime-2.1-mini', realtimeReasoning: 'high', otherTool: 'legacy-value', custom: { nested: [1, 2] }, realtimeVoice: 'cedar', realtimeEagerness: 'medium', realtimeNoiseReduction: 'far_field', realtimeTranscriptionModel: 'gpt-4o-mini-transcribe' });
   assert.equal(statSync(configPath).mode & 0o777, 0o600);
   assert.equal((await post('/api/settings/voice', { reasoning: 'low' })).body.settings.model, 'gpt-realtime-2.1-mini', 'a partial change keeps the rest');
 
@@ -91,7 +94,7 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
   assert.equal(broken.status, 400); assert.deepEqual(broken.body, { error: 'Invalid request.' }, 'a malformed body is not echoed');
   const set = await post('/api/settings/key', { key: `  ${savedKey}\n` });
   assert.equal(set.status, 200); assert.deepEqual(set.body.key, { set: true, source: 'config' });
-  assert.equal(config().openaiKey, savedKey, 'trimmed'); assert.equal(config().geminiKey, 'legacy-value');
+  assert.equal(config().openaiKey, savedKey, 'trimmed'); assert.equal(config().otherTool, 'legacy-value');
   assert.equal(statSync(configPath).mode & 0o777, 0o600);
   const removed = await post('/api/settings/key', { key: null });
   assert.deepEqual(removed.body.key, { set: true, source: 'env' }, 'the environment key is used again');
@@ -109,8 +112,48 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
   assert.equal((await post('/api/settings/key', { key: null })).status, 200);
   assert.equal((await call('/api/status', { headers: bearer })).body.voiceReady, false);
 
-  // No response or log line ever carries either key, or a fragment of it.
-  for (const secret of [savedKey, envKey]) for (const text of [...responses, output]) {
+  // Gemini Live: the model picks the provider, and its own key decides whether voice is ready.
+  assert.equal((await post('/api/settings/key', { provider: 'other', key: geminiKey })).status, 400);
+  // A call request still arriving while Settings switches the provider is refused, not opened on the old one.
+  const prefix = '{"provider":"realtime","backend":"t3","sdp":"v=0';
+  let finishLive!: () => void;
+  const pending = new Promise<{ status: number; body: string }>(resolve => {
+    const request = http.request(base + '/api/live', { method: 'POST', headers: { ...bearer, 'Content-Length': '200' } }, response => {
+      let text = ''; response.on('data', chunk => { text += chunk; }); response.on('end', () => resolve({ status: response.statusCode || 0, body: text }));
+    });
+    request.write(prefix);
+    finishLive = () => request.end('"'.padEnd(200 - prefix.length - 1, ' ') + '}');
+  });
+  await wait(100);
+  const gemini = await post('/api/settings/voice', { model: 'gemini-3.8-live', geminiVoice: 'Puck' });
+  finishLive();
+  const late = await pending;
+  assert.equal(late.status, 409, late.body); assert.match(late.body, /voice model has changed/);
+  assert.equal(gemini.status, 200); assert.equal(gemini.body.provider, 'gemini');
+  let geminiStatus = (await call('/api/status', { headers: bearer })).body;
+  assert.equal(geminiStatus.voiceReady, false, 'no Gemini key yet'); assert.equal(geminiStatus.voiceModel.provider, 'gemini'); assert.equal(geminiStatus.voiceModel.voice, 'Puck');
+  const geminiSet = await post('/api/settings/key', { provider: 'gemini', key: geminiKey });
+  assert.equal(geminiSet.status, 200); assert.deepEqual(geminiSet.body.geminiKey, { set: true, source: 'config' }); assert.deepEqual(geminiSet.body.key, { set: false, source: null }, 'the OpenAI key is separate');
+  assert.equal(config().geminiKey, geminiKey); assert.equal(config().realtimeModel, 'gemini-3.8-live'); assert.equal(config().geminiVoice, 'Puck');
+  geminiStatus = (await call('/api/status', { headers: bearer })).body;
+  assert.equal(geminiStatus.voiceReady, true, 'the Gemini key applies without a restart');
+  // The audio socket of a relayed call follows the API's authentication.
+  const upgrade = (headers: Record<string, string>) => new Promise<number>(resolve => {
+    const request = http.get(base + '/api/live/stream?id=gem_none', { headers: { Connection: 'Upgrade', Upgrade: 'websocket', 'Sec-WebSocket-Version': '13', 'Sec-WebSocket-Key': 'dGhlIHNhbXBsZSBub25jZQ==', ...headers } });
+    request.on('response', response => { response.resume(); resolve(response.statusCode || 0); });
+    request.on('upgrade', (_response, socket) => { socket.destroy(); resolve(101); });
+    request.on('error', () => resolve(0));
+  });
+  assert.equal(await upgrade({}), 401);
+  assert.equal(await upgrade({ Cookie: cookie, Origin: 'https://attacker.invalid' }), 403);
+  assert.equal(await upgrade({ Cookie: cookie }), 403, 'a browser cookie without Origin');
+  assert.equal(await upgrade({ Cookie: cookie, Origin: base }), 404, 'no such call');
+  assert.equal((await post('/api/settings/key', { provider: 'gemini', key: null })).status, 200);
+  assert.equal('geminiKey' in config(), false);
+  assert.equal((await call('/api/status', { headers: bearer })).body.voiceReady, false);
+
+  // No response or log line ever carries any key, or a fragment of it.
+  for (const secret of [savedKey, envKey, geminiKey]) for (const text of [...responses, output]) {
     assert.ok(!text.includes(secret.slice(8)), 'a key fragment was returned or logged');
   }
 });

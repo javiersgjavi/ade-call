@@ -4,7 +4,9 @@ export function audioDiagnostics(input: unknown) {
   const result: Record<string, unknown> = {};
   if (!input || typeof input !== 'object' || Array.isArray(input)) return result;
   const data = input as Record<string, unknown>;
-  for (const key of ['packetsReceived', 'packetsLost', 'packetsDiscarded', 'bytesReceived', 'concealedSamples', 'silentConcealedSamples', 'concealmentEvents', 'totalSamplesReceived', 'jitterMs', 'roundTripTimeMs', 'jitterBufferMeanMs', 'outputReadyState', 'statsAgeMs', 'disconnects', 'localGateActivations', 'localGateActiveMs', 'localGateTimeouts']) {
+  for (const key of ['packetsReceived', 'packetsLost', 'packetsDiscarded', 'bytesReceived', 'concealedSamples', 'silentConcealedSamples', 'concealmentEvents', 'totalSamplesReceived', 'jitterMs', 'roundTripTimeMs', 'jitterBufferMeanMs', 'outputReadyState', 'statsAgeMs', 'disconnects', 'localGateActivations', 'localGateActiveMs', 'localGateTimeouts',
+    // A call the server relays (Gemini Live): frames each way, cut answers, queued playback.
+    'relayFramesSent', 'relayFramesReceived', 'relayInterruptions', 'relaySocketState', 'relayQueuedMs']) {
     const value = data[key];
     if (typeof value === 'number' && Number.isFinite(value) && value >= (key === 'packetsLost' ? -1e9 : 0) && value <= 1e12) result[key] = value;
   }
@@ -23,8 +25,8 @@ export function audioDiagnostics(input: unknown) {
 export function clientCloseReason(cause: unknown) {
   const reasons: Record<string, string> = {
     user_hangup: 'the user hung up.',
-    transport_failed: 'The WebRTC audio connection failed.',
-    transport_closed: 'The WebRTC audio connection closed.',
+    transport_failed: 'The audio connection (WebRTC or the server relay) failed.',
+    transport_closed: 'The audio connection (WebRTC or the server relay) closed.',
     data_channel_closed: 'The voice data channel closed.',
     provider_closed: 'The provider closed the voice session.',
     server_session_missing: 'The server no longer recognizes the voice session.',

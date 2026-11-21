@@ -11,6 +11,7 @@ after editing them. No rebuild is needed.
 | --- | --- | --- |
 | [system_prompt_voice.txt](system_prompt_voice.txt) | Instructions for a voice call. | `src/direct/prompt.mts` |
 | [voice_language.json](voice_language.json) | The first sentence of the `LANGUAGE` rule (language chosen in the settings, the browser's, or unknown) and the language and accent reminder sent before each response the server requests. `{{language}}` and `{{variety}}` are English names computed from a BCP 47 tag, such as "Spanish" and "Spanish (Spain)". | `src/direct/prompt.mts` |
+| [voice_notes.json](voice_notes.json) | The greeting request, the header of a server note where the provider has no system role (Gemini Live), the notes that tell the model the result of a send it cancelled or that finished while the connection was renewed, the result of a call abandoned before it started, and the line that carries an agent's message in a notice. `{{text}}`, `{{tool}}`, `{{output}}` and `{{body}}` are values, never scanned for placeholders. | `src/voice/realtime.mts`, `src/voice/gemini.mts` |
 | [ade_prompts.json](ade_prompts.json) | The ADE-specific parts of those instructions, for `t3` and `orca`. | `src/direct/t3.mts`, `src/direct/orca.mts` |
 | [tools.json](tools.json) | Each tool's description and parameters. | `src/adapters/**`, `src/direct/*.mts` |
 | [error_messages.json](error_messages.json) | Errors the tools return to the model. | `src/adapters/**`, `src/direct/*.mts` |
