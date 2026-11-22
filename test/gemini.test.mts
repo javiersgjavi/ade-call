@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import type { DirectResult, DirectTool, DirectToolContext } from '../src/direct/contract.mjs';
-import { GeminiCalls, isGeminiModel } from '../src/voice/gemini.mjs';
+import { GeminiCalls, geminiSchema, isGeminiModel } from '../src/voice/gemini.mjs';
 import { directInstructions } from '../src/direct/prompt.mjs';
 import { StatusError } from '../src/shared/contracts.mjs';
 import { pcmToFloat, streamUrl } from '../public/relayed-call.js';
@@ -510,4 +510,9 @@ test('a transcript that only recites the recognition hints is shown but is not a
   f.call('fake_send', 'call_yes');
   await wait(100);
   assert.equal(f.runs.length, 1);
+});
+
+test('tool parameters keep only the schema keywords Gemini accepts', () => {
+  assert.deepEqual(geminiSchema({ type: 'object', additionalProperties: false, required: ['q'], properties: { q: { type: 'string', minLength: 1, description: 'Query' }, additionalProperties: { type: 'array', items: { type: 'integer', minimum: 0, const: 1 }, maxItems: 2 } } }),
+    { type: 'object', required: ['q'], properties: { q: { type: 'string', minLength: 1, description: 'Query' }, additionalProperties: { type: 'array', items: { type: 'integer', minimum: 0 }, maxItems: 2 } } });
 });

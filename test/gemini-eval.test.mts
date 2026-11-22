@@ -79,6 +79,11 @@ test('a Gemini run records the setup, the send of a yes, its result and the anno
   const setup = provider!.sent.find(m => m.setup) as { setup: { inputAudioTranscription: { customVocabulary: string[] } } };
   assert.deepEqual(run.vocabulary, setup.setup.inputAudioTranscription.customVocabulary);
   assert.ok(run.vocabulary!.includes('proj'));
+  // The production tools in the subset of JSON Schema Gemini accepts: an
+  // unknown keyword such as additionalProperties makes it refuse the setup.
+  const declarations = (setup.setup as unknown as { tools: { functionDeclarations: { name: string; parameters: { properties: Record<string, unknown> } }[] }[] }).tools[0].functionDeclarations;
+  assert.doesNotMatch(JSON.stringify(declarations), /additionalProperties/);
+  assert.ok(declarations.find(d => d.name === 't3_send_message')!.parameters.properties.message);
   assert.match(run.initialCatalog!, /^T3 CATALOG/);
   // The microphone reaches the provider as the page sends it: 100 ms of 16 kHz PCM.
   const frame = provider!.sent.find(m => (m as { realtimeInput?: { audio?: unknown } }).realtimeInput?.audio) as { realtimeInput: { audio: { data: string; mimeType: string } } };

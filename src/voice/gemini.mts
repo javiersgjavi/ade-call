@@ -52,6 +52,23 @@ export type Socket = { readyState: number; send(data: string | Buffer, options?:
   on(event: string, fn: (...args: never[]) => void): unknown; once(event: string, fn: (...args: never[]) => void): unknown };
 // The key goes in a header, never in the URL, so no log or error can quote it.
 export const connectGemini = (key: string) => new WebSocket(GEMINI_ENDPOINT, { headers: { 'x-goog-api-key': key }, handshakeTimeout: 15_000, maxPayload: 4 * 1024 * 1024 }) as unknown as Socket;
+// Function parameters take Gemini's OpenAPI subset of JSON Schema: a keyword
+// outside it (additionalProperties) makes the provider refuse the whole setup.
+// Other keywords are dropped; property names are kept as they are.
+const SCHEMA_KEYWORDS = new Set(['type', 'format', 'title', 'description', 'nullable', 'enum', 'maxItems', 'minItems', 'properties', 'required', 'minProperties', 'maxProperties',
+  'minLength', 'maxLength', 'pattern', 'example', 'anyOf', 'propertyOrdering', 'default', 'items', 'minimum', 'maximum']);
+export function geminiSchema(schema: unknown): unknown {
+  if (Array.isArray(schema)) return schema.map(geminiSchema);
+  if (!schema || typeof schema !== 'object') return schema;
+  const out: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (!SCHEMA_KEYWORDS.has(key)) continue;
+    if (key === 'properties' && value && typeof value === 'object') out[key] = Object.fromEntries(Object.entries(value).map(([name, property]) => [name, geminiSchema(property)]));
+    else if (key === 'items' || key === 'anyOf') out[key] = geminiSchema(value);
+    else out[key] = value;
+  }
+  return out;
+}
 interface FunctionCallPart { id?: string; name?: string; args?: Record<string, unknown> }
 interface ServerMessage {
   setupComplete?: object;
@@ -155,7 +172,7 @@ export class GeminiCalls {
       systemInstruction: { parts: [{ text: directInstructions(this.ade, { callStart: this.context.timing?.(), capabilities: { backend: this.context.backend, capabilities: this.context.capabilities }, language }) }] },
       // BLOCKING: the model waits for each result before it speaks about it,
       // as with Realtime. 3.1 is synchronous already and takes no behavior.
-      tools: [{ functionDeclarations: this.ade.tools.map(({ name, description, parameters }) => ({ name, description, parameters, ...(blocking ? { behavior: 'BLOCKING' } : {}) })) }],
+      tools: [{ functionDeclarations: this.ade.tools.map(({ name, description, parameters }) => ({ name, description, parameters: geminiSchema(parameters), ...(blocking ? { behavior: 'BLOCKING' } : {}) })) }],
       inputAudioTranscription: blocking && vocabulary.length ? { customVocabulary: vocabulary } : {},
       outputAudioTranscription: {},
       // History and catalog go first as client content; they never trigger a reply.
