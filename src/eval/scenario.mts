@@ -185,6 +185,8 @@ export function validateScenario(value: unknown, file = 'scenario'): Scenario {
     let text: string | undefined;
     try { text = validateInstructions(s.instructions); } catch (error) { fail(file, `instructions: ${(error as Error).message}`); }
     if (!text) fail(file, 'instructions is blank: remove it');
+    // Kept as Settings would save them, so the voice and the judges get production's text.
+    s.instructions = text;
   }
   if (s.language !== undefined && (typeof s.language !== 'string' || !/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(s.language))) fail(file, 'language must be a BCP 47 tag');
   // Every shape the checks and the judges read, so a paid call never ends in a crash.

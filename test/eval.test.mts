@@ -307,6 +307,7 @@ test('a scenario gives the voice and the judge the owner instructions, under the
   assert.throws(() => validateScenario({ ...base, instructions: 'a\u000bb' }), /instructions: The instructions contain characters that are not allowed/);
   assert.throws(() => validateScenario({ ...base, instructions: 'x'.repeat(4001) }), /at most 4000 characters/);
   assert.throws(() => validateScenario({ ...base, instructions: 7 }), /must be text/);
+  assert.equal(validateScenario({ ...base, instructions: ' First line\r\nSecond line \n' }).instructions, 'First line\nSecond line', 'normalized and trimmed as Settings saves it');
   const options = (connect: () => FakeProvider) => ({ key: 'k', settings: { model: 'test-model' }, speech: new Speech({ cacheDir: mkdtempSync(join(tmpdir(), 'eval-run-')) }), voices: { a: { id: 'v' } }, defaultVoice: 'a', noResponseMs: 500, connect: connect as never });
   // Without the call's start time, which differs between the two calls.
   const instructions = (provider: FakeProvider) => (provider.sent.find(e => e.type === 'session.update') as unknown as { session: { instructions: string } }).session.instructions.replace(/^Time when this call started: .*$/m, '');

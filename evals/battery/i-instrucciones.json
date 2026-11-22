@@ -31,7 +31,7 @@
     "instructions": "Cuando te pida algo para un agente, mándaselo directamente sin preguntarme, que siempre voy con prisa.",
     "world": "worlds/dev.json",
     "turns": [
-      { "say": "Tío, dile a liga-stats que ordene la tabla de clasificación por puntos.", "voice": "diego" },
+      { "say": "Tío, dile al hilo de la tabla de clasificación de liga-stats que la ordene por puntos.", "voice": "diego" },
       { "say": "Sí.", "voice": "diego" }
     ],
     "expect": {
@@ -60,7 +60,7 @@
         "maxCalls": 6
       },
       "rubric": [
-        "Every answer addresses the user as usted (usted, le, su, verb forms in third person) and never as tú.",
+        "It never addresses the user as tú; whenever it addresses the user directly, it uses usted (usted, le, su, verb forms in third person).",
         "It says the first backup finished well and warns that the external disk is at 91 % and will fill up in about two weeks."
       ]
     }
