@@ -80,6 +80,8 @@ export type VoiceSettingField = 'model' | 'voice' | 'reasoning' | 'eagerness' | 
 export interface VoiceSettingsResponse {
   settings: Record<VoiceSettingField, string>; options: Record<VoiceSettingField, string[]>;
   key: { set: boolean; source: 'config' | 'env' | null }; busy: boolean;
+  // The owner's custom instructions ('' when none) and their maximum length.
+  instructions: string; instructionsMax: number;
 }
 // Stored events of a call, as src/voice/realtime.mts publishes them: what the
 // user and the agent said, and each tool run with sanitized details.

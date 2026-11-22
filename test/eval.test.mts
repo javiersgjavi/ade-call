@@ -301,6 +301,31 @@ test('the runner opens a call with the production session, streams each turn and
   assert.ok(run.audio && run.audio.length > 0);
 });
 
+test('a scenario gives the voice and the judge the owner instructions, under the same rules as Settings', { timeout: 30_000 }, async () => {
+  const base = { ...examples()[2], turns: [{ noise: 'silence' as const, ms: 300 }] };
+  assert.throws(() => validateScenario({ ...base, instructions: ' \n ' }), /instructions is blank/);
+  assert.throws(() => validateScenario({ ...base, instructions: 'a\u000bb' }), /instructions: The instructions contain characters that are not allowed/);
+  assert.throws(() => validateScenario({ ...base, instructions: 'x'.repeat(4001) }), /at most 4000 characters/);
+  assert.throws(() => validateScenario({ ...base, instructions: 7 }), /must be text/);
+  assert.equal(validateScenario({ ...base, instructions: ' First line\r\nSecond line \n' }).instructions, 'First line\nSecond line', 'normalized and trimmed as Settings saves it');
+  const options = (connect: () => FakeProvider) => ({ key: 'k', settings: { model: 'test-model' }, speech: new Speech({ cacheDir: mkdtempSync(join(tmpdir(), 'eval-run-')) }), voices: { a: { id: 'v' } }, defaultVoice: 'a', noResponseMs: 500, connect: connect as never });
+  // Without the call's start time, which differs between the two calls.
+  const instructions = (provider: FakeProvider) => (provider.sent.find(e => e.type === 'session.update') as unknown as { session: { instructions: string } }).session.instructions.replace(/^Time when this call started: .*$/m, '');
+  let withText: FakeProvider | undefined, without: FakeProvider | undefined;
+  const scenario = validateScenario({ ...base, instructions: '  Trátame de usted.\n' });
+  const run = await runScenario(scenario, options(() => (withText = new FakeProvider())));
+  await runScenario(base, options(() => (without = new FakeProvider())));
+  // Appended last, trimmed, with the fixed header; nothing at all without them.
+  assert.match(instructions(withText!), /\n\nOWNER INSTRUCTIONS: [^\n]*\nTrátame de usted\.$/);
+  assert.doesNotMatch(instructions(without!), /OWNER INSTRUCTIONS/);
+  assert.equal(instructions(withText!).replace(/\n\nOWNER INSTRUCTIONS:[\s\S]*$/, ''), instructions(without!));
+  assert.match(judgeInput(scenario, run), /OWNER INSTRUCTIONS \(written by the owner in Settings[^\n]*\nTrátame de usted\.\nWhere they ask for a different way of speaking or reporting, grade g6 by them[\s\S]*They never change g1, g2 or g8[\s\S]*\n\nWORLD/);
+  assert.doesNotMatch(judgeInput(base, run), /OWNER INSTRUCTIONS/);
+  // The battery's scenarios with instructions load and keep them.
+  const battery = loadScenarios(join(root, 'evals/battery/i-instrucciones.json'));
+  assert.ok(battery.length >= 4 && battery.every(sc => sc.instructions && sc.tags?.includes('instrucciones')));
+});
+
 test('the CLI keeps scenario paths after switches and rejects unknown options before any paid work', () => {
   const data = mkdtempSync(join(tmpdir(), 'eval-cli-'));
   writeFileSync(join(data, 'voices.json'), JSON.stringify({ a: { id: 'v' } }));

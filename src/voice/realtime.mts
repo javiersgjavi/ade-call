@@ -50,6 +50,8 @@ type Fetch = (url: string, init: RequestInit) => Promise<Pick<Response, 'ok' | '
 export interface RealtimeOptions {
   key?: string; ade: DirectAde; context: VoiceContext; publish: Publish; store: { meta(key: string, value?: unknown): unknown };
   settings?: RealtimeSettings; fetch?: Fetch; connect?: (callId: string) => Socket;
+  // The owner's custom instructions (Settings), appended to the instructions when not blank.
+  instructions?: string;
   // A delivery the ADE accepted, and a thread the model read: both feed the thread watch.
   delivered?: (thread: DeliveredThread, conversationId?: string) => void; read?: (threadId: string) => void;
 }
@@ -83,6 +85,8 @@ const TRANSCRIPT_WAIT_MS = 2500;
 
 export class RealtimeCalls {
   key: string | undefined; ade: DirectAde; publish: Publish; store: RealtimeOptions['store']; context: VoiceContext;
+  // The owner's custom instructions; changed by configure().
+  instructions: string | undefined;
   // Set by apply().
   model!: string; voice!: string; reasoning!: string; eagerness!: Eagerness; noiseReduction!: string; transcriptionModel!: string;
   sessions: Map<string, RealtimeCall>; creating: boolean; timer: NodeJS.Timeout;
@@ -98,8 +102,8 @@ export class RealtimeCalls {
   hints?: string[];
   fetch: Fetch; connect: (callId: string) => Socket;
   delivered?: RealtimeOptions['delivered']; read?: RealtimeOptions['read'];
-  constructor({ key, ade, publish, store, context, settings = {}, fetch: fetcher, connect, delivered, read }: RealtimeOptions) {
-    this.key = key; this.ade = ade; this.publish = publish; this.store = store; this.context = context; this.delivered = delivered; this.read = read;
+  constructor({ key, ade, publish, store, context, settings = {}, instructions, fetch: fetcher, connect, delivered, read }: RealtimeOptions) {
+    this.instructions = instructions; this.key = key; this.ade = ade; this.publish = publish; this.store = store; this.context = context; this.delivered = delivered; this.read = read;
     this.sessions = new Map(); this.creating = false;
     this.apply(settings);
     this.fetch = fetcher || ((url, init) => fetch(url, init));
@@ -118,7 +122,7 @@ export class RealtimeCalls {
     const hints = this.hints = this.transcriptionModel.startsWith('gpt-4o') ? this.context.vocabulary().slice(0, 80) : [];
     return {
       type: 'realtime', model: this.model, output_modalities: ['audio'],
-      instructions: directInstructions(this.ade, { callStart: this.context.timing?.(), capabilities: { backend: this.context.backend, capabilities: this.context.capabilities }, language }),
+      instructions: directInstructions(this.ade, { callStart: this.context.timing?.(), capabilities: { backend: this.context.backend, capabilities: this.context.capabilities }, language, custom: this.instructions }),
       reasoning: { effort: this.reasoning },
       audio: {
         input: {
@@ -150,9 +154,11 @@ export class RealtimeCalls {
   // A tool still executing (a send keeps going after a hang-up): stopping the
   // service waits for it as it waits for a call (see shutdown in server.mts).
   get working() { return this.running > 0; }
-  configure({ settings, key }: { settings?: RealtimeSettings; key?: string | null }) {
+  // instructions: null clears them; undefined keeps them.
+  configure({ settings, key, instructions }: { settings?: RealtimeSettings; key?: string | null; instructions?: string | null }) {
     if (this.busy) throw new Error('End the call before changing the voice settings.');
     if (settings) this.apply(settings);
+    if (instructions !== undefined) this.instructions = instructions || undefined;
     if (key !== undefined) this.key = key || undefined;
   }
   get settings(): Required<RealtimeSettings> {

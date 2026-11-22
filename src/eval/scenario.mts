@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { WORKING } from '../conversation/thread-watch.mjs';
 import { isSensitiveKey, looksLikeCredential } from './redact.mjs';
+import { validateInstructions } from '../voice/settings.mjs';
 
 // A scenario is one scripted call: the ADE world the voice sees, the user's
 // turns (spoken by a synthetic voice, or noise), and what must and must not
@@ -82,6 +83,8 @@ export interface Scenario {
   channel?: 'clean' | 'phone';
   // What the voice remembers of earlier calls (the "historical conversation").
   history?: string;
+  // The owner's custom instructions from Settings, appended to the prompt as in production.
+  instructions?: string;
   world: World;
   turns: Turn[];
   expect: Expectations;
@@ -177,6 +180,14 @@ export function validateScenario(value: unknown, file = 'scenario'): Scenario {
   const sentTo = new Set((s.expect?.sends || []).flatMap(e => e.thread ? [e.thread] : []));
   for (const p of s.world.projects) for (const t of p.threads || []) if (sentTo.has(t.key) && t.onSend?.afterTurn && t.onSend.afterTurn > s.turns.length) fail(file, `thread ${t.key}: onSend.afterTurn ${t.onSend.afterTurn} is past the last turn`);
   if (s.history !== undefined && typeof s.history !== 'string') fail(file, 'history must be text');
+  // The same rules as Settings: a scenario cannot give the voice what the page would refuse.
+  if (s.instructions !== undefined) {
+    let text: string | undefined;
+    try { text = validateInstructions(s.instructions); } catch (error) { fail(file, `instructions: ${(error as Error).message}`); }
+    if (!text) fail(file, 'instructions is blank: remove it');
+    // Kept as Settings would save them, so the voice and the judges get production's text.
+    s.instructions = text;
+  }
   if (s.language !== undefined && (typeof s.language !== 'string' || !/^[a-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(s.language))) fail(file, 'language must be a BCP 47 tag');
   // Every shape the checks and the judges read, so a paid call never ends in a crash.
   const texts = (value: unknown, name: string) => { if (value !== undefined && (!Array.isArray(value) || value.some(v => typeof v !== 'string' || !v))) fail(file, `${name} must be a list of non-empty texts`); };

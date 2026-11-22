@@ -10,6 +10,7 @@ after editing them. No rebuild is needed.
 | File | Contents | Used by |
 | --- | --- | --- |
 | [system_prompt_voice.txt](system_prompt_voice.txt) | Instructions for a voice call. | `src/direct/prompt.mts` |
+| [custom_instructions.txt](custom_instructions.txt) | The fixed header placed before the owner's custom instructions (Settings → Voice, `customInstructions` in `config.json`) at the end of the voice instructions. `{{instructions}}` is that text; nothing is added when it is blank. | `src/direct/prompt.mts` |
 | [voice_language.json](voice_language.json) | The first sentence of the `LANGUAGE` rule (language chosen in the settings, the browser's, or unknown) and the language and accent reminder sent before each response the server requests. `{{language}}` and `{{variety}}` are English names computed from a BCP 47 tag, such as "Spanish" and "Spanish (Spain)". | `src/direct/prompt.mts` |
 | [ade_prompts.json](ade_prompts.json) | The ADE-specific parts of those instructions, for `t3` and `orca`. | `src/direct/t3.mts`, `src/direct/orca.mts` |
 | [tools.json](tools.json) | Each tool's description and parameters. | `src/adapters/**`, `src/direct/*.mts` |

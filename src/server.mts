@@ -11,7 +11,7 @@ import { Recordings } from './voice/recordings.mjs';
 import { Store } from './conversation/store.mjs';
 import { clientCloseReason } from './voice/diagnostics.mjs';
 import { REALTIME_DEFAULTS, RealtimeCalls } from './voice/realtime.mjs';
-import { CONFIG_FIELDS, VOICE_FIELDS, readConfig, updateConfig, validateKey, validateVoiceSettings, voiceOptions, type VoiceSettings } from './voice/settings.mjs';
+import { CONFIG_FIELDS, INSTRUCTIONS_FIELD, MAX_INSTRUCTIONS, VOICE_FIELDS, readConfig, updateConfig, validateInstructions, validateKey, validateVoiceSettings, voiceOptions, type VoiceSettings } from './voice/settings.mjs';
 import { ProjectContext } from './conversation/context.mjs';
 import { ades, getAde } from './adapters/registry.mjs';
 import { Discovery } from './adapters/discovery.mjs';
@@ -48,6 +48,10 @@ let shuttingDown = false;
 // The voice settings of the next call, the same for every ADE.
 const realtimeSettings: VoiceSettings = { ...REALTIME_DEFAULTS };
 for (const field of VOICE_FIELDS) realtimeSettings[field] = text(config[CONFIG_FIELDS[field]]) || realtimeSettings[field];
+// The owner's custom instructions (Settings → Voice), appended to every call's prompt.
+let customInstructions: string | undefined;
+try { customInstructions = validateInstructions(config[INSTRUCTIONS_FIELD]); }
+catch (error) { throw new Error(`config.json ${INSTRUCTIONS_FIELD}: ${errorMessage(error)}`, { cause: error }); }
 // Voice exists only for an ADE with direct tools (src/direct).
 interface Runtime { adapter: Ade; backend: string; context: ProjectContext; discovery: Discovery; realtime: RealtimeCalls | null; watch: ThreadWatch | null }
 const runtimes = new Map<string, Runtime>();
@@ -72,7 +76,7 @@ for (const adapter of Object.values(ades)) {
   if (ade) {
     const delivered = (thread: { threadId: string; runId: string | null; link: string | null; project: string }, conversationId?: string) => runtime.watch?.add({ ...thread, conversationId });
     const read = (threadId: string) => runtime.watch?.markRead(threadId);
-    runtime.realtime = new RealtimeCalls({ key: openaiKey(), ade, context, publish: scopedPublish, store, settings: realtimeSettings, delivered, read });
+    runtime.realtime = new RealtimeCalls({ key: openaiKey(), ade, context, publish: scopedPublish, store, settings: realtimeSettings, instructions: customInstructions, delivered, read });
   }
   runtimes.set(backend, runtime);
 }
@@ -84,14 +88,15 @@ function runtime(id: string) {
 function voiceBusy() { return [...runtimes.values()].some(({ realtime }) => realtime?.busy); }
 function toolsRunning() { return [...runtimes.values()].some(({ realtime }) => realtime?.working); }
 function voiceState(): VoiceSettingsResponse {
-  return { settings: { ...realtimeSettings }, options: voiceOptions(realtimeSettings), key: { set: !!openaiKey(), source: configKey ? 'config' : envKey ? 'env' : null }, busy: voiceBusy() };
+  return { settings: { ...realtimeSettings }, options: voiceOptions(realtimeSettings), key: { set: !!openaiKey(), source: configKey ? 'config' : envKey ? 'env' : null }, busy: voiceBusy(),
+    instructions: customInstructions || '', instructionsMax: MAX_INSTRUCTIONS };
 }
 // Saved first, then applied to every ADE's next call; the callers have checked
 // that no call is active or connecting, and nothing awaits in between.
 function saveVoice(res: http.ServerResponse, changes: Record<string, string | undefined>, apply: () => void) {
   try { updateConfig(configPath, changes); } catch (error) { return json(res, 500, { error: errorMessage(error) }); }
   apply();
-  for (const { realtime } of runtimes.values()) realtime?.configure({ settings: realtimeSettings, key: openaiKey() ?? null });
+  for (const { realtime } of runtimes.values()) realtime?.configure({ settings: realtimeSettings, key: openaiKey() ?? null, instructions: customInstructions ?? null });
   return json(res, 200, voiceState());
 }
 function broadcast(event: StoredEvent) {
@@ -256,7 +261,7 @@ const server = http.createServer(async (req, res) => {
         // installer reads it before restarting the service (scripts/service-busy.mts).
         serviceBusy: voiceBusy() || toolsRunning() });
     }
-    // Server-wide voice settings and OpenAI key (Settings). Changes are refused
+    // Server-wide voice settings, custom instructions and OpenAI key (Settings). Changes are refused
     // during a call or while one connects: the call keeps what it started with.
     if (req.method === 'GET' && url.pathname === '/api/settings/voice') return json(res, 200, voiceState());
     if (req.method === 'POST' && url.pathname === '/api/settings/voice') {
@@ -266,6 +271,14 @@ const server = http.createServer(async (req, res) => {
       try { next = validateVoiceSettings(data, realtimeSettings); } catch (error) { return json(res, 400, { error: errorMessage(error) }); }
       const changed = VOICE_FIELDS.filter(field => Object.hasOwn(data, field));
       return saveVoice(res, Object.fromEntries(changed.map(field => [CONFIG_FIELDS[field], next[field]])), () => Object.assign(realtimeSettings, next));
+    }
+    if (req.method === 'POST' && url.pathname === '/api/settings/instructions') {
+      const data = await body(req, 64 * 1024);
+      if (!Object.hasOwn(data, 'instructions') || Object.keys(data).length !== 1) return json(res, 400, { error: 'Send only the instructions field.' });
+      if (voiceBusy()) return json(res, 409, { error: 'End the call before changing the instructions.' });
+      let next: string | undefined;
+      try { next = validateInstructions(data.instructions); } catch (error) { return json(res, 400, { error: errorMessage(error) }); }
+      return saveVoice(res, { [INSTRUCTIONS_FIELD]: next }, () => { customInstructions = next; });
     }
     if (req.method === 'POST' && url.pathname === '/api/settings/key') {
       // Parse errors can quote the body: never echo them here.
