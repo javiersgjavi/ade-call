@@ -25,9 +25,11 @@ export const USER_QUIET_MS = 2500;
 type Reader = (threadId: string) => Promise<T3Response>;
 type Deliver = (notice: ThreadNotice) => boolean;
 
-const WORKING = new Set(['running', 'starting', 'preparing', 'queued', 'in_progress', 'busy']);
+export const WORKING = new Set(['running', 'starting', 'preparing', 'queued', 'in_progress', 'busy']);
 const FAILED = new Set(['failed', 'error']);
 const STOPPED = new Set(['interrupted', 'stopped', 'cancelled', 'canceled']);
+// The kind of final notice for the status a thread ended its turn with.
+export const finalKind = (status?: string): ThreadNoticeKind => FAILED.has(String(status)) ? 'failed' : STOPPED.has(String(status)) ? 'stopped' : 'finished';
 const key = (m: Message) => `${m.runId || ''}\u0000${m.role}\u0000${m.text}`;
 // Byte bound keeps headers under the append limit whatever the alphabet.
 function clip(text: string, maxBytes: number) {
@@ -122,7 +124,7 @@ export class ThreadWatch {
     const status = thread.status || '';
     const endedAt = Date.parse(thread.updatedAt || '');
     const quiet = watch.readAt != null && (!Number.isFinite(endedAt) || watch.readAt > endedAt);
-    watch.final = { ...base, kind: FAILED.has(status) ? 'failed' : STOPPED.has(status) ? 'stopped' : 'finished', text: messages.at(-1)?.text, quiet };
+    watch.final = { ...base, kind: finalKind(status), text: messages.at(-1)?.text, quiet };
     if (this.deliver(watch.final)) this.watches.delete(watch.threadId);
   }
 }

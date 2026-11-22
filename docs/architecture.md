@@ -271,8 +271,8 @@ server serves only an allowlist of compiled files.
 These hold across the codebase. Each is explained once, where linked.
 
 - ADE state changes only through the ADE's CLI; T3's database is read-only.
-- A sending tool runs only for a new transcribed user turn, at most once per
-  `call_id`, and is never retried ([delivery-safety.md](delivery-safety.md)).
+- A sending tool runs only for a new transcribed user turn (an echo of the
+  recognition hints is not one), at most once per `call_id`, and is never retried ([delivery-safety.md](delivery-safety.md)).
 - A send that may have happened is recorded as uncertain and blocks the project
   until it is resolved ([delivery-safety.md](delivery-safety.md#uncertain-deliveries)).
 - Hanging up does not cancel ADE work.

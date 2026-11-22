@@ -1,0 +1,20 @@
+{
+  "projects": [
+    { "key": "recipes", "name": "recipe-app", "threads": [
+      { "key": "search", "title": "Add ingredient search", "status": "completed",
+        "messages": [
+          { "role": "user", "text": "Add a search box that filters recipes by ingredient." },
+          { "role": "assistant", "text": "Done: the search box filters by ingredient as you type, accents and case are ignored, and there are tests for both. One open question: should an empty search show all recipes or none?" }
+        ],
+        "onSend": { "delayMs": 6000, "reply": ["Understood: an empty search now shows all recipes. Tests updated and passing."] } },
+      { "key": "dark-mode", "title": "Dark mode", "status": "running",
+        "messages": [ { "role": "assistant", "text": "Switching the color tokens to CSS variables; the settings toggle comes next." } ] }
+    ] },
+    { "key": "billing", "name": "billing-service", "threads": [
+      { "key": "invoices", "title": "Fix invoice rounding", "status": "completed",
+        "messages": [
+          { "role": "assistant", "text": "The rounding bug came from converting to float before summing. Amounts are now integer cents; 14 tests pass. I have not deployed anything." }
+        ] }
+    ] }
+  ]
+}

@@ -15,6 +15,8 @@ after editing them. No rebuild is needed.
 | [ade_prompts.json](ade_prompts.json) | The ADE-specific parts of those instructions, for `t3` and `orca`. | `src/direct/t3.mts`, `src/direct/orca.mts` |
 | [tools.json](tools.json) | Each tool's description and parameters. | `src/adapters/**`, `src/direct/*.mts` |
 | [error_messages.json](error_messages.json) | Errors the tools return to the model. | `src/adapters/**`, `src/direct/*.mts` |
+| [eval_judge.txt](eval_judge.txt) | Instructions and general rubric of the LLM judges of the [conversation evaluations](../docs/evals.md). | `src/eval/judge.mts` |
+| [eval_texts.json](eval_texts.json) | The other texts of the conversation evaluations: the history the voice gets in a scenario, and the frame of the judge's input (`{{id}}`, `{{description}}`, `{{history}}`, `{{world}}`, `{{criteria}}`, `{{log}}`, `{{list}}`), and the lines of the world and call log it reads (`world_*`, `log_*`). | `src/eval/judge.mts`, `src/eval/runner.mts` |
 | [t3_delivery_prompt_main.txt](t3_delivery_prompt_main.txt), [t3_delivery_prompt_existing.txt](t3_delivery_prompt_existing.txt) | The message a T3 agent receives with an accepted send, to the project's main thread or to an existing thread. | `src/adapters/t3/coordinator.mts` |
 
 ## Instruction placeholders

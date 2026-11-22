@@ -209,8 +209,16 @@ test('T3 voice instructions keep every rule area and stay compact', () => {
   for (const area of ['LANGUAGE:', 'TIME:', 'Interruption policy:', 'Backchannel policy:', 'ROLE:', 'SPEECH:', 'TURNS:', 'NAMES:', 'ANSWERING:', 'EVIDENCE:', 'SENDING:', 'LIMITS:', 'IDS:', 'NOTICES:'])
     assert.ok(voice.includes(area), area);
   // The search guidance for described topics and main threads added about 260 (8427 → 8689).
-  assert.ok(voice.length < 8750, `compact voice instructions (${voice.length} chars)`);
-  assert.match(voice, /Before each t3_send_message ask in one sentence what you will send and to which thread/);
+  // Heard-to-the-end acceptance, lone words and project matching added about 210 (8682 → 8895).
+  assert.ok(voice.length < 8950, `compact voice instructions (${voice.length} chars)`);
+  assert.match(voice, /Before each t3_send_message propose it in one short, natural sentence/);
+  assert.match(voice, /name the thread or project only if the user did not name it or to tell candidates apart/);
+  // Only a yes to the voice's proposal authorizes (also one that cuts it off); lone words and wrong matches do not.
+  assert.match(voice, /of your proposal authorizes a send/);
+  assert.match(voice, /a lone word, number or name that accepts no proposal \(often a transcription artifact\)/);
+  assert.match(voice, /A yes that cuts your proposal off accepts it if message and recipient are what the user asked for; otherwise ask/);
+  assert.match(voice, /never pick one silently/);
+  assert.match(voice, /never present another project or thread as the one asked for/);
   assert.match(voice, /completed means the agent finished its turn/);
   assert.match(voice, /Your tools are t3_find_threads, t3_list_threads, t3_read_thread, t3_read_document, t3_send_message and t3_release_uncertain\./);
   // Reading is always allowed: the model reads and validates before answering, and asks only for decisions.
@@ -218,7 +226,7 @@ test('T3 voice instructions keep every rule area and stay compact', () => {
   assert.match(voice, /Ask the user only for decisions: sends, choosing between candidates or missing data/);
   assert.match(voice, /After sending, if useful, read the thread to see that it arrived and report what you see\./);
   assert.match(voice, /Notes on what a status does not prove .* limit your claims; do not relay them as warnings\./);
-  assert.match(voice, /On a confirmed send, briefly name the recipient and confirm delivery \(or queuing, if queued\)/);
+  assert.match(voice, /On a confirmed send, confirm delivery \(or queuing\) briefly; do not imply the work is done/);
   assert.match(voice, /if there are none, omit the topic, including claims of "no warnings"/);
   assert.match(voice, /Voice doubt only on a failure, an uncertain result or the agent's own caveat/);
   assert.doesNotMatch(voice, /ofrece (?:leer|listar|buscar|comprobar)/);

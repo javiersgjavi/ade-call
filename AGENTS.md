@@ -18,6 +18,7 @@ keep the code free of personal names, machines, domains and networks.
 - [docs/gemini.md](docs/gemini.md): the Gemini Live provider.
 - [CONTRIBUTING.md](CONTRIBUTING.md): setup, conventions, PR process.
 - [docs/testing.md](docs/testing.md): what the tests prove and what they do not.
+- [docs/evals.md](docs/evals.md): paid conversation evaluations of the voice model.
 
 ## Code map
 
@@ -33,9 +34,11 @@ keep the code free of personal names, machines, domains and networks.
 | `src/adapters/orca/` | Orca CLI client, terminal reads, sends and launches. |
 | `src/conversation/` | Context, persistence (`store.mts`), thread watch, time context. |
 | `src/access/browsers.mts` | Pairing codes and browser sessions. |
+| `src/eval/`, `scripts/eval.mts`, `evals/` | Paid conversation evaluations: simulated T3 world, ElevenLabs speech, closed-loop Realtime runner, checks, LLM judges ([docs/evals.md](docs/evals.md)). |
 | `src/resources.mts`, `resources/` | Model-facing text and its loader ([resources/README.md](resources/README.md)). |
 | `public/` | Browser UI and audio (`relayed-call.ts` and `pcm-capture.ts` for Gemini); `public/i18n.ts` holds the interface dictionaries. |
 | `scripts/`, `deploy/` | Build, checks, installer, access CLI, integration scripts, systemd units, proxy example. |
+| `skills/` | Agent skills ([skills/README.md](skills/README.md)), such as running a branch as a separate preview. |
 | `test/` | Node tests with simulated providers and CLIs; `test/project-sync_test.py`. |
 
 ## Commands
@@ -52,12 +55,21 @@ Node version: [.node-version](.node-version) (24 or later). Tests never need key
 a real ADE. Paid or real-system scripts are listed in [docs/testing.md](docs/testing.md);
 do not run them unless the task asks for it.
 
+## Trying a branch
+
+To let the owner see or try a branch, PR or change before merging, use the
+[branch-preview skill](skills/branch-preview/SKILL.md): it runs the branch next to
+the installed service, on its own port, configuration and state, and opens it
+already signed in. Never restart or reconfigure the installed service to show a
+change.
+
 ## Hard rules
 
 - Keep authentication and origin validation on every API route.
 - Never write to T3's database. Read it read-only; mutate only through the T3 CLI.
 - The server runs a send only after a new transcribed user turn since the previous
-  send, once per turn; it does not check that the turn accepts a proposal. That
+  send, once per turn (a transcript that only recites the recognition hints is not
+  a turn); it does not check that the turn accepts a proposal. That
   judgment is the model's, guided by the prompt: asking, designing or reading does
   not authorize sending. Do not describe the server gate as a confirmation check
   ([docs/delivery-safety.md](docs/delivery-safety.md#the-send-rule)).
