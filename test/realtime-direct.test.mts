@@ -210,7 +210,8 @@ test('T3 voice instructions keep every rule area and stay compact', () => {
     assert.ok(voice.includes(area), area);
   // The search guidance for described topics and main threads added about 260 (8427 → 8689).
   // Heard-to-the-end acceptance, lone words and project matching added about 210 (8682 → 8895).
-  assert.ok(voice.length < 8950, `compact voice instructions (${voice.length} chars)`);
+  // Saying that the main thread is omitted threadId, never a listed thread, added about 60 (8930 → 8988).
+  assert.ok(voice.length < 9000, `compact voice instructions (${voice.length} chars)`);
   assert.match(voice, /Before each t3_send_message propose it in one short, natural sentence/);
   assert.match(voice, /name the thread or project only if the user did not name it or to tell candidates apart/);
   // Only a yes to the voice's proposal authorizes (also one that cuts it off); lone words and wrong matches do not.

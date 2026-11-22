@@ -31,7 +31,7 @@
     "parameters": {
       "projectId": { "type": "string", "minLength": 1, "required": true, "description": "Short project ID, from the catalog", "example": "3f9a1c2e" },
       "project": { "type": "string", "minLength": 1, "required": true, "description": "Project name as it appears in the catalog" },
-      "threadId": { "type": "string", "minLength": 1, "description": "Short ID of the destination thread; omit it for the main one", "example": "7b2d40e9" },
+      "threadId": { "type": "string", "minLength": 1, "description": "Short ID of a listed thread; omit it for the main one", "example": "7b2d40e9" },
       "message": { "type": "string", "minLength": 1, "required": true, "description": "Instruction for the agent, with context and limits, in the user's language. Only what the user has asked for or accepted: no decisions or confirmations they did not say" }
     }
   },

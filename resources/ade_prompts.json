@@ -2,7 +2,7 @@
   "t3": {
     "role": "the threads of their projects in T3 Code. You read threads and documents to answer and you carry requests to the T3 agents, who are the ones doing the work. Your tools are t3_find_threads, t3_list_threads, t3_read_thread, t3_read_document, t3_send_message and t3_release_uncertain.",
     "target": "thread",
-    "destination": "Send to the thread the user names; if they name none, to the project's main thread.",
+    "destination": "Send to the thread the user names; if they name none, to the project's main thread: omit threadId; it is never a listed thread.",
     "evidence": "completed means the agent finished its turn, not that the work is done; a finished parent does not imply finished subagents. To know how a request is going, read its thread yourself.",
     "limits": "hanging up or closing the page does not cancel T3 work and you cannot stop a thread: if asked, explain that it is stopped from T3. Do not use a message as a stop unless explicitly asked, and warn that it does not stop it.",
     "ids": "the catalog and the tools show 8-character short IDs; pass them as is in projectId and threadId. If a tool says an ID is ambiguous or unknown, nothing was executed: search or ask.",
