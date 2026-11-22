@@ -12,6 +12,18 @@ import { errorText, t3DeliveryPrompt } from '../../resources.mjs';
 
 // The first line of every prompt the coordinator sends: a user message of a
 // thread that starts with it (at a line start) carries that send's reference.
+// The arguments a send needs before anything is dispatched, or the error that
+// refuses it (nothing is sent). Shared with the evaluations' simulated T3.
+export function dispatchArgumentError({ requestId, projectId, project, message, threadId }: { requestId?: unknown; projectId?: unknown; project?: unknown; message?: unknown; threadId?: unknown }): string | null {
+  const missing = (value: unknown) => typeof value !== 'string' || !value.trim();
+  if (missing(requestId)) return errorText('send.missing_request_id');
+  if (missing(projectId)) return errorText('t3.send.missing_project_id');
+  if (missing(project)) return errorText('t3.send.missing_project');
+  if (missing(message)) return errorText('t3.send.missing_message');
+  if (!cliId(projectId as string)) return errorText('t3.send.invalid_project_id');
+  if (threadId !== undefined && threadId !== null && (missing(threadId) || !cliId(threadId as string))) return errorText('t3.send.invalid_thread_id');
+  return null;
+}
 export const referenceLine = (requestId: string) => `Request received by ADE Call. Reference: ${requestId}.`;
 const REFERENCE = /^Request received by ADE Call\. Reference: ([a-zA-Z0-9:_-]{8,180})\.$/gm;
 // The references in the user messages of a thread. Agent or system messages
@@ -77,13 +89,8 @@ export class T3Coordinator {
   }
   async deliver({ requestId, projectId, project, message, threadId }: { requestId: string; projectId: string; project: string; message: string; threadId?: string }, attempt: () => void, signal?: AbortSignal) {
     signal?.throwIfAborted();
-    const missing = (value: unknown) => typeof value !== 'string' || !value.trim();
-    if (missing(requestId)) throw new Error(errorText('send.missing_request_id'));
-    if (missing(projectId)) throw new Error(errorText('t3.send.missing_project_id'));
-    if (missing(project)) throw new Error(errorText('t3.send.missing_project'));
-    if (missing(message)) throw new Error(errorText('t3.send.missing_message'));
-    if (!cliId(projectId)) throw new Error(errorText('t3.send.invalid_project_id'));
-    if (threadId !== undefined && threadId !== null && (missing(threadId) || !cliId(threadId))) throw new Error(errorText('t3.send.invalid_thread_id'));
+    const invalid = dispatchArgumentError({ requestId, projectId, project, message, threadId });
+    if (invalid) throw new Error(invalid);
     this.db.exec('BEGIN IMMEDIATE');
     let main: MainThread | undefined;
     try {
@@ -218,14 +225,14 @@ export class T3Coordinator {
     try {
       this.releaseStale();
       const row = this.blocking(projectId);
-      if (!row) { this.db.exec('COMMIT'); return 'NOT BLOCKED: no uncertain send is blocking this project. Nothing was changed or sent.'; }
+      if (!row) { this.db.exec('COMMIT'); return errorText('t3.release.not_blocked'); }
       const e = earlier(row, this.now());
       if (this.inFlight(row)) throw new NotDispatchedError(errorText('release.in_flight', { when: e.when, where: e.where }));
       if (e.thread && !read(e.thread, row.createdAt)) throw new NotDispatchedError(errorText('t3.release.unread', { thread: named(e.thread, row.targetTitle) }));
       this.db.prepare("UPDATE dispatches SET status='released', receipt=? WHERE requestId=?").run(JSON.stringify({ status: 'released', reason: 'user_decision', by: requestId, at: this.now() }), row.requestId);
       const more = this.blocking(projectId);
       this.db.exec('COMMIT');
-      return `RELEASED: the uncertain send (${e.when}, ${e.where}) stays unchecked, released by the user's decision. Nothing was sent. ${more ? 'Another uncertain send remains in this project: check it too.' : 'The project accepts sends again: if the user asked to resend it, use t3_send_message with the request they accepted.'}`;
+      return errorText('t3.release.done', { when: e.when, where: e.where, next: errorText(more ? 't3.release.more' : 't3.release.open') });
     } catch (error) { if (this.db.isTransaction) this.db.exec('ROLLBACK'); throw error; }
   }
   projectName(id: string) {

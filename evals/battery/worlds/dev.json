@@ -1,0 +1,363 @@
+{
+  "projects": [
+    {
+      "key": "huerto",
+      "name": "huerto-app",
+      "threads": [
+        {
+          "key": "riego",
+          "title": "Notificaciones de riego",
+          "status": "completed",
+          "updatedAt": "2026-11-19T17:40:00Z",
+          "messages": [
+            {
+              "role": "user",
+              "text": "Añade notificaciones push para recordar cuándo toca regar cada bancal, según la planta y el último riego registrado."
+            },
+            {
+              "role": "assistant",
+              "text": "Hecho: las notificaciones push de riego ya funcionan en iOS y Android con Expo Notifications. Cada bancal calcula su próximo riego a partir del tipo de planta y del último riego registrado; si el usuario marca el riego desde la notificación, se reprograma la siguiente. He añadido 12 tests en src/notifications/schedule.test.ts y pasan todos. Me queda una duda abierta: ¿a qué hora deben llegar las notificaciones por defecto? Ahora mismo uso las 9:00 como valor provisional, pero el usuario no puede cambiarla todavía."
+            }
+          ],
+          "onSend": {
+            "delayMs": 8000,
+            "reply": [
+              "Entendido. He cambiado la hora por defecto de las notificaciones a la que me has indicado y lo he dejado en una constante en src/notifications/config.ts. Los 12 tests siguen pasando."
+            ]
+          }
+        },
+        {
+          "key": "expo",
+          "title": "Migrar a Expo 52",
+          "status": "running",
+          "updatedAt": "2026-11-20T06:15:00Z",
+          "messages": [
+            {
+              "role": "user",
+              "text": "Migra el proyecto de Expo 50 a Expo 52 sin romper nada."
+            },
+            {
+              "role": "assistant",
+              "text": "Voy por la mitad. Ya he actualizado expo, react-native a 0.76 y expo-router a la versión 4, y la app arranca en el simulador de iOS. Me falta: sustituir expo-barcode-scanner, que se ha eliminado, por la cámara de expo-camera; revisar el build de Android, que falla en Gradle por la versión de Kotlin; y volver a pasar los 48 tests, de los que ahora fallan 5."
+            }
+          ]
+        },
+        {
+          "key": "crash-android",
+          "title": "Crash en Android 14",
+          "status": "completed",
+          "updatedAt": "2026-11-18T11:05:00Z",
+          "messages": [
+            {
+              "role": "user",
+              "text": "La app se cierra al abrir la cámara en Android 14. Arréglalo."
+            },
+            {
+              "role": "assistant",
+              "text": "Arreglado. El crash venía de pedir el permiso READ_MEDIA_IMAGES sin declararlo en el manifiesto, algo que Android 14 ya no tolera. Lo he declarado en app.json y he añadido la petición del permiso parcial de fotos. He añadido 3 tests y pasan los 51 de la suite. Lo he probado en un emulador con Android 14 y ya no se cierra."
+            }
+          ]
+        },
+        {
+          "key": "mapa",
+          "title": "Prototipo de mapa",
+          "status": "completed",
+          "archived": true,
+          "updatedAt": "2026-09-02T10:00:00Z",
+          "messages": [
+            {
+              "role": "assistant",
+              "text": "Prototipo descartado: el mapa de huertos con react-native-maps consumía demasiada batería. Lo dejo aparcado."
+            }
+          ]
+        },
+        {
+          "key": "widget",
+          "title": "Widget de pantalla de inicio",
+          "status": "completed",
+          "updatedAt": "2026-11-18T11:00:00Z",
+          "messages": [
+            {
+              "role": "user",
+              "text": "Haz un widget para la pantalla de inicio con el estado de las plantas."
+            },
+            {
+              "role": "assistant",
+              "text": "Hecho: el widget muestra la humedad de las tres plantas con más sed y se actualiza cada 30 minutos. Funciona en iOS y Android; pasan los 12 tests."
+            }
+          ],
+          "onSend": {
+            "afterTurn": 3,
+            "delayMs": 4000,
+            "reply": [
+              "Listo: el widget ya muestra la próxima hora de riego debajo de la humedad. Lo he probado en iOS y Android."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "key": "pagos-api",
+      "name": "pagos-api",
+      "threads": [
+        {
+          "key": "reembolsos-api",
+          "title": "Reembolsos parciales",
+          "status": "completed",
+          "updatedAt": "2026-11-19T15:20:00Z",
+          "messages": [
+            {
+              "role": "user",
+              "text": "Implementa reembolsos parciales en la API: un pago puede reembolsarse en varias partes hasta su importe total."
+            },
+            {
+              "role": "assistant",
+              "text": "Listo: el endpoint POST /payments/{id}/refunds acepta un importe parcial, impide superar el total pagado y guarda cada reembolso en la tabla refunds. Pasan los 64 tests, 9 de ellos nuevos. Tengo una pregunta antes de cerrarlo: ¿los reembolsos parciales de pagos con más de 30 días deben pasar por aprobación manual, o se procesan automáticamente como los demás?"
+            }
+          ],
+          "onSend": {
+            "delayMs": 6000,
+            "reply": [
+              "De acuerdo. He aplicado el criterio que me indicas para los reembolsos de pagos con más de 30 días y he añadido 2 tests que lo cubren. Pasan los 66."
+            ]
+          }
+        },
+        {
+          "key": "webhook",
+          "title": "Webhook duplicado",
+          "status": "error",
+          "updatedAt": "2026-11-20T03:50:00Z",
+          "messages": [
+            {
+              "role": "user",
+              "text": "El webhook de confirmación de pago llega a veces dos veces. Haz que sea idempotente."
+            },
+            {
+              "role": "assistant",
+              "text": "He añadido una restricción única sobre event_id en la tabla webhook_events, pero la migración 0042_unique_event_id ha fallado en staging: ya hay 37 eventos duplicados que violan la restricción. La migración ha quedado a medias y el webhook sigue sin deduplicar, así que mientras tanto se pueden seguir generando cobros duplicados. No he tocado producción. Necesito que alguien decida si borro los duplicados o los fusiono antes de reintentar."
+            }
+          ]
+        },
+        {
+          "key": "idempotencia",
+          "title": "Revisar tests de idempotencia",
+          "status": "completed",
+          "parent": "reembolsos-api",
+          "updatedAt": "2026-11-19T15:05:00Z",
+          "messages": [
+            {
+              "role": "assistant",
+              "text": "He revisado los tests de idempotencia de reembolsos. Fallan 2 de 14: test_refund_same_key_twice devuelve 201 en la segunda llamada en lugar de 200, y test_refund_key_expired no caduca la clave a las 24 horas porque el TTL está en segundos y se compara en milisegundos."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "pagos-web",
+      "name": "pagos-web",
+      "threads": [
+        {
+          "key": "reembolsos-web",
+          "title": "Pantalla de reembolsos",
+          "status": "running",
+          "updatedAt": "2026-11-20T05:30:00Z",
+          "messages": [
+            {
+              "role": "user",
+              "text": "Crea la pantalla de reembolsos en el panel: lista de reembolsos de un pago y formulario para pedir uno parcial."
+            },
+            {
+              "role": "assistant",
+              "text": "Estoy con ello. La lista de reembolsos ya se muestra en RefundsPage.tsx; ahora estoy haciendo el formulario de reembolso parcial con validación del importe máximo. Falta conectarlo con el endpoint nuevo y escribir los tests."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "blog",
+      "name": "blog-personal",
+      "threads": [
+        {
+          "key": "rust-post",
+          "title": "Post sobre Rust",
+          "status": "completed",
+          "updatedAt": "2026-11-20T08:30:00Z",
+          "messages": [
+            {
+              "role": "user",
+              "text": "Escribe un borrador de post sobre lo que aprendí migrando un script de Python a Rust."
+            },
+            {
+              "role": "assistant",
+              "text": "El borrador está listo en src/content/posts/de-python-a-rust.md: unas 1.400 palabras, con tres ejemplos de código y la comparación de tiempos, de 4,2 segundos en Python a 0,3 en Rust. Lo he dejado con draft: true y el build de Astro pasa sin errores. ¿Lo publico ya o prefieres revisarlo antes?"
+            }
+          ],
+          "onSend": {
+            "delayMs": 6000,
+            "reply": [
+              "Recibido, gracias. Quedo atento a lo que decidas sobre el borrador."
+            ]
+          }
+        },
+        {
+          "key": "tema-oscuro",
+          "title": "Tema oscuro",
+          "status": "completed",
+          "updatedAt": "2026-10-28T19:00:00Z",
+          "messages": [
+            {
+              "role": "assistant",
+              "text": "Tema oscuro terminado: sigue la preferencia del sistema y tiene un botón en la cabecera que guarda la elección. El contraste pasa la comprobación AA en todas las páginas."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "infra",
+      "name": "infra-casa",
+      "threads": [
+        {
+          "key": "backup",
+          "title": "Backup de Nextcloud",
+          "status": "completed",
+          "updatedAt": "2026-11-19T23:10:00Z",
+          "messages": [
+            {
+              "role": "user",
+              "text": "Configura un backup diario de Nextcloud al disco externo."
+            },
+            {
+              "role": "assistant",
+              "text": "El backup diario ya está configurado con restic a las 3:00 y la primera copia ha terminado bien: 212 GB en 47 minutos, y he verificado la restauración de una carpeta de prueba. Pero ojo: el disco externo está al 91 % de capacidad. Con el ritmo actual se llenará en unas dos semanas y entonces los backups empezarán a fallar. Habría que ampliar el disco o configurar una política de retención."
+            }
+          ]
+        },
+        {
+          "key": "proxmox",
+          "title": "Actualizar Proxmox",
+          "status": "running",
+          "updatedAt": "2026-11-19T20:00:00Z",
+          "failReads": true,
+          "messages": [
+            {
+              "role": "assistant",
+              "text": "Actualizando Proxmox a la 9.1."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "liga",
+      "name": "liga-stats",
+      "threads": [
+        {
+          "key": "scraper",
+          "title": "Scraper de resultados",
+          "status": "completed",
+          "updatedAt": "2026-11-17T21:30:00Z",
+          "messages": [
+            {
+              "role": "assistant",
+              "text": "El scraper ya descarga los resultados de las 18 jornadas de la liga de veteranos y los guarda en data/resultados.csv. Se ejecuta cada lunes a las 8:00 con un cron. He añadido 6 tests con páginas HTML guardadas."
+            }
+          ]
+        },
+        {
+          "key": "clasificacion",
+          "title": "Tabla de clasificación",
+          "status": "completed",
+          "updatedAt": "2026-11-18T20:45:00Z",
+          "messages": [
+            {
+              "role": "user",
+              "text": "Genera la tabla de clasificación a partir de los resultados."
+            },
+            {
+              "role": "assistant",
+              "text": "La tabla de clasificación ya se genera en clasificacion.html con los 12 equipos: partidos jugados, ganados, empatados, perdidos y diferencia de goles. Ahora mismo está ordenada alfabéticamente por nombre de equipo."
+            }
+          ],
+          "onSend": {
+            "delayMs": 15000,
+            "reply": [
+              "Hecho: la tabla ya se ordena por puntos y, en caso de empate, por diferencia de goles. He regenerado clasificacion.html y pasan los 9 tests."
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "key": "orbital",
+      "name": "orbital",
+      "threads": [
+        {
+          "key": "rate-limit",
+          "title": "Rate limiter for public API",
+          "status": "completed",
+          "updatedAt": "2026-11-19T10:00:00Z",
+          "messages": [
+            {
+              "role": "user",
+              "text": "Add rate limiting to the public API."
+            },
+            {
+              "role": "assistant",
+              "text": "Done. I added a token bucket rate limiter in middleware/rate_limit.go: 100 requests per minute per API key, with the counters in Redis so it works across the three API instances. Requests over the limit get a 429 with a Retry-After header. 22 tests pass, including a load test with 500 concurrent requests. Open question: should internal service keys be rate limited too, or should they bypass the limiter?"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "key": "notas",
+      "name": "notas-cli",
+      "threads": [
+        {
+          "key": "export",
+          "title": "Exportar a Markdown",
+          "status": "completed",
+          "updatedAt": "2026-11-16T18:00:00Z",
+          "messages": [
+            {
+              "role": "user",
+              "text": "Añade un comando para exportar todas las notas a Markdown."
+            },
+            {
+              "role": "assistant",
+              "text": "Hecho: notas export --format md escribe un fichero .md por nota en la carpeta que indiques, con la fecha y las etiquetas en el encabezado. Pasan los 31 tests."
+            }
+          ],
+          "onSend": {
+            "uncertain": true
+          }
+        }
+      ]
+    },
+    {
+      "key": "tiendas",
+      "name": "tiendas",
+      "threads": [
+        {
+          "key": "catalogo",
+          "title": "Catálogo de productos",
+          "status": "completed",
+          "updatedAt": "2026-11-19T19:30:00Z",
+          "messages": [
+            {
+              "role": "user",
+              "text": "Monta el catálogo de productos de la web de las tiendas a partir del CSV del proveedor, con filtros y búsqueda."
+            },
+            {
+              "role": "assistant",
+              "text": "El catálogo ya está: he importado los 340 productos del CSV del proveedor, con filtros por categoría y precio y búsqueda por nombre. Pasan los 27 tests. Me queda pendiente lo de las fotos: 85 productos todavía no tienen imagen y ahora muestran un marcador gris. Y una pregunta: ¿los precios se muestran con IVA incluido o sin IVA?"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

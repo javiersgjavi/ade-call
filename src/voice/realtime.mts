@@ -5,6 +5,7 @@ import { StatusError, errorMessage } from '../shared/contracts.mjs';
 import WebSocket from 'ws';
 import { randomUUID } from 'node:crypto';
 import { audioDiagnostics } from './diagnostics.mjs';
+import { isHintEcho } from '../conversation/hint-echo.mjs';
 import { noticeBody, noticeHeader, USER_QUIET_MS, type ThreadNotice } from '../conversation/thread-watch.mjs';
 import { DirectSession, requestIdFor, toolFailure, type FunctionCall } from '../direct/session.mjs';
 import { callLanguage, directInstructions, languageReminder, type CallLanguage } from '../direct/prompt.mjs';
@@ -37,6 +38,8 @@ export interface RealtimeCall {
   lastUserAt?: number; resultAt?: number;
   // Turns, short IDs and reads of this call; discarded when it ends.
   direct?: DirectSession;
+  // The recognition hints this call's transcription was given (isHintEcho).
+  hints?: string[];
 }
 interface RealtimeEvent {
   type: string; delta?: string; transcript?: string; item_id?: string; event_id?: string;
@@ -95,6 +98,8 @@ export class RealtimeCalls {
   pending?: { id?: string; hungUp?: boolean };
   // Tool runs still executing, including those of calls that already ended.
   running = 0;
+  // The hints of the last session built, taken by the call it configures.
+  hints?: string[];
   fetch: Fetch; connect: (callId: string) => Socket;
   delivered?: RealtimeOptions['delivered']; read?: RealtimeOptions['read'];
   constructor({ key, ade, publish, store, context, settings = {}, instructions, fetch: fetcher, connect, delivered, read }: RealtimeOptions) {
@@ -113,6 +118,8 @@ export class RealtimeCalls {
   // detects the spoken language.
   session(language?: CallLanguage) {
     const code = transcriptionCode(language);
+    // Kept for the call it configures: a transcript reciting them is not a turn.
+    const hints = this.hints = this.transcriptionModel.startsWith('gpt-4o') ? this.context.vocabulary().slice(0, 80) : [];
     return {
       type: 'realtime', model: this.model, output_modalities: ['audio'],
       instructions: directInstructions(this.ade, { callStart: this.context.timing?.(), capabilities: { backend: this.context.backend, capabilities: this.context.capabilities }, language, custom: this.instructions }),
@@ -121,7 +128,7 @@ export class RealtimeCalls {
         input: {
           noise_reduction: this.noiseReduction === 'off' ? null : { type: this.noiseReduction },
           // The hint is only the names, with no words in any language around them.
-          transcription: { model: this.transcriptionModel, ...(code ? { language: code } : {}), ...(this.transcriptionModel.startsWith('gpt-4o') ? { prompt: this.context.vocabulary().slice(0, 80).join(', ') } : {}) },
+          transcription: { model: this.transcriptionModel, ...(code ? { language: code } : {}), ...(hints.length ? { prompt: hints.join(', ') } : {}) },
           // Semantic VAD judges whether the sentence is finished; low eagerness
           // waits up to 8 s on an open phrase instead of a fixed silence.
           turn_detection: { type: 'semantic_vad', eagerness: this.eagerness, create_response: true, interrupt_response: true }
@@ -214,7 +221,7 @@ export class RealtimeCalls {
   }
   track(id: string) {
     const call: RealtimeCall = { backend: this.context.snapshot?.backend, conversationId: this.context.conversation?.().id, id, seen: Date.now(), closed: false,
-      pendingItems: new Set(), order: new Map(), toolsPending: new Set(), queue: [], usage: {} };
+      pendingItems: new Set(), order: new Map(), toolsPending: new Set(), queue: [], usage: {}, hints: this.hints };
     this.sessions.set(id, call);
     return call;
   }
@@ -223,7 +230,7 @@ export class RealtimeCalls {
     // Closed while the sideband connected (shutdown()): it is not announced.
     if (call.closed) throw new StatusError(503, 'The call ended while it was connecting.');
     const spoken = callLanguage(language, languages);
-    if (update) { const { model: _model, ...session } = this.session(spoken); this.send(call, { type: 'session.update', session: { ...session, ...extra } }); }
+    if (update) { const { model: _model, ...session } = this.session(spoken); call.hints = this.hints; this.send(call, { type: 'session.update', session: { ...session, ...extra } }); }
     this.system(call, this.context.resume({ languages, language }));
     // Warm the ADE's read cache while the voice greets; it never adds tokens.
     try { this.ade.prefetch?.(); } catch { /* Only a later cache miss. */ }
@@ -277,7 +284,8 @@ export class RealtimeCalls {
         const text = (event.transcript || '').trim();
         if (!text) { call.direct?.forget(event.item_id); break; }
         call.lastUserAt = Date.now();
-        this.remember(call, 'user', text, event.item_id);
+        // A recital of the recognition hints is stored and shown, not a turn.
+        this.remember(call, 'user', text, event.item_id, isHintEcho(text, call.hints || []));
         break;
       }
       case 'conversation.item.input_audio_transcription.failed':
@@ -319,9 +327,9 @@ export class RealtimeCalls {
       }
     }
   }
-  remember(call: RealtimeCall, role: 'user' | 'assistant', text: string, itemId?: string) {
-    call.direct?.fill(itemId, role, text);
-    this.publish('transcript', { call: call.id, role, text, order: this.slot(call, itemId), item: itemId, backend: call.backend, conversationId: call.conversationId });
+  remember(call: RealtimeCall, role: 'user' | 'assistant', text: string, itemId?: string, echo = false) {
+    call.direct?.fill(itemId, role, text, { echo });
+    this.publish('transcript', { call: call.id, role, text, order: this.slot(call, itemId), item: itemId, backend: call.backend, conversationId: call.conversationId, ...(echo ? { echo: true } : {}) });
   }
   // The order in which the provider created an item (user audio committed,
   // answer or function call added). A user transcript completes after the

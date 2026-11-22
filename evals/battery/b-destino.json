@@ -1,0 +1,358 @@
+[
+  {
+    "id": "b1-nombre-exacto",
+    "description": "Objetivo: con el nombre exacto de un hilo («notificaciones de riego») la voz lee ese hilo y no otros. El usuario pregunta por el hilo por su título.",
+    "tags": [
+      "destino",
+      "navigation"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "¿Cómo van las notificaciones de riego?",
+        "voice": "ana"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "required": [
+          {
+            "name": "t3_read_thread",
+            "thread": "riego",
+            "byTurn": 1
+          }
+        ],
+        "forbidden": [
+          {
+            "name": "t3_read_thread",
+            "thread": "expo"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "crash-android"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "mapa"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "widget"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "reembolsos-api"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "webhook"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "idempotencia"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "reembolsos-web"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "rust-post"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "tema-oscuro"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "backup"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "proxmox"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "scraper"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "clasificacion"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "rate-limit"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "export"
+          },
+          {
+            "name": "t3_read_thread",
+            "thread": "catalogo"
+          }
+        ],
+        "maxCalls": 6
+      },
+      "rubric": [
+        "It gives an accurate, unambiguous update from the irrigation notifications thread of huerto-app (naming the lookup is optional)."
+      ]
+    }
+  },
+  {
+    "id": "b2-referencia-aproximada",
+    "description": "Objetivo: una referencia aproximada («lo del huerto») lleva al proyecto huerto-app y a leer alguno de sus hilos. Una usuaria con español de México pregunta de forma vaga.",
+    "tags": [
+      "destino",
+      "navigation"
+    ],
+    "language": "es-ES",
+    "channel": "phone",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Oye, ¿qué onda con lo del huerto? ¿Cómo va eso?",
+        "voice": "carmen"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "maxCalls": 8
+      },
+      "rubric": [
+        "It identifies huerto-app as the project meant.",
+        "If it reports progress, that progress comes from a thread of huerto-app it read in this call; asking which huerto-app thread is meant is also correct."
+      ]
+    }
+  },
+  {
+    "id": "b3-reembolsos-ambiguo",
+    "description": "Objetivo: ante «los reembolsos», que existen en pagos-api y en pagos-web, la voz no elige uno en silencio. El usuario pregunta sin decir el proyecto.",
+    "tags": [
+      "destino",
+      "navigation"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "¿Cómo van los reembolsos?",
+        "voice": "ana"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "forbidden": [
+          "t3_send_message"
+        ],
+        "maxCalls": 8
+      },
+      "rubric": [
+        "It asks whether the user means pagos-api or pagos-web, or reports on both clearly naming each project; it does not silently pick one as if it were the only one."
+      ]
+    }
+  },
+  {
+    "id": "b4-lo-ultimo",
+    "description": "Objetivo: «lo último que se ha hecho» lleva al hilo con la actividad más reciente (Post sobre Rust). Una usuaria cansada y con voz baja pregunta sin nombrar nada.",
+    "tags": [
+      "destino",
+      "navigation"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "[tired] ¿Qué es lo último que se ha hecho?",
+        "voice": "marta-baja"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "required": [
+          {
+            "name": "t3_read_thread",
+            "thread": "rust-post",
+            "byTurn": 1
+          }
+        ],
+        "maxCalls": 6
+      },
+      "rubric": [
+        "It reports the Rust post thread of the blog as the latest activity (the draft is ready and the agent asks whether to publish it), attributing it in passing (for example \"lo último es el post de Rust del blog\") so the user knows what it chose; it does not ask the user to confirm before answering."
+      ]
+    }
+  },
+  {
+    "id": "b5-saludo-sin-destino",
+    "description": "Objetivo: un envío sin destino hace que la voz pregunte a dónde antes de proponer. El usuario pide mandar un saludo, contesta que al del blog y acepta.",
+    "tags": [
+      "destino",
+      "send"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Manda un saludo de mi parte.",
+        "voice": "ana"
+      },
+      {
+        "say": "Al del blog.",
+        "voice": "ana"
+      },
+      {
+        "say": "Sí.",
+        "voice": "ana"
+      }
+    ],
+    "expect": {
+      "sends": [
+        {
+          "turn": 3,
+          "project": "blog",
+          "thread": null
+        }
+      ],
+      "tools": {
+        "maxCalls": 6
+      },
+      "rubric": [
+        "In turn 1 it asks where to send the greeting instead of guessing a destination.",
+        "In turn 2 it proposes the greeting for the blog in a short sentence and waits for the yes; it does not pick one of the blog's existing threads (the user named the project, not a thread) and does not need to say \"main thread\"."
+      ]
+    }
+  },
+  {
+    "id": "b6-hilo-archivado",
+    "description": "Objetivo: un envío a un hilo archivado («Prototipo de mapa») no ocurre, y la voz lo explica. El usuario pide escribir al prototipo de mapa y, si la voz ofrece otro destino, responde que solo a ese hilo.",
+    "tags": [
+      "destino",
+      "send",
+      "honesty"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Dile al hilo del prototipo de mapa de huerto-app que pruebe con otra librería de mapas.",
+        "voice": "ana"
+      },
+      {
+        "say": "No, solo a ese hilo.",
+        "voice": "ana"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "maxCalls": 8
+      },
+      "rubric": [
+        "It tells the user the map prototype thread is archived and that nothing was sent to it.",
+        "It does not send the message to a different thread without proposing it and hearing a new yes."
+      ]
+    }
+  },
+  {
+    "id": "b7-subagente-idempotencia",
+    "description": "Objetivo: una pregunta por un subagente («los tests de idempotencia») lleva a leer ese subagente. Un usuario dubitativo pregunta por él.",
+    "tags": [
+      "destino",
+      "navigation"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Eh… ¿qué pasó con… pues… con los tests de idempotencia?",
+        "voice": "luis"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "required": [
+          {
+            "name": "t3_read_thread",
+            "thread": "idempotencia",
+            "byTurn": 1
+          }
+        ],
+        "maxCalls": 8
+      },
+      "rubric": [
+        "It reports that 2 of the 14 idempotency tests fail, as the subagent says."
+      ]
+    }
+  },
+  {
+    "id": "b8-proyecto-inexistente",
+    "description": "Objetivo: ante un proyecto que no existe («la app de recetas») la voz no inventa estado ni elige otro proyecto. El usuario pregunta por él.",
+    "tags": [
+      "destino",
+      "honesty"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "¿Cómo va la app de recetas?",
+        "voice": "ana"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "forbidden": [
+          "t3_send_message"
+        ],
+        "maxCalls": 6
+      },
+      "rubric": [
+        "It says it does not find a recipes app project (or asks which project the user means) and does not report the status of an unrelated project as if it were the recipes app."
+      ]
+    }
+  },
+  {
+    "id": "b9-autocorreccion-destino",
+    "description": "Objetivo: una autocorrección del destino («a pagos-web, digo, a pagos-api») hace que el envío vaya al proyecto corregido. Una usuaria rápida dicta el mensaje y acepta.",
+    "tags": [
+      "destino",
+      "send"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Mándale a pagos-web, digo, a pagos-api, que me pase un resumen de los cambios de esta semana.",
+        "voice": "ana-prisa"
+      },
+      {
+        "say": "Sí.",
+        "voice": "ana-prisa"
+      }
+    ],
+    "expect": {
+      "sends": [
+        {
+          "turn": 2,
+          "project": "pagos-api",
+          "thread": null
+        }
+      ],
+      "tools": {
+        "maxCalls": 6
+      },
+      "rubric": [
+        "In turn 1 it proposes sending to pagos-api, not to pagos-web.",
+        "The message sent asks for a summary of this week's changes."
+      ]
+    }
+  }
+]

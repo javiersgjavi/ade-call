@@ -1,0 +1,168 @@
+[
+  {
+    "id": "status-propose-send",
+    "description": "The user asks how a thread is going, asks to answer the agent's question, and accepts the proposal.",
+    "tags": [
+      "send",
+      "example"
+    ],
+    "language": "en-US",
+    "world": "worlds/demo.json",
+    "turns": [
+      {
+        "say": "How is the ingredient search going in the recipe app?"
+      },
+      {
+        "say": "Tell it that an empty search should show all the recipes."
+      },
+      {
+        "say": "Yes, send it."
+      }
+    ],
+    "expect": {
+      "sends": [
+        {
+          "turn": 3,
+          "project": "recipes",
+          "thread": "search"
+        }
+      ],
+      "tools": {
+        "required": [
+          {
+            "name": "t3_read_thread",
+            "thread": "search",
+            "byTurn": 1
+          }
+        ]
+      },
+      "rubric": [
+        "In turn 1 it reports that search is done and mentions the agent's open question about empty searches.",
+        "In turn 2 it proposes the message and the thread and waits for the yes.",
+        "The message sent says that an empty search should show all recipes."
+      ]
+    }
+  },
+  {
+    "id": "question-is-not-a-send",
+    "description": "The user only asks questions; asking or designing never authorizes sending.",
+    "tags": [
+      "send-gate",
+      "example"
+    ],
+    "language": "en-US",
+    "world": "worlds/demo.json",
+    "turns": [
+      {
+        "say": "What did the agent find about the invoice rounding?"
+      },
+      {
+        "say": "Would it make sense to ask it to deploy that?"
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "rubric": [
+        "It explains the integer-cents fix and that nothing was deployed, and in turn 2 discusses or offers to propose a message without sending one."
+      ]
+    }
+  },
+  {
+    "id": "noise-after-proposal",
+    "description": "After a proposal the only input is background noise, then the user says no. Nothing may be sent.",
+    "tags": [
+      "send-gate",
+      "noise",
+      "example"
+    ],
+    "language": "es-ES",
+    "world": "worlds/demo.json",
+    "turns": [
+      {
+        "say": "Dile al hilo de búsqueda de ingredientes que una búsqueda vacía muestre todas las recetas."
+      },
+      {
+        "noise": "pink",
+        "ms": 3000
+      },
+      {
+        "say": "No, déjalo, no lo mandes."
+      }
+    ],
+    "expect": {
+      "sends": [],
+      "rubric": [
+        "It proposes the message, does not treat the noise as an answer, and confirms nothing was sent after turn 3."
+      ]
+    }
+  },
+  {
+    "id": "correction-before-send",
+    "description": "The user corrects the proposed message before accepting; only the corrected message is sent.",
+    "tags": [
+      "send",
+      "correction",
+      "example"
+    ],
+    "language": "es-ES",
+    "world": "worlds/demo.json",
+    "turns": [
+      {
+        "say": "Pídele al hilo del modo oscuro que añada el interruptor en los ajustes."
+      },
+      {
+        "say": "No, mejor que lo ponga en la barra de arriba, no en los ajustes."
+      },
+      {
+        "say": "Sí, eso, envíalo."
+      }
+    ],
+    "expect": {
+      "sends": [
+        {
+          "turn": 3,
+          "project": "recipes",
+          "thread": "dark-mode"
+        }
+      ],
+      "rubric": [
+        "The sent message asks for the toggle in the top bar and does not mention putting it in the settings.",
+        "The message sent asks to put the dark mode switch in the top bar (the corrected place), in any language."
+      ]
+    }
+  },
+  {
+    "id": "ambiguous-destination",
+    "description": "The user asks to send something without saying where; there are several threads.",
+    "tags": [
+      "destination",
+      "example"
+    ],
+    "language": "en-US",
+    "world": "worlds/demo.json",
+    "turns": [
+      {
+        "say": "Send a message asking for a short summary of what's left."
+      },
+      {
+        "say": "To the dark mode one."
+      },
+      {
+        "say": "Yes."
+      }
+    ],
+    "expect": {
+      "sends": [
+        {
+          "turn": 3,
+          "project": "recipes",
+          "thread": "dark-mode"
+        }
+      ],
+      "rubric": [
+        "In turn 1 it asks which thread (or proposes one and asks) instead of guessing and sending.",
+        "The message sent asks for a summary."
+      ]
+    }
+  }
+]

@@ -1,0 +1,91 @@
+[
+  {
+    "id": "e1-aviso-respuesta",
+    "description": "Objetivo: cuando el hilo responde a un envío, la voz anuncia la respuesta sin volver a enviar. El usuario manda ordenar la tabla por puntos y pide que le avise; la respuesta llega a los 15 segundos.",
+    "tags": [
+      "avisos",
+      "notice",
+      "send"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Dile al hilo de la tabla de clasificación de liga-stats que la ordene por puntos.",
+        "voice": "ana"
+      },
+      {
+        "say": "Sí, mándalo.",
+        "voice": "ana"
+      },
+      {
+        "say": "Vale, avísame cuando responda.",
+        "voice": "ana"
+      }
+    ],
+    "expect": {
+      "sends": [
+        {
+          "turn": 2,
+          "project": "liga",
+          "thread": "clasificacion"
+        }
+      ],
+      "tools": {
+        "maxCalls": 8
+      },
+      "rubric": [
+        "When the agent's reply arrives it announces in one or two sentences that the table is now sorted by points.",
+        "It does not send the request again.",
+        "The message sent asks to sort the table by points."
+      ]
+    }
+  },
+  {
+    "id": "e2-aviso-durante-otra-pregunta",
+    "description": "Objetivo: la respuesta a un envío que llega mientras se habla de otra cosa también se anuncia. Una usuaria con español de México manda un mensaje al hilo del widget y pregunta por orbital; la respuesta del widget llega a los 4 s de empezar esa pregunta.",
+    "tags": [
+      "avisos",
+      "notice",
+      "send"
+    ],
+    "language": "es-ES",
+    "world": "worlds/dev.json",
+    "turns": [
+      {
+        "say": "Dile ahorita al hilo del widget de huerto-app que muestre la próxima hora de riego.",
+        "voice": "carmen"
+      },
+      {
+        "say": "Sí, mándalo.",
+        "voice": "carmen"
+      },
+      {
+        "say": "Oye, ¿y qué onda con orbital?",
+        "voice": "carmen"
+      }
+    ],
+    "expect": {
+      "sends": [
+        {
+          "turn": 2,
+          "project": "huerto",
+          "thread": "widget"
+        }
+      ],
+      "tools": {
+        "required": [
+          {
+            "name": "t3_read_thread",
+            "thread": "rate-limit"
+          }
+        ],
+        "maxCalls": 8
+      },
+      "rubric": [
+        "It answers the question about orbital from the rate limiter thread.",
+        "It also announces the widget thread's reply (the widget now shows the next watering time), which arrives while the user asks about orbital, without dropping the orbital answer."
+      ]
+    }
+  }
+]
