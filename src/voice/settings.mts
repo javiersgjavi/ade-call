@@ -47,6 +47,25 @@ export function validateVoiceSettings(input: unknown, current: VoiceSettings): V
   return next;
 }
 
+// The owner's custom instructions (Settings → Voice), appended to every call's
+// instructions under a fixed header. Stored as config.json customInstructions.
+export const INSTRUCTIONS_FIELD = 'customInstructions';
+export const MAX_INSTRUCTIONS = 4000;
+/** Trimmed text with \n line breaks (\r\n is accepted), or undefined when null or blank (nothing is
+ * added to the prompt). Control characters other than tab and line break are
+ * refused before trimming, so they never turn a value into a removal; so is
+ * text longer than MAX_INSTRUCTIONS. */
+export function validateInstructions(input: unknown): string | undefined {
+  if (input === null || input === undefined) return undefined;
+  if (typeof input !== 'string') throw new SettingsError('The instructions must be text.');
+  // CRLF becomes LF; a lone CR is a control character like any other.
+  const normalized = input.replace(/\r\n/g, '\n');
+  if (/[^\P{Cc}\t\n]/u.test(normalized)) throw new SettingsError('The instructions contain characters that are not allowed.');
+  const text = normalized.trim();
+  if (text.length > MAX_INSTRUCTIONS) throw new SettingsError(`The instructions can have at most ${MAX_INSTRUCTIONS} characters.`);
+  return text || undefined;
+}
+
 /** A trimmed key, or a SettingsError that never quotes the input. */
 export function validateKey(input: unknown) {
   if (typeof input !== 'string') throw new SettingsError('The API key must be text.');

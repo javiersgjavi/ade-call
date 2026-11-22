@@ -95,6 +95,19 @@ test('gemini-3.1-flash-live-preview declares tools without a behavior: it is alw
   assert.ok(isGeminiModel('gemini-3.8-live') && !isGeminiModel('gpt-realtime-2.1'));
 });
 
+test('the owner\'s custom instructions end the Gemini instructions, and configure() changes or clears them', async t => {
+  const f = fixture(); t.after(() => f.close());
+  f.gemini.configure({ instructions: 'Answer in one sentence.' });
+  await f.start();
+  const text = f.upstream().sent[0].setup.systemInstruction.parts[0].text;
+  assert.equal(text, directInstructions(f.ade, { custom: 'Answer in one sentence.' }));
+  assert.match(text, /OWNER INSTRUCTIONS[\s\S]*Answer in one sentence\.$/);
+  f.gemini.close(f.gemini.sessions.keys().next().value!);
+  await wait();
+  f.gemini.configure({ instructions: null });
+  assert.equal(f.gemini.instructions, undefined);
+});
+
 test('a refused setup is a provider error with its reason, and leaves no call behind', async t => {
   const f = fixture({ refuse: 'API key not valid. AIzaSyFAKEFAKEFAKEFAKE' }); t.after(() => f.close());
   await assert.rejects(f.gemini.create(), (error: Error) => error instanceof StatusError && error.status === 502 && /API key not valid/.test(error.message) && !/AIzaSy/.test(error.message));

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, readdirSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { updateConfig, validateKey, validateVoiceSettings, voiceOptions, SettingsError } from '../src/voice/settings.mjs';
+import { MAX_INSTRUCTIONS, updateConfig, validateInstructions, validateKey, validateVoiceSettings, voiceOptions, SettingsError } from '../src/voice/settings.mjs';
 import { REALTIME_DEFAULTS } from '../src/voice/realtime.mjs';
 
 test('voice settings accept only the offered values, and the current ones', () => {
@@ -22,6 +22,14 @@ test('Gemini Live models and voices are offered next to the Realtime ones', () =
   assert.deepEqual(validateVoiceSettings({ model: 'gemini-3.8-live', geminiVoice: 'Puck' }, current), { ...current, model: 'gemini-3.8-live', geminiVoice: 'Puck' });
   for (const bad of [{ geminiVoice: 'marin' }, { voice: 'Kore' }, { model: 'gemini-made-up' }])
     assert.throws(() => validateVoiceSettings(bad, current), SettingsError, JSON.stringify(bad));
+});
+
+test('custom instructions are trimmed, keep tabs and line breaks, and refuse any control character', () => {
+  for (const blank of [null, undefined, '', '  \n\t ']) assert.equal(validateInstructions(blank), undefined, JSON.stringify(blank));
+  assert.equal(validateInstructions('  a\r\n\tb\nc  '), 'a\n\tb\nc');
+  assert.equal(validateInstructions(` ${'x'.repeat(MAX_INSTRUCTIONS)} `), 'x'.repeat(MAX_INSTRUCTIONS), 'the limit counts the trimmed text');
+  for (const bad of [3, ['a'], {}, '\r', 'a\rb', '\u000b', '\u000c', 'A\u0085B', '\u009f', '\u0000', 'bell\u0007', '\u007f', 'x'.repeat(MAX_INSTRUCTIONS + 1)])
+    assert.throws(() => validateInstructions(bad), SettingsError, JSON.stringify(bad).slice(0, 30));
 });
 
 test('a key is trimmed and checked without quoting it', () => {

@@ -41,6 +41,17 @@ test('the voice system prompt renders completely for every ADE', () => {
   assert.ok(delivery.startsWith('Reference: x.\nYou are this project\'s main voice thread') && delivery.endsWith('\nUse {{literal}}'));
 });
 
+test('custom instructions go last, under the fixed header, and only when not blank', () => {
+  const ade = { name: 'T3', prompt: T3_PROMPT, tools: t3DirectTools({ state: '/nonexistent' }) };
+  const base = directInstructions(ade);
+  for (const custom of [undefined, '', '  \n\t ']) assert.equal(directInstructions(ade, { custom }), base, JSON.stringify(custom));
+  assert.doesNotMatch(base, /OWNER INSTRUCTIONS/);
+  const text = directInstructions(ade, { custom: '  Tell me everything the agent says.\nUse {{literal}} braces.  ' });
+  assert.ok(text.startsWith(`${base}\n\nOWNER INSTRUCTIONS:`), 'appended after the whole prompt');
+  assert.ok(text.endsWith('\nTell me everything the agent says.\nUse {{literal}} braces.'), 'trimmed, and the text is never rendered as a template');
+  assert.match(text, /never overrides SENDING/);
+});
+
 test('voice_language.json names any language and accent it is given, and every text is used', () => {
   const texts = JSON.parse(resourceText('voice_language.json')) as Record<string, string>;
   assert.deepEqual(Object.keys(texts).sort(), ['browser', 'reminder', 'settings', 'unknown']);

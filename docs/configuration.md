@@ -26,7 +26,8 @@ All fields are strings. Only the key of the provider you use is required (`opena
   "realtimeReasoning": "low",
   "realtimeEagerness": "low",
   "realtimeNoiseReduction": "near_field",
-  "realtimeTranscriptionModel": "gpt-4o-transcribe"
+  "realtimeTranscriptionModel": "gpt-4o-transcribe",
+  "customInstructions": "When an agent answers, tell me everything important it says."
 }
 ```
 
@@ -41,8 +42,9 @@ All fields are strings. Only the key of the provider you use is required (`opena
 | `realtimeEagerness` | `low` | `low`, `medium`, `high`, `auto` | Semantic turn detection. `low` waits longer, up to about 8 s, when your sentence sounds unfinished. |
 | `realtimeNoiseReduction` | `near_field` | `near_field`, `far_field`, `off` | `near_field` for a phone at your mouth or headphones, `far_field` for hands-free or a laptop. |
 | `realtimeTranscriptionModel` | `gpt-4o-transcribe` | An OpenAI transcription model | Transcribes what you say, for the Conversation panel and for the send rule. With a `gpt-4o*` model, your project names are passed as a spelling hint. |
+| `customInstructions` | none | Text up to 4000 characters after trimming, without control characters (C0 or C1) other than line breaks and tabs | Appended at the end of the voice's instructions under a fixed header ([`resources/custom_instructions.txt`](../resources/custom_instructions.txt)), for every ADE. Missing or blank adds nothing. They are preferences: they do not override the send rule and never authorize a send. Edited in **Settings → Voice**. |
 
-An invalid value for `realtimeReasoning`, `realtimeEagerness` or `realtimeNoiseReduction` stops startup with an error that names the field, rather than silently falling back. Model and voice names are not checked locally: a wrong one fails when you place a call, with OpenAI's error in the page. A file that is not valid JSON also stops startup.
+An invalid value for `realtimeReasoning`, `realtimeEagerness`, `realtimeNoiseReduction` or `customInstructions` stops startup with an error that names the field, rather than silently falling back. Model and voice names are not checked locally: a wrong one fails when you place a call, with OpenAI's error in the page. A file that is not valid JSON also stops startup.
 
 Every field can also be changed from the page, between calls: the `realtime*` fields in **Settings → Voice** and `geminiVoice` in **Settings → Voice**, `openaiKey` and `geminiKey` in **Settings → API keys**, which can save or remove them but never show them; see [Settings](#settings). Changes made there are written back to this file.
 
@@ -76,11 +78,11 @@ The **Settings** panel, behind the gear button in the header, has four tabs:
 - **General**
   - **Language**: **Browser** (the rule in [Interface language](#interface-language)) or a fixed language. The choice is stored in this browser's `localStorage` under `ui-language` and reloads the page, or waits until the current call ends. It is also sent with the next call: the voice transcribes, greets and speaks in it with a native accent (with **Browser**, the browser's first preference is used the same way). The voice still answers in whatever language you actually speak.
   - **Call recording**: the switch for [diagnostic recordings](troubleshooting.md#diagnostic-recordings).
-- **Voice**: model, reasoning, voice (`marin`, `cedar`), turn taking, noise reduction and transcription model (`gpt-4o-transcribe`, `gpt-4o-mini-transcribe`). With a Gemini model only the model and the Gemini voice are shown. Each choice is saved as soon as it changes, with no Save button; the row marks it as saved and the call screen shows the new model and reasoning at once. A value written by hand in `config.json` outside these lists stays offered while it is the current one.
+- **Voice**: model, reasoning, voice (`marin`, `cedar`), turn taking, noise reduction and transcription model (`gpt-4o-transcribe`, `gpt-4o-mini-transcribe`). With a Gemini model only the model and the Gemini voice are shown. Each choice is saved as soon as it changes, with no Save button; the row marks it as saved and the call screen shows the new model and reasoning at once. A value written by hand in `config.json` outside these lists stays offered while it is the current one. Below them, **Custom instructions** is a text box saved with its own button into `customInstructions`; saving it empty removes the field, and then nothing is added to the prompt. They apply to both providers.
 - **API keys**: for OpenAI and for Gemini, says whether a key is saved in `config.json`, comes from the environment (`OPENAI_API_KEY`; `GEMINI_API_KEY` or `GOOGLE_API_KEY`) or is missing. It never shows a key. **Save key** writes `openaiKey` or `geminiKey`; **Remove saved key** deletes it, and the server then falls back to the environment if it has one. `POST /api/settings/key` takes `provider: "gemini"` for the Gemini key.
 - **Devices**: paired browsers and links for another device; see [Access](access.md#list-and-revoke).
 
-Voice and key settings are server-wide: they apply to every paired browser and every ADE, from the next call, without a restart. While any call is active or connecting, the server refuses the change (`409`) and the page locks those tabs; a call keeps the settings and key it started with. The server validates every value against the offered options and rewrites `config.json` atomically with mode `0600`, keeping any other field; if the file is not valid JSON it refuses to save and leaves it untouched. The endpoints are `GET`/`POST /api/settings/voice` and `POST /api/settings/key`.
+Voice settings, custom instructions and the key are server-wide: they apply to every paired browser and every ADE, from the next call, without a restart. While any call is active or connecting, the server refuses the change (`409`) and the page locks those tabs; a call keeps the settings and key it started with. The server validates every value against the offered options and rewrites `config.json` atomically with mode `0600`, keeping any other field; if the file is not valid JSON it refuses to save and leaves it untouched. The endpoints are `GET`/`POST /api/settings/voice`, `POST /api/settings/instructions` (`{"instructions": "…"}`; `{"instructions": null}` or blank text removes them; `GET /api/settings/voice` returns the current text) and `POST /api/settings/key`.
 
 What each control keeps after reloading the page or restarting the service:
 
@@ -89,6 +91,7 @@ What each control keeps after reloading the page or restarting the service:
 | Language | This browser's `localStorage` (`ui-language`) | At once (the page reloads), or when the call ends | Kept in this browser; other browsers keep their own. |
 | Call recording | Nowhere: the open page only | Every call of that page | Off. Turn it on again before the next call. |
 | Voice: model, reasoning, voice, turn taking, noise reduction, transcription, Gemini voice | `config.json` (`realtimeModel`, `realtimeReasoning`, `realtimeVoice`, `realtimeEagerness`, `realtimeNoiseReduction`, `realtimeTranscriptionModel`, `geminiVoice`) | Next call, no restart | Kept, for every paired browser and after a restart. |
+| Custom instructions | `config.json` (`customInstructions`) | Next call, no restart | Kept, for every paired browser and after a restart. |
 | API keys | `config.json` (`openaiKey`, `geminiKey`) | Next call, no restart | Kept; the page shows whether it is set, never the key. |
 | Paired browsers | `browser-access.sqlite` in the configuration directory | At once | Kept. A link created for another device is shown only until Settings closes. |
 

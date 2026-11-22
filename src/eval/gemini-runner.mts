@@ -201,7 +201,7 @@ export async function runGeminiScenario(scenario: Scenario, options: GeminiRunOp
   }
 
   const gemini: GeminiCalls = new GeminiCalls({
-    key: options.key, ade: sim.ade, store: { meta() { return undefined; } }, settings: options.settings, utteranceGapMs: options.utteranceGapMs,
+    key: options.key, ade: sim.ade, store: { meta() { return undefined; } }, settings: options.settings, instructions: scenario.instructions, utteranceGapMs: options.utteranceGapMs,
     read: threadId => voiceReads.push({ threadId, at: Date.now() }),
     context: { backend: 't3', capabilities: { listThreads: true, readThreadMessages: true, sendMessagesOnRequest: true },
       resume: () => scenario.history ? evalText('resume_with_history', { history: scenario.history }) : evalText('resume_without_history'),

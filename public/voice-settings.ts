@@ -25,3 +25,25 @@ export function optionLabel(field: VoiceSettingField, value: string) {
   if (field === 'voice' || field === 'geminiVoice') return capital(value);
   return value;
 }
+
+// Which server answer may fill the custom-instructions textarea. Its own
+// counters, separate from the other settings: a voice or key save never
+// cancels the load that brings the instructions, and never fills them itself.
+// A load fills them only when the person is not editing, no instructions save
+// started since the load began, and no later load has filled them already.
+export class InstructionsSync {
+  edited = false;
+  private generation = 0; private loads = 0; private filled = 0;
+  /** A settings load starts: its token. */
+  loadStarted() { return { generation: this.generation, load: ++this.loads }; }
+  /** That load's answer arrived: may it fill the textarea? */
+  loadMayFill(token: { generation: number; load: number }) {
+    if (this.edited || token.generation !== this.generation || token.load < this.filled) return false;
+    this.filled = token.load; return true;
+  }
+  input() { this.edited = true; }
+  /** Loads started before an instructions save may hold the old text. */
+  saveStarted() { this.generation++; }
+  /** Its answer is the saved text; loads started while it ran are dropped too. */
+  saved() { this.generation++; this.edited = false; }
+}

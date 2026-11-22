@@ -888,6 +888,10 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
 .settings-section select { width: 100%; min-height: 44px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: var(--r-s); background: var(--surface-2); color: var(--text); font: inherit; }
 .settings-section .fine { margin: 10px 0 0; }
 .settings-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.instructions-form { margin-top: 20px; }
+.instructions-form h3 { margin: 0 0 4px; }
+.instructions-form textarea { display: block; box-sizing: border-box; width: 100%; min-height: 7em; margin-top: 8px; padding: 10px 12px; border: 1px solid var(--line); border-radius: var(--r-s); background: var(--surface-2); resize: vertical; line-height: 1.4; }
+.instructions-form textarea:disabled { opacity: .6; }
 .settings-section-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -6px -4px 6px 0; }
 .settings-section-head h3 { margin: 0; }
 .settings-section .settings-lead { margin: 0 0 16px; }

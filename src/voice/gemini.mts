@@ -126,6 +126,8 @@ export interface GeminiSettings { model?: string; voice?: string }
 export interface GeminiOptions {
   key?: string; ade: DirectAde; context: VoiceContext; publish: Publish; store: { meta(key: string, value?: unknown): unknown };
   settings?: GeminiSettings;
+  // The owner's custom instructions (Settings), appended to the instructions when not blank.
+  instructions?: string;
   // Opens the provider socket; tests pass a fake.
   connect?: (key: string) => Socket;
   // Tests shorten the pause that separates two utterances.
@@ -137,11 +139,13 @@ export class GeminiCalls {
   readonly provider = 'gemini';
   key: string | undefined; ade: DirectAde; publish: Publish; store: GeminiOptions['store']; context: VoiceContext;
   model!: string; voice!: string;
+  // The owner's custom instructions; changed by configure().
+  instructions: string | undefined;
   sessions = new Map<string, GeminiCall>(); creating = false; stopping = false; running = 0;
   connect: (key: string) => Socket; timer: NodeJS.Timeout; gap: number;
   delivered?: GeminiOptions['delivered']; read?: GeminiOptions['read'];
-  constructor({ key, ade, publish, store, context, settings = {}, connect, delivered, read, utteranceGapMs = UTTERANCE_GAP_MS }: GeminiOptions) {
-    this.key = key; this.ade = ade; this.publish = publish; this.store = store; this.context = context; this.gap = utteranceGapMs;
+  constructor({ key, ade, publish, store, context, settings = {}, instructions, connect, delivered, read, utteranceGapMs = UTTERANCE_GAP_MS }: GeminiOptions) {
+    this.instructions = instructions; this.key = key; this.ade = ade; this.publish = publish; this.store = store; this.context = context; this.gap = utteranceGapMs;
     this.delivered = delivered; this.read = read;
     this.apply(settings);
     this.connect = connect || connectGemini;
@@ -155,9 +159,11 @@ export class GeminiCalls {
   }
   get busy() { return this.creating || this.sessions.size > 0; }
   get working() { return this.running > 0; }
-  configure({ settings, key }: { settings?: GeminiSettings; key?: string | null }) {
+  // instructions: null clears them; undefined keeps them.
+  configure({ settings, key, instructions }: { settings?: GeminiSettings; key?: string | null; instructions?: string | null }) {
     if (this.busy) throw new Error('End the call before changing the voice settings.');
     if (settings) this.apply(settings);
+    if (instructions !== undefined) this.instructions = instructions || undefined;
     if (key !== undefined) this.key = key || undefined;
   }
   // The setup message: instructions, the ADE's tools and audio in both
@@ -169,7 +175,7 @@ export class GeminiCalls {
     return {
       model: `models/${this.model}`,
       generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: this.voice } } } },
-      systemInstruction: { parts: [{ text: directInstructions(this.ade, { callStart: this.context.timing?.(), capabilities: { backend: this.context.backend, capabilities: this.context.capabilities }, language }) }] },
+      systemInstruction: { parts: [{ text: directInstructions(this.ade, { callStart: this.context.timing?.(), capabilities: { backend: this.context.backend, capabilities: this.context.capabilities }, language, custom: this.instructions }) }] },
       // BLOCKING: the model waits for each result before it speaks about it,
       // as with Realtime. 3.1 is synchronous already and takes no behavior.
       tools: [{ functionDeclarations: this.ade.tools.map(({ name, description, parameters }) => ({ name, description, parameters: geminiSchema(parameters), ...(blocking ? { behavior: 'BLOCKING' } : {}) })) }],

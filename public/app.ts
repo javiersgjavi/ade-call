@@ -17,6 +17,9 @@ interface Elements {
   'reveal-gemini-key': HTMLElementTagNameMap['button'];
   'save-gemini-key': HTMLElementTagNameMap['button'];
   'remove-gemini-key': HTMLElementTagNameMap['button'];
+  'instructions-form': HTMLElementTagNameMap['form'];
+  'custom-instructions': HTMLElementTagNameMap['textarea'];
+  'save-instructions': HTMLElementTagNameMap['button'];
   'key-form': HTMLElementTagNameMap['form'];
   'openai-key': HTMLElementTagNameMap['input'];
   'reveal-key': HTMLElementTagNameMap['button'];
@@ -46,7 +49,7 @@ import { RecordingPanel } from './recording-panel.js';
 import { browserRows, browserNote, type PairedBrowser } from './browser-list.js';
 import { PairDevice, type PairInvite } from './pair-device.js';
 import { play } from './sounds.js';
-import { modelName, modelProvider, optionLabel, VOICE_FIELDS, type VoiceValues } from './voice-settings.js';
+import { InstructionsSync, modelName, modelProvider, optionLabel, VOICE_FIELDS, type VoiceValues } from './voice-settings.js';
 import { t, locale, isMessageKey, storedPreference, storePreference, voiceLanguages } from './i18n.js';
 const recordings = new RecordingPanel();
 const $ = <K extends string>(id: K) => document.getElementById(id)! as K extends keyof Elements ? Elements[K] : HTMLElement;
@@ -728,6 +731,7 @@ $('settings').addEventListener('close', () => pairDevice.dismiss());
 // browser's call and when the server reports one; a call keeps what it began with.
 const VOICE_SELECTS = { model: 'setting-model', reasoning: 'setting-reasoning', voice: 'setting-voice', eagerness: 'setting-eagerness', noiseReduction: 'setting-noise', transcriptionModel: 'setting-transcription', geminiVoice: 'setting-gemini-voice' } as const;
 let voiceSaved: VoiceSettingsResponse | null = null, settingsBusy = false, settingsRequest = 0;
+const instructionsSync = new InstructionsSync();
 // Each voice choice is saved as soon as it is made, one request at a time and in order.
 const pendingVoice: Partial<VoiceValues> = {};
 let voiceQueue: Promise<void> = Promise.resolve();
@@ -767,8 +771,8 @@ function saveVoiceField(field: VoiceSettingField, value: string) {
   });
 }
 const localCall = () => !!(stream || callId || restarting) || stage.dataset.state === 'connecting';
-type FormStatus = 'voice-status' | 'key-status' | 'gemini-key-status';
-type KeyButton = 'save-key' | 'remove-key' | 'save-gemini-key' | 'remove-gemini-key';
+type FormStatus = 'voice-status' | 'instructions-status' | 'key-status' | 'gemini-key-status';
+type KeyButton = 'save-key' | 'remove-key' | 'save-gemini-key' | 'remove-gemini-key' | 'save-instructions';
 function formStatus(id: FormStatus, text: string, state: 'ok' | 'error' | '' = '') {
   const node = $(id); node.textContent = text; if (state) node.dataset.state = state; else delete node.dataset.state;
 }
@@ -777,9 +781,12 @@ function lockSettings() {
   for (const id of Object.values(VOICE_SELECTS)) $(id).disabled = locked;
   for (const id of ['save-key', 'remove-key', 'openai-key'] as const) $(id).disabled = locked || busy('save-key', 'remove-key');
   for (const id of ['save-gemini-key', 'remove-gemini-key', 'gemini-key'] as const) $(id).disabled = locked || busy('save-gemini-key', 'remove-gemini-key');
+  for (const id of ['save-instructions', 'custom-instructions'] as const) $(id).disabled = locked || busy('save-instructions');
   const note = locked && voiceSaved ? t('settings.inCall') : '';
   if (note || $('voice-status').textContent === t('settings.inCall')) formStatus('voice-status', note);
 }
+// The instructions textarea is filled only by loadVoiceSettings and by its own
+// save, as InstructionsSync decides; other answers may be older than either.
 function showVoiceSettings(result: VoiceSettingsResponse) {
   // This browser's own call locks the form by itself and unlocks it when it ends.
   voiceSaved = result; settingsBusy = result.busy && !localCall();
@@ -803,10 +810,11 @@ function showVoiceSettings(result: VoiceSettingsResponse) {
   lockSettings();
 }
 async function loadVoiceSettings() {
-  const request = ++settingsRequest;
+  const request = ++settingsRequest, instructions = instructionsSync.loadStarted();
   if (!voiceSaved) formStatus('voice-status', t('settings.loading'));
   try {
     const result = await api('/api/settings/voice');
+    if (instructionsSync.loadMayFill(instructions)) $('custom-instructions').value = result.instructions;
     if (request !== settingsRequest) return;
     formStatus('voice-status', ''); showVoiceSettings(result);
   } catch (error) { if (request === settingsRequest) formStatus('voice-status', t('settings.loadFailed') + ' ' + errorMessage(error), 'error'); }
@@ -815,23 +823,39 @@ async function loadVoiceSettings() {
 async function refreshVoice() {
   try { showVoice(await api('/api/status')); } catch { /* The next boot or status poll shows it. */ }
 }
-async function saveSettings(button: KeyButton, status: FormStatus, path: '/api/settings/voice' | '/api/settings/key', data: Record<string, unknown>, done: string) {
+async function saveSettings(button: KeyButton, status: FormStatus, path: '/api/settings/voice' | '/api/settings/key' | '/api/settings/instructions', data: Record<string, unknown>, done: string) {
   $(button).setAttribute('aria-busy', 'true'); lockSettings();
   formStatus(status, t('settings.saving'));
   try {
     settingsRequest++;
-    showVoiceSettings(await api(path, data));
+    const result = await api(path, data) as VoiceSettingsResponse;
+    showVoiceSettings(result);
     formStatus(status, done, 'ok');
     void refreshVoice();
-    return true;
+    return result;
   } catch (error) {
     formStatus(status, errorMessage(error), 'error');
     void loadVoiceSettings();
-    return false;
+    return null;
   } finally { $(button).removeAttribute('aria-busy'); lockSettings(); }
 }
 $('voice-form').onsubmit = event => event.preventDefault();
 for (const field of VOICE_FIELDS) $(VOICE_SELECTS[field]).onchange = () => saveVoiceField(field, $(VOICE_SELECTS[field]).value);
+// Custom instructions: saved with their button; empty text removes them.
+$('custom-instructions').oninput = () => { instructionsSync.input(); formStatus('instructions-status', ''); };
+$('instructions-form').onsubmit = async event => {
+  event.preventDefault();
+  // Sent as typed: the server trims and validates it, and blank text removes it.
+  // No maxlength on the textarea: it would cut pasted text before trimming,
+  // so the limit is checked here on the trimmed text, as the server does.
+  const instructions = $('custom-instructions').value, max = voiceSaved?.instructionsMax;
+  if (max && instructions.trim().length > max) {
+    formStatus('instructions-status', t('settings.instructionsTooLong', { max, count: instructions.trim().length }), 'error'); $('custom-instructions').focus(); return;
+  }
+  instructionsSync.saveStarted();
+  const saved = await saveSettings('save-instructions', 'instructions-status', '/api/settings/instructions', { instructions }, t(instructions.trim() ? 'settings.instructionsSaved' : 'settings.instructionsCleared'));
+  if (saved) { instructionsSync.saved(); $('custom-instructions').value = saved.instructions; }
+};
 function hideKey() { $('openai-key').type = 'password'; $('reveal-key').setAttribute('aria-pressed', 'false'); $('reveal-key').textContent = t('login.show'); }
 $('reveal-key').onclick = () => {
   const show = $('openai-key').type === 'password';
@@ -875,12 +899,32 @@ $('open-settings').onclick = () => {
   $('settings').dataset.signedIn = String(signedIn);
   for (const block of $('settings').querySelectorAll<HTMLElement>('.settings-tabs, .settings-block[data-auth]')) block.hidden = !signedIn;
   showSettingsTab(signedIn ? settingsTab : 'general', false);
-  formStatus('voice-status', ''); formStatus('key-status', ''); formStatus('gemini-key-status', '');
+  formStatus('voice-status', ''); formStatus('instructions-status', ''); formStatus('key-status', ''); formStatus('gemini-key-status', '');
   $('settings').showModal();
-  if (signedIn) { void refreshBrowsers(); void loadVoiceSettings(); }
+  if (signedIn) { void refreshBrowsers(); void loadVoiceSettings(); watchSettingsBusy(); }
 };
 // Closing forgets a typed key that was not saved.
-$('settings').addEventListener('close', () => { $('openai-key').value = ''; hideKey(); $('gemini-key').value = ''; hideGeminiKey(); });
+$('settings').addEventListener('close', () => { $('openai-key').value = ''; hideKey(); $('gemini-key').value = ''; hideGeminiKey(); clearInterval(settingsBusyTimer); settingsBusyWatch++; });
+// While Settings is open, a call another browser starts or ends locks or
+// unlocks the form. Only the busy flag is refreshed: options and text being
+// edited stay as they are.
+// One poll at a time, and an answer from before the dialog was reopened or
+// another settings request is dropped, so an old "busy" never locks it again.
+let settingsBusyTimer = 0, settingsBusyWatch = 0, settingsBusyPolling = false;
+function watchSettingsBusy() {
+  clearInterval(settingsBusyTimer);
+  const watch = ++settingsBusyWatch;
+  settingsBusyTimer = window.setInterval(async () => {
+    if (settingsBusyPolling || !$('settings').open || !voiceSaved) return;
+    const request = settingsRequest;
+    settingsBusyPolling = true;
+    try {
+      const { busy } = await api('/api/settings/voice') as VoiceSettingsResponse;
+      if (watch !== settingsBusyWatch || request !== settingsRequest || !$('settings').open) return;
+      settingsBusy = busy && !localCall(); lockSettings();
+    } catch { /* The next tick or reopening Settings tries again. */ } finally { settingsBusyPolling = false; }
+  }, 4000);
+}
 // Tabs: General (language, recording), Voice, API key and Devices. The last
 // one chosen is reopened in this page; arrow keys move between tabs.
 type SettingsTab = 'general' | 'voice' | 'key' | 'devices';

@@ -393,12 +393,55 @@ test('voice settings: readable option names, only changed fields sent, a key fie
   assert.match(app, /'\/api\/settings\/key', \{ key: null \}/);
 });
 
+test('custom instructions: only a current load or their own save fill the textarea, whatever order answers arrive in', async () => {
+  const { InstructionsSync } = await import('../public/voice-settings.js');
+  // An ordinary load fills it; its own counters mean a voice or key save made
+  // meanwhile (settingsRequest) does not stop it.
+  let sync = new InstructionsSync();
+  const reopened = sync.loadStarted();
+  assert.equal(sync.loadMayFill(reopened), true);
+  // Two loads answering in reverse order: the older one does not overwrite the newer.
+  sync = new InstructionsSync();
+  const first = sync.loadStarted(), second = sync.loadStarted();
+  assert.equal(sync.loadMayFill(second), true); assert.equal(sync.loadMayFill(first), false);
+  // Text being edited is never replaced by a load.
+  sync = new InstructionsSync(); const whileEditing = sync.loadStarted(); sync.input();
+  assert.equal(sync.loadMayFill(whileEditing), false);
+  // A load started before or during a save answers after it: dropped, so the saved text stays.
+  sync = new InstructionsSync(); sync.input();
+  const before = sync.loadStarted(); sync.saveStarted(); const during = sync.loadStarted(); sync.saved();
+  assert.equal(sync.edited, false);
+  assert.equal(sync.loadMayFill(before), false); assert.equal(sync.loadMayFill(during), false);
+  assert.equal(sync.loadMayFill(sync.loadStarted()), true, 'a load started after the save fills it');
+  // A failed save keeps the person's text: they are still editing.
+  sync = new InstructionsSync(); sync.input(); sync.saveStarted();
+  assert.equal(sync.loadMayFill(sync.loadStarted()), false);
+});
+
 test('after a reload Settings shows the stored language and server values, and the recording switch is off by design', async () => {
   // Language: this browser's localStorage, put back into the select on load.
   assert.match(app, /\$\('ui-language'\)\.value = storedPreference\(localStorage\);/);
   // Voice and key: read from the server each time Settings opens, never from this browser.
-  assert.match(app, /if \(signedIn\) \{\s*void refreshBrowsers\(\);\s*void loadVoiceSettings\(\);\s*\}/);
+  assert.match(app, /if \(signedIn\) \{\s*void refreshBrowsers\(\);\s*void loadVoiceSettings\(\);\s*watchSettingsBusy\(\);\s*\}/);
   assert.match(app, /select\.value = pendingVoice\[field\] \?\? result\.settings\[field\];/);
+  // Custom instructions: text being edited is never replaced, and is sent as typed for the server to validate.
+  // Only loadVoiceSettings and the instructions' own save fill the textarea, as InstructionsSync decides.
+  assert.match(app, /if \(instructionsSync\.loadMayFill\(instructions\)\)\s*\$\('custom-instructions'\)\.value = result\.instructions;\s*if \(request !== settingsRequest\)\s*return;/);
+  assert.equal([...app.matchAll(/\$\('custom-instructions'\)\.value = /g)].length, 2, 'no other answer writes the textarea');
+  assert.match(app, /if \(saved\) \{\s*instructionsSync\.saved\(\);\s*\$\('custom-instructions'\)\.value = saved\.instructions;\s*\}/);
+  assert.match(app, /const instructions = \$\('custom-instructions'\)\.value, max = /);
+  assert.match(app, /'\/api\/settings\/instructions', \{ instructions \}/);
+  // While Settings is open, a call from another browser locks or unlocks it: only the busy flag changes.
+  const watch = app.slice(app.indexOf('function watchSettingsBusy'), app.indexOf('}, 4000);'));
+  assert.match(watch, /settingsBusy = busy && !localCall\(\);\s*lockSettings\(\);/);
+  assert.doesNotMatch(watch, /showVoiceSettings|\.value =/, 'the poll does not touch options or edited text');
+  assert.match(watch, /if \(settingsBusyPolling \|\|/, 'one poll at a time');
+  assert.match(watch, /watch !== settingsBusyWatch \|\| request !== settingsRequest/, 'a superseded answer is dropped');
+  // No raw length cap: pasted text with spaces around 4000 characters is not cut before the server trims it.
+  assert.doesNotMatch(tag('custom-instructions'), /maxlength/);
+  assert.doesNotMatch(app, /custom-instructions'\)\.maxLength|instructions\.maxLength/);
+  assert.match(app, /instructions\.trim\(\)\.length > max/);
+  assert.match(app, /addEventListener\('close', \(\) => \{[^\n]*clearInterval\(settingsBusyTimer\)/);
   assert.doesNotMatch(app, /localStorage\.setItem\('(?!ade')/, 'only the ADE choice and, through i18n.ts, the language are stored in the browser');
   // Diagnostic recording: off on every load, even when the browser restores form state.
   assert.match(tag('record-call'), /autocomplete="off"/);

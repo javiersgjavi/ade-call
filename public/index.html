@@ -240,6 +240,15 @@
         </fieldset>
       </form>
       <p id="voice-status" class="fine form-status" role="status" aria-live="polite"></p>
+      <form id="instructions-form" class="instructions-form" autocomplete="off">
+        <h3><label for="custom-instructions" data-i18n="settings.instructions">Custom instructions</label></h3>
+        <p id="instructions-hint" class="fine" data-i18n="settings.instructionsHint">Added at the end of the voice's instructions in every call, for every ADE. For example: "When an agent answers, tell me everything important it says, not just a summary." Leave it empty to add nothing. They do not replace the question before sending work.</p>
+        <textarea id="custom-instructions" rows="5" aria-describedby="instructions-hint"></textarea>
+        <div class="settings-actions">
+          <button id="save-instructions" class="btn btn-accent" type="submit" data-i18n="settings.instructionsSave">Save instructions</button>
+        </div>
+        <p id="instructions-status" class="fine form-status" role="status" aria-live="polite"></p>
+      </form>
     </section>
     <section class="settings-section settings-panel" data-auth data-panel="key" id="key-settings" role="tabpanel" aria-labelledby="tab-key" hidden>
       <div class="settings-section-head">

@@ -86,6 +86,8 @@ export interface VoiceSettingsResponse {
   settings: Record<VoiceSettingField, string>; options: Record<VoiceSettingField, string[]>;
   // key: the OpenAI key; geminiKey: the Gemini API key. provider: the one the model in use needs.
   key: KeyState; geminiKey: KeyState; provider: VoiceProvider; busy: boolean;
+  // The owner's custom instructions ('' when none) and their maximum length.
+  instructions: string; instructionsMax: number;
 }
 // Stored events of a call, as src/voice/realtime.mts publishes them: what the
 // user and the agent said, and each tool run with sanitized details.

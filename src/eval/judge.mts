@@ -84,6 +84,7 @@ export function judgeInput(scenario: Scenario, run: RunRecord, secrets: string[]
   const criteria = (scenario.expect.rubric || []).map((c, i) => `s${i + 1} ${c}`);
   return evalText('judge_input', { id: scenario.id, description: scenario.description, started: run.clock ? evalText('judge_clock', { utc: run.clock.now || run.startedAt, local: run.clock.localNow, zone: run.clock.timeZone }) : run.startedAt || evalText('judge_no_start'), language: scenario.expect.language ? evalText('judge_language', { language: scenario.expect.language }) : '',
     history: scenario.history ? evalText('judge_history', { history: scenario.history }) : '',
+    instructions: scenario.instructions ? evalText('judge_instructions', { instructions: scenario.instructions.trim() }) : '',
     world: worldText(scenario) + '\n\n' + (run.vocabulary === undefined ? evalText('judge_vocabulary_missing') : run.vocabulary.length ? evalText('judge_vocabulary', { hints: JSON.stringify(redactEvidence(run.vocabulary)) }) : evalText('judge_vocabulary_empty')), catalog: run.initialCatalog ? evalText('judge_catalog', { text: run.initialCatalog }) : evalText('judge_no_catalog'), log: callLog(scenario, run),
     criteria: criteria.length ? evalText('judge_criteria', { list: criteria.join('\n') }) : evalText('judge_no_criteria') });
 }

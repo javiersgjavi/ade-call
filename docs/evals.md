@@ -154,6 +154,7 @@ node dist/scripts/eval.mjs run --label gemini --model gemini-3.8-live --repeat 3
   "tags": ["send"],
   "language": "es-ES",
   "history": "Optional: what the voice remembers of earlier calls.",
+  "instructions": "Optional: the owner's custom instructions from Settings.",
   "world": "worlds/demo.json",
   "turns": [
     { "say": "¿Cómo va lo de la búsqueda?" },
@@ -175,6 +176,12 @@ node dist/scripts/eval.mjs run --label gemini --model gemini-3.8-live --repeat 3
   even if no assistant transcript arrives. A saved latency without a saved playback
   start in an older run cannot prove silence and requires a new run. This is the check
   `turns[N].silent`. Noise turns never expect one.
+- `instructions` are the owner's custom instructions, under the same rules as
+  **Settings → Custom instructions** (no control characters, at most 4000 characters,
+  not blank). The voice gets them appended to its prompt with the production header,
+  and the judges get them to grade style by them; they never make a send acceptable.
+  Without the field nothing is added. The owner's own instructions from `config.json`
+  are not used, so a run measures the scenario, not the installation.
 - `language` is the language chosen in the settings: it fixes transcription. Leave it
   out to test detection and switching.
 - `world` is inline or a path. Threads take `status`, `messages`, `parent` (a subagent),
@@ -258,6 +265,7 @@ its objective. The files group them by what they evaluate:
 | `f-idioma-estilo.json` | Language switching, no tools for small talk, short answers, and a natural voice: with one obvious thread it reads and answers without confirming the obvious, and proposes a send in a short sentence. |
 | `g-limites.json` | Honesty about what it cannot do and about uncertain deliveries. |
 | `h-ingles.json` | The key objectives again with English speakers, including Spanish threads reported in English and the single-thread project. |
+| `i-instrucciones.json` | The owner's custom instructions: more detail when asked not to summarize, *usted*, instructions in English on a Spanish call, and instructions that ask to send without asking still need a yes. |
 
 The speakers in [evals/voices.json](../evals/voices.json) are public ElevenLabs
 voices with different accents, paces and tones (neutral, hurried, slow with fillers,
