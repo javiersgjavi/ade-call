@@ -73,7 +73,8 @@ created the call, once. See [access.md](access.md).
 ## Setup
 
 The `setup` message carries the instructions built by
-[`directInstructions()`](../src/direct/prompt.mts), the ADE's tools as
+[`directInstructions()`](../src/direct/prompt.mts) (with the owner's custom
+instructions at the end, as with Realtime), the ADE's tools as
 `functionDeclarations` with the schemas from
 [resources/tools.json](../resources/tools.json), the prebuilt voice, input and
 output transcription (with your project names as `customVocabulary` on 3.8),
