@@ -384,7 +384,7 @@ function showVoice(status: StatusResponse) {
   const direct = !!status.ades.find(ade => ade.id === backend)?.direct;
   if (callId || stream || restarting) return;
   $('call').disabled = !voiceReady;
-  if (voiceReady) setCall('idle', ''); else setCall('unavailable', direct ? t('call.configureKey') : t('call.voiceNotYet', { ade: adeName() }));
+  if (voiceReady) setCall('idle', ''); else setCall('unavailable', direct ? t(voiceProvider === 'gemini' ? 'call.configureGeminiKey' : 'call.configureKey') : t('call.voiceNotYet', { ade: adeName() }));
 }
 async function boot() {
   const generation = ++viewGeneration;

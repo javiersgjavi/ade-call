@@ -164,7 +164,12 @@ socket route is tested for authentication and origin
 
 The [conversation evaluations](evals.md#gemini-live) run the battery on Gemini
 Live with `--model gemini-3.8-live`: real calls with the production engine, a
-synthetic user and a simulated T3. They are paid.
+synthetic user and a simulated T3. They are paid. On the 53-scenario battery
+(November 2026, one pass) `gemini-3.8-live` passed about 77% of the runs and
+`gpt-realtime-2.1` about 89%, with higher latency on Gemini (median about 1.2 to
+2.2 s against about 0.9 s). Gemini still sometimes takes a lone mistranscribed
+word for a yes and leaves out key details when it reports an agent's answer, so it
+stays an experimental choice and GPT Realtime the default.
 
 Not yet verified against the real service: a live call end to end, the audio
 quality and echo cancellation of the relay on phones, whether silent notes sent
