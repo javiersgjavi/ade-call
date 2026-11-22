@@ -72,7 +72,9 @@ test('creates a Gemini Live session with the ADE tools, its instructions, transc
   assert.equal(setup.model, 'models/gemini-3.8-live');
   assert.deepEqual(setup.generationConfig.responseModalities, ['AUDIO']);
   assert.equal(setup.generationConfig.speechConfig.voiceConfig.prebuiltVoiceConfig.voiceName, 'Puck');
-  assert.equal(setup.systemInstruction.parts[0].text, directInstructions(f.ade));
+  assert.equal(setup.systemInstruction.parts[0].text, directInstructions(f.ade, { provider: 'gemini' }));
+  assert.match(setup.systemInstruction.parts[0].text, /SENDING[\s\S]*\nSENDING STEPS[\s\S]*Never call fake_send in the same response as your proposal/, 'the send procedure as steps, after the shared rules');
+  assert.doesNotMatch(directInstructions(f.ade), /SENDING STEPS/, 'Realtime keeps the shared prompt');
   assert.deepEqual(setup.tools[0].functionDeclarations.map((d: Message) => [d.name, d.behavior]), [['fake_send', 'BLOCKING'], ['fake_read', 'BLOCKING']], 'the voice model calls the ADE tools itself, synchronously');
   assert.deepEqual(setup.inputAudioTranscription, { customVocabulary: ['Faro'] }); assert.deepEqual(setup.outputAudioTranscription, {});
   assert.deepEqual(setup.historyConfig, { initialHistoryInClientContent: true });
@@ -100,7 +102,7 @@ test('the owner\'s custom instructions end the Gemini instructions, and configur
   f.gemini.configure({ instructions: 'Answer in one sentence.' });
   await f.start();
   const text = f.upstream().sent[0].setup.systemInstruction.parts[0].text;
-  assert.equal(text, directInstructions(f.ade, { custom: 'Answer in one sentence.' }));
+  assert.equal(text, directInstructions(f.ade, { custom: 'Answer in one sentence.', provider: 'gemini' }));
   assert.match(text, /OWNER INSTRUCTIONS[\s\S]*Answer in one sentence\.$/);
   f.gemini.close(f.gemini.sessions.keys().next().value!);
   await wait();

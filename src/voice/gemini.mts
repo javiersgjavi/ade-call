@@ -175,7 +175,7 @@ export class GeminiCalls {
     return {
       model: `models/${this.model}`,
       generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: this.voice } } } },
-      systemInstruction: { parts: [{ text: directInstructions(this.ade, { callStart: this.context.timing?.(), capabilities: { backend: this.context.backend, capabilities: this.context.capabilities }, language, custom: this.instructions }) }] },
+      systemInstruction: { parts: [{ text: directInstructions(this.ade, { callStart: this.context.timing?.(), capabilities: { backend: this.context.backend, capabilities: this.context.capabilities }, language, custom: this.instructions, provider: 'gemini' }) }] },
       // BLOCKING: the model waits for each result before it speaks about it,
       // as with Realtime. 3.1 is synchronous already and takes no behavior.
       tools: [{ functionDeclarations: this.ade.tools.map(({ name, description, parameters }) => ({ name, description, parameters: geminiSchema(parameters), ...(blocking ? { behavior: 'BLOCKING' } : {}) })) }],

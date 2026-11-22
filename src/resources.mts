@@ -27,6 +27,11 @@ let customHeader: string | undefined;
 export const customInstructionsText = (instructions: string) =>
   render(customHeader ??= resourceText('custom_instructions.txt').trimEnd(), { instructions }, 'custom_instructions.txt');
 
+// Instructions only for Gemini Live (resources/gemini_prompt.txt): the send
+// procedure as separate steps, appended after the voice instructions.
+let geminiPrompt: string | undefined;
+export const geminiPromptText = (vars: Vars) => render(geminiPrompt ??= resourceText('gemini_prompt.txt').trimEnd(), vars, 'gemini_prompt.txt');
+
 // The language and accent a call starts in (resources/voice_language.json):
 // the one chosen in the settings, the browser's, or unknown; and the short
 // reminder sent before each response the server requests.
