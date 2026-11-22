@@ -15,7 +15,10 @@ import { runGeminiScenario, toInputRate } from '../src/eval/gemini-runner.mjs';
 // 'send': the user's words are a yes and the model sends to thread t.
 // 'talk': the model answers the first turn at length; the second turn
 // speaks over it and the provider interrupts the model.
-type Mode = 'send' | 'talk';
+// 'murmur': the first words of the user are transcribed and the model voices a
+// lone "..." while the user is still speaking,
+// and answers 1.6 s after the user stops.
+type Mode = 'send' | 'talk' | 'murmur';
 class FakeGemini extends EventEmitter {
   readyState = 1; sent: Record<string, unknown>[] = []; speaking = false; turns = 0;
   constructor(readonly mode: Mode) { super(); setTimeout(() => this.emit('open'), 5); }
@@ -39,6 +42,10 @@ class FakeGemini extends EventEmitter {
     if (!audio) return;
     const loud = Buffer.from(audio.data, 'base64').some(byte => byte !== 0);
     if (loud) {
+      if (!this.speaking && this.mode === 'murmur') {
+        this.message({ serverContent: { inputTranscription: { text: 'Cuéntame' } } });
+        setTimeout(() => this.speak('...', 100), 10);
+      }
       if (!this.speaking && this.mode === 'talk' && this.turns === 1) this.message({ serverContent: { interrupted: true } });
       this.speaking = true; return;
     }
@@ -48,6 +55,11 @@ class FakeGemini extends EventEmitter {
     if (this.mode === 'send') {
       this.message({ serverContent: { inputTranscription: { text: 'Sí, mándalo.' } } });
       setTimeout(() => this.message({ toolCall: { functionCalls: [{ id: `call_send${n}`, name: 't3_send_message', args: sendTo('t') }] } }), 30);
+      return;
+    }
+    if (this.mode === 'murmur') {
+      this.message({ serverContent: { inputTranscription: { text: ' algo.' } } });
+      setTimeout(() => this.speak('Respuesta real.'), 1600);
       return;
     }
     this.message({ serverContent: { inputTranscription: { text: n === 1 ? 'Cuéntame algo.' : 'Vale, para.' } } });
@@ -123,4 +135,14 @@ test('a Gemini interruption cuts the answer playing, and the record says how muc
   assert.ok(long.cut && long.cut.heardMs >= 400 && long.cut.heardMs < 3000 && long.cut.totalMs === 3000, JSON.stringify(long.cut));
   assert.ok(run.transcript.some(l => l.role === 'assistant' && l.text === 'Vale.' && l.turn === 2));
   assert.equal(checkRun(scenario, run).find(c => c.id === 'turns[2].bargeIn')!.pass, true);
+});
+
+test('a lone "..." voiced while the user speaks neither answers the turn nor sets its latency', { timeout: 60_000 }, async () => {
+  const scenario = validateScenario({ id: 'gemini-murmur', description: 'd', world, language: 'es-ES', turns: [{ noise: 'pink', ms: 800 }], expect: { sends: [] } });
+  const run = await runGeminiScenario(scenario, options(() => {}, 'murmur'));
+  assert.ok(run.transcript.some(l => l.role === 'assistant' && l.text === '...'), 'the murmur stays in the transcript');
+  assert.ok(run.transcript.some(l => l.role === 'assistant' && l.text === 'Respuesta real.' && l.turn === 1), 'the run waited for the real answer');
+  const turn = run.turns.find(t => t.index === 1)!;
+  assert.ok(turn.latencyMs != null && turn.latencyMs >= 1400, `latency from the real answer: ${turn.latencyMs}`);
+  assert.deepEqual(run.timeouts, []);
 });

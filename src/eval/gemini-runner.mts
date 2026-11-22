@@ -77,6 +77,9 @@ export async function runGeminiScenario(scenario: Scenario, options: GeminiRunOp
   const turnNow = () => turnStarts.filter(start => start <= clock()).length;
   const responseTurn = new Map<string, number>(), callTurn = new Map<string, number>(), callStart = new Map<string, number>(), requestTurn = new Map<string, number>();
   const calling = new Set<string>(), open = new Set<string>();
+  // An answer has words or calls a tool: a lone "..." or breath the model voices
+  // while the user pauses neither answers the turn nor sets its latency.
+  const substantive = (id: string) => calling.has(id) || /[\p{L}\p{N}]/u.test(said.get(id) || '');
   const ownTurn = (responseId?: string) => responseId && responseTurn.has(responseId) ? responseTurn.get(responseId)! : committed;
   const voiceReads: { threadId: string; at: number }[] = [];
   // The turn each utterance started in, in order, and of the latest piece
@@ -286,7 +289,7 @@ export async function runGeminiScenario(scenario: Scenario, options: GeminiRunOp
     const speak = async (pcm: Buffer, first?: () => void) => { firstSample.run = first ?? null; queue = Buffer.concat([queue, pcm]); while (queue.length && pumping) { alive(); await sleep(20); } };
     // Quiet: nothing pending in the engine, playback over, and no event for a moment.
     const quiet = () => !live.responding && !live.toolsPending.size && !live.queue.length && !gemini.working && clock() >= playhead && clock() - lastActivity > 1200;
-    const answered = (owner: number) => [...responseTurn.values()].includes(owner);
+    const answered = (owner: number) => [...responseTurn].some(([id, turn]) => turn === owner && substantive(id));
     const settle = async (limit: number, done: () => boolean, noResponseMs = options.noResponseMs ?? 10_000) => {
       const from = clock(), until = from + limit;
       while (clock() < until) {
@@ -365,7 +368,7 @@ export async function runGeminiScenario(scenario: Scenario, options: GeminiRunOp
     finishCut();
     // Latency runs from the end of the turn's speech to the first sample of its answer that played.
     for (const t of record.turns) {
-      const first = voiceTrack.filter(p => p.audio.length && p.at < record.durationMs && !coverage.has(p.response) && ownTurn(p.response) === t.index).sort((a, b) => a.at - b.at)[0];
+      const first = voiceTrack.filter(p => p.audio.length && p.at < record.durationMs && !coverage.has(p.response) && substantive(p.response) && ownTurn(p.response) === t.index).sort((a, b) => a.at - b.at)[0];
       t.firstAnswerMs = first ? Math.round(first.at) : null;
       t.latencyMs = first ? Math.round(first.at - t.endMs) : null;
     }
