@@ -156,7 +156,7 @@ test('a direct search names the parents of the subagents it left out by short ID
     subagentsMatching: { count: 4, parents } }) }).find(t => t.name === 't3_find_threads')!;
   const state = new DirectCallState(); compactCatalog(catalog, state);
   const { text } = await find.execute({ query: 'humedad' }, { requestId: 'r', signal: AbortSignal.timeout(1000), state });
-  assert.match(text, /main threads only/);
+  assert.match(text, /top-level threads only/);
   assert.match(text, /4 subagent threads also match and are not shown\. Search them with includeSubagents=true/);
   const shown = [...text.matchAll(/^- (?:"[^"]*" · )?parent (\S+)$/gm)].map(m => m[1]);
   assert.equal(shown.length, parents.length, text);
@@ -232,7 +232,7 @@ test('T3 voice instructions keep every rule area and stay compact', () => {
   assert.match(voice, /Voice doubt only on a failure, an uncertain result or the agent's own caveat/);
   assert.doesNotMatch(voice, /ofrece (?:leer|listar|buscar|comprobar)/);
   // A described topic: several of its words, recent main threads before old subagents.
-  assert.match(voice, /For a described topic, search several of its meaningful words, not just one\. Unless they ask for a subagent, prefer recent main threads \(searches and listings leave subagents out by default\): one in the catalog or a listing that fits comes before old subagents\./);
+  assert.match(voice, /For a described topic, search several of its meaningful words, not just one\. Unless they ask for a subagent, prefer recent top-level threads \(searches and listings leave subagents out by default\): one in the catalog or a listing that fits comes before old subagents\./);
 });
 
 test('T3 direct tools are compact and only the send changes T3', () => {

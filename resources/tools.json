@@ -1,16 +1,16 @@
 {
   "t3_find_threads": {
-    "description": "Searches threads by title and projects by name when the user names or describes something; main threads only by default. Returns candidates with date and short ID. Zero results do not prove it does not exist: try other words or list the project.",
+    "description": "Searches threads by title and projects by name when the user names or describes something; top-level threads only by default. Returns candidates with date and short ID. Zero results do not prove it does not exist: try other words or list the project.",
     "parameters": {
       "query": { "type": "string", "minLength": 1, "required": true, "description": "What you heard, as is, even if it looks mistranscribed", "example": "guisper" },
       "variants": { "type": "array", "maxItems": 5, "items": { "type": "string", "minLength": 1 }, "description": "Up to 5 likely spellings of what you heard (known term, acronym, catalog spelling) or other words they said", "example": ["Whisper", "Wisper"] },
       "projectId": { "type": "string", "minLength": 1, "description": "Limit to one project: its short ID from the catalog", "example": "3f9a1c2e" },
       "includeClosed": { "type": "boolean", "description": "Include finished or archived threads; only if asked (false by default)" },
-      "includeSubagents": { "type": "boolean", "description": "Also subagents, after main threads; only if asked or nothing else fits (false by default)" }
+      "includeSubagents": { "type": "boolean", "description": "Also subagents, after top-level threads; only if asked or nothing else fits (false by default)" }
     }
   },
   "t3_list_threads": {
-    "description": "Lists the main threads of a project, or of all of them, to see what there is when there is no specific name. Metadata only: to know what a thread says or how it is going, read it.",
+    "description": "Lists the top-level threads of a project, or of all of them, to see what there is when there is no specific name. Metadata only: to know what a thread says or how it is going, read it.",
     "parameters": {
       "includeSubagents": { "type": "boolean", "description": "All subagents; slow, only for a global view (false by default)" },
       "projectId": { "type": "string", "minLength": 1, "description": "Short project ID from the catalog; omit it for all", "example": "3f9a1c2e" },
