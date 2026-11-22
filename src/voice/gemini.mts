@@ -11,6 +11,7 @@ import { redact } from '../direct/text.mjs';
 import { toolDetails } from '../conversation/tool-details.mjs';
 import { voiceNoteText } from '../resources.mjs';
 import { audioDiagnostics } from './diagnostics.mjs';
+import { isHintEcho } from '../conversation/hint-echo.mjs';
 
 // Gemini Live (BidiGenerateContent over WebSocket). Unlike OpenAI Realtime it
 // has no WebRTC leg and no sideband: whoever holds the provider socket sees the
@@ -49,6 +50,8 @@ const GOAWAY_MARGIN_MS = 1000;
 
 export type Socket = { readyState: number; send(data: string | Buffer, options?: { binary?: boolean }): void; close(code?: number, reason?: string): void;
   on(event: string, fn: (...args: never[]) => void): unknown; once(event: string, fn: (...args: never[]) => void): unknown };
+// The key goes in a header, never in the URL, so no log or error can quote it.
+export const connectGemini = (key: string) => new WebSocket(GEMINI_ENDPOINT, { headers: { 'x-goog-api-key': key }, handshakeTimeout: 15_000, maxPayload: 4 * 1024 * 1024 }) as unknown as Socket;
 interface FunctionCallPart { id?: string; name?: string; args?: Record<string, unknown> }
 interface ServerMessage {
   setupComplete?: object;
@@ -99,6 +102,8 @@ export interface GeminiCall {
   // callId: the note carries the result of that function call.
   queue: { text: string; speak: boolean; reply?: boolean; callId?: string }[]; flushTimer?: NodeJS.Timeout;
   usage: Record<string, number>; diagnosticsAt?: number; setup: Record<string, unknown>;
+  // The recognition hints the transcription was given (isHintEcho).
+  hints: string[];
 }
 export interface GeminiSettings { model?: string; voice?: string }
 export interface GeminiOptions {
@@ -122,8 +127,7 @@ export class GeminiCalls {
     this.key = key; this.ade = ade; this.publish = publish; this.store = store; this.context = context; this.gap = utteranceGapMs;
     this.delivered = delivered; this.read = read;
     this.apply(settings);
-    // The key goes in a header, never in the URL, so no log or error can quote it.
-    this.connect = connect || (k => new WebSocket(GEMINI_ENDPOINT, { headers: { 'x-goog-api-key': k }, handshakeTimeout: 15_000, maxPayload: 4 * 1024 * 1024 }) as unknown as Socket);
+    this.connect = connect || connectGemini;
     this.timer = setInterval(() => {
       for (const [id, call] of this.sessions) if (Date.now() - call.seen > 45_000) this.close(id, `The connection with the phone was lost. Requests keep running in ${this.ade.name}.`);
     }, 10_000).unref();
@@ -144,7 +148,7 @@ export class GeminiCalls {
   // follow the instructions and the user.
   setup(language?: ReturnType<typeof callLanguage>) {
     const blocking = this.model.startsWith('gemini-3.8');
-    const vocabulary = this.context.vocabulary().slice(0, 100);
+    const vocabulary = this.hints(blocking);
     return {
       model: `models/${this.model}`,
       generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: this.voice } } } },
@@ -160,6 +164,8 @@ export class GeminiCalls {
       sessionResumption: {}
     };
   }
+  // The names given to transcription as custom vocabulary (3.8 only).
+  hints(blocking = this.model.startsWith('gemini-3.8')) { return blocking ? this.context.vocabulary().slice(0, 100) : []; }
   // Creates the provider session and returns where the browser streams audio.
   // The call is ready for audio when this answers.
   async create({ languages = [], language }: { languages?: string[]; language?: string } = {}): Promise<LiveResponse> {
@@ -169,7 +175,8 @@ export class GeminiCalls {
     const id = `gem_${randomUUID()}`, spoken = callLanguage(language, languages);
     // Built before the engine counts as busy: a failure here leaves nothing behind.
     const call: GeminiCall = { id, backend: this.context.snapshot?.backend, conversationId: this.context.conversation?.().id, seen: Date.now(), closed: false,
-      resumes: 0, items: 0, order: new Map(), toolsPending: new Set(), cancelled: new Map(), results: new Map(), requested: new Map(), queue: [], usage: {}, setup: this.setup(spoken) };
+      resumes: 0, items: 0, order: new Map(), toolsPending: new Set(), cancelled: new Map(), results: new Map(), requested: new Map(), queue: [], usage: {}, setup: this.setup(spoken), hints: [] };
+    call.hints = ((call.setup.inputAudioTranscription as { customVocabulary?: string[] }).customVocabulary) || [];
     this.creating = true;
     this.sessions.set(id, call);
     try {
@@ -386,6 +393,12 @@ export class GeminiCalls {
     }
     const user = call.user;
     user.text += text; user.message.text = user.text.trim(); user.at = now;
+    // A recital of the recognition hints is shown, never a user turn; it is
+    // judged on the whole utterance so far, as its text grows.
+    if (call.direct) {
+      const echoes = call.direct.echoes as WeakSet<object>;
+      if (isHintEcho(user.message.text, call.hints)) echoes.add(user.message); else echoes.delete(user.message);
+    }
     clearTimeout(user.timer);
     user.timer = setTimeout(() => { if (call.user === user) this.end(call, 'user'); }, this.gap);
     user.timer.unref?.();
@@ -405,8 +418,9 @@ export class GeminiCalls {
     call[role] = undefined; clearTimeout(item.timer);
     const text = item.text.trim();
     if (!text) { call.direct?.forget(item.id); return; }
-    call.direct?.fill(item.id, role, text);
-    this.publish('transcript', { call: call.id, role, text, order: this.slot(call, item.id), item: item.id, backend: call.backend, conversationId: call.conversationId });
+    const echo = role === 'user' && isHintEcho(text, call.hints);
+    call.direct?.fill(item.id, role, text, { echo });
+    this.publish('transcript', { call: call.id, role, text, order: this.slot(call, item.id), item: item.id, backend: call.backend, conversationId: call.conversationId, ...(echo ? { echo: true } : {}) });
   }
   // A send is about to use the latest user utterance: hold it (see Held).
   hold(call: GeminiCall, callId: string) {

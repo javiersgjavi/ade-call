@@ -106,6 +106,10 @@ events that feed it differ.
   and Gemini interrupts the model. Words you
   say before that boundary therefore count as part of the same turn; say them
   again after the reply if they were a new request.
+- As with Realtime, an utterance that only recites the recognition hints (the
+  custom vocabulary, 3.8 only) is shown in the conversation but is not a user turn
+  ([hint-echo.mts](../src/conversation/hint-echo.mts)). It is judged on the
+  whole utterance as it grows, so a recital followed by the user's own words counts.
 - A `toolCall` may carry several `functionCalls`. Each runs once per `id`
   through `DirectSession.run()`. A sending tool with no new user words waits up
   to 2.5 s for a transcript, then is refused with `NOT SENT (no_user_turn)`.
@@ -153,6 +157,10 @@ resumable checkpoint, no audio before a new connection's setup, results that
 finish during a reconnect, and hang-up. The
 socket route is tested for authentication and origin
 ([test/settings-http.test.mts](../test/settings-http.test.mts)).
+
+The [conversation evaluations](evals.md#gemini-live) run the battery on Gemini
+Live with `--model gemini-3.8-live`: real calls with the production engine, a
+synthetic user and a simulated T3. They are paid.
 
 Not yet verified against the real service: a live call end to end, the audio
 quality and echo cancellation of the relay on phones, whether silent notes sent

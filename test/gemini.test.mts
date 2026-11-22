@@ -492,3 +492,22 @@ test('hanging up closes both sockets and the heartbeat keeps the call alive', as
   assert.equal(f.gemini.busy, false); assert.equal(f.gemini.heartbeat(session.id), false);
   assert.equal(f.gemini.attach(session.id, new Browser() as never), false, 'no socket attaches to an ended call');
 });
+
+test('a transcript that only recites the recognition hints is shown but is not a user turn', { timeout: 10_000 }, async t => {
+  const f = fixture(); t.after(() => f.close());
+  f.gemini.context.vocabulary = () => ['Faro', 'Codex', 'README', 'Claude'];
+  await f.start();
+  f.heard('Faro, Codex,'); f.heard(' README.');
+  f.call('fake_send', 'call_echo');
+  await wait(2800);
+  assert.match(f.responses().find(r => r.id === 'call_echo').response.output, /no_user_turn/);
+  assert.deepEqual(f.runs, [], 'nothing was sent');
+  await wait(250);
+  const echo = f.published.find(e => e.type === 'transcript' && e.data.role === 'user')!;
+  assert.equal(echo.data.text, 'Faro, Codex, README.'); assert.equal(echo.data.echo, true);
+  // Words of the user's own make it a turn as it grows.
+  f.heard('Sí, mándalo a Faro.');
+  f.call('fake_send', 'call_yes');
+  await wait(100);
+  assert.equal(f.runs.length, 1);
+});

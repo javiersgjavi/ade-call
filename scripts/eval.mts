@@ -1,8 +1,8 @@
 // Conversation evaluations of the voice: scripted calls spoken by a synthetic
-// user (ElevenLabs), run closed loop against GPT Realtime with the production
-// engine over a simulated T3, checked deterministically and graded by LLM
-// judges. Paid (OpenAI Realtime, judges, ElevenLabs the first time a phrase is
-// spoken). Nothing reaches a real ADE. See docs/evals.md.
+// user (ElevenLabs), run closed loop against GPT Realtime or Gemini Live (a
+// gemini-* --model) with the production engine over a simulated T3, checked
+// deterministically and graded by LLM judges. Paid (the voice provider, the
+// OpenAI judges, ElevenLabs the first time a phrase is spoken). Nothing reaches a real ADE. See docs/evals.md.
 //
 //   node dist/scripts/eval.mjs extract [--db caller.sqlite] [--out DIR]
 //   node dist/scripts/eval.mjs speak SCENARIOS... [--dry]
@@ -20,6 +20,8 @@ import { basename, dirname, join, resolve } from 'node:path';
 import { loadScenarios, validateScenario, type Scenario } from '../src/eval/scenario.mjs';
 import { Speech, audioFile, spokenWords, wav, type Voice } from '../src/eval/speech.mjs';
 import { runScenario, type RunRecord } from '../src/eval/runner.mjs';
+import { runGeminiScenario } from '../src/eval/gemini-runner.mjs';
+import { GEMINI_VOICES, isGeminiModel } from '../src/voice/gemini.mjs';
 import { ENUMS, pick } from '../src/voice/realtime.mjs';
 import { checkRun, latencySummary, median, type Check } from '../src/eval/checks.mjs';
 import { judge, judgementPasses, type Judgement } from '../src/eval/judge.mjs';
@@ -72,9 +74,11 @@ const config = (() => { try { return JSON.parse(readFileSync(join(configDir, 'co
 const cleanKey = (value: unknown) => typeof value === 'string' && value.trim() ? value.trim() : undefined;
 const openaiKey = () => cleanKey(config.openaiKey || process.env.OPENAI_API_KEY) || fail('The OpenAI key is missing (openaiKey in config.json or OPENAI_API_KEY).');
 const elevenKey = () => cleanKey(config.elevenlabsKey || process.env.ELEVENLABS_API_KEY);
+// As the server reads it: geminiKey in config.json, else GEMINI_API_KEY or GOOGLE_API_KEY.
+const geminiKey = () => cleanKey(config.geminiKey) || cleanKey(process.env.GEMINI_API_KEY) || cleanKey(process.env.GOOGLE_API_KEY);
 // What is saved or printed is masked as the judges' copy is: transcripts, sends
 // and provider messages can repeat a credential the call came across.
-const secrets = () => [cleanKey(config.openaiKey || process.env.OPENAI_API_KEY), elevenKey()].filter((k): k is string => !!k);
+const secrets = () => [cleanKey(config.openaiKey || process.env.OPENAI_API_KEY), elevenKey(), geminiKey()].filter((k): k is string => !!k);
 function fail(message: string): never { console.error(message); process.exit(2); }
 // Written aside and renamed into place: a reader never sees half a file, even if the process stops.
 const write = (file: string, data: unknown) => {
@@ -254,14 +258,23 @@ async function run() {
   const list = scenarios(positional);
   if (!list.length) fail('No scenarios.');
   const judges = judgeModels(), effort = judgeReasoning(), judgeEffort = judges.length ? effort : undefined;
-  const settings = { model: flag('model', config.realtimeModel), voice: flag('voice', config.realtimeVoice), reasoning: flag('reasoning', config.realtimeReasoning),
-    eagerness: flag('eagerness', config.realtimeEagerness), noiseReduction: flag('noise-reduction', config.realtimeNoiseReduction), transcriptionModel: flag('transcription', config.realtimeTranscriptionModel) };
-  for (const field of ['model', 'voice', 'transcriptionModel'] as const) {
+  // The model chooses the provider, as in the server: a gemini-* model runs on
+  // Gemini Live with its own voice, and the Realtime settings do not apply.
+  const model = flag('model', config.realtimeModel);
+  if (model !== undefined && (typeof model !== 'string' || !model.trim())) fail('model must be a nonblank string.');
+  const gemini = !!model && isGeminiModel(model);
+  if (gemini) for (const option of ['reasoning', 'eagerness', 'noise-reduction', 'transcription']) if (flags.has(option)) fail(`--${option} is a GPT Realtime setting; Gemini Live has no such setting.`);
+  const settings: { model?: string; voice?: string; reasoning?: string; eagerness?: string; noiseReduction?: string; transcriptionModel?: string } = gemini
+    ? { model, voice: flag('voice', config.geminiVoice) }
+    : { model, voice: flag('voice', config.realtimeVoice), reasoning: flag('reasoning', config.realtimeReasoning),
+      eagerness: flag('eagerness', config.realtimeEagerness), noiseReduction: flag('noise-reduction', config.realtimeNoiseReduction), transcriptionModel: flag('transcription', config.realtimeTranscriptionModel) };
+  for (const field of ['voice', 'transcriptionModel'] as const) {
     const value = settings[field];
     if (value !== undefined && (typeof value !== 'string' || !value.trim())) fail(`${field} must be a nonblank string.`);
   }
+  if (gemini && settings.voice !== undefined && !(GEMINI_VOICES as readonly string[]).includes(settings.voice)) fail(`${settings.voice} is not a Gemini voice (${GEMINI_VOICES.join(', ')}).`);
   // Checked as the server checks them, before anything is synthesized or called.
-  try { pick(settings.reasoning, ENUMS.reasoning, '', 'reasoning'); pick(settings.eagerness, ENUMS.eagerness, '', 'eagerness'); pick(settings.noiseReduction, ENUMS.noiseReduction, '', 'noise reduction'); }
+  if (!gemini) try { pick(settings.reasoning, ENUMS.reasoning, '', 'reasoning'); pick(settings.eagerness, ENUMS.eagerness, '', 'eagerness'); pick(settings.noiseReduction, ENUMS.noiseReduction, '', 'noise reduction'); }
   catch (error) { fail((error as Error).message); }
   // The phone line and recorded clips need ffmpeg: missing, nothing is paid for first.
   if (list.some(sc => sc.channel === 'phone' || sc.turns.some(t => t.audio !== undefined)) && spawnSync('ffmpeg', ['-version'], { stdio: 'ignore' }).status !== 0)
@@ -281,7 +294,9 @@ async function run() {
   // All selected phrases must be possible before any job can incur API charges.
   if (!s.options.key && list.some(sc => sc.turns.some(t => t.say !== undefined && !s.has(t.say, v.all[t.voice || v.default], sc.language))))
     fail('The ElevenLabs key is missing and selected speech is not cached (ELEVENLABS_API_KEY or elevenlabsKey in config.json).');
-  const key = openaiKey();
+  // The voice provider's key; the judges always use OpenAI's.
+  const key = gemini ? geminiKey() || fail('The Gemini key is missing (geminiKey in config.json, GEMINI_API_KEY or GOOGLE_API_KEY).') : openaiKey();
+  if (judges.length) openaiKey();
   // A run folder holds one invocation: old results never fill in for failed runs.
   if (existsSync(target) && readdirSync(target).length) fail(`${target} already has results: choose another --label or --out.`);
   const out = ensure(target);
@@ -309,7 +324,8 @@ async function run() {
       write(join(dir, 'scenario.json'), { ...sc, file: undefined });
       // Anything that fails in a job, from the call to the judges, is a failed run with a result.
       try {
-        const { audio, ...raw } = await runScenario(sc, { key, settings, speech: s, voices: v.all, defaultVoice: v.default, log: parallel > 1 ? undefined : line => console.log(line) });
+        const common = { key, speech: s, voices: v.all, defaultVoice: v.default, log: parallel > 1 ? undefined : (line: string) => console.log(line) };
+        const { audio, ...raw } = gemini ? await runGeminiScenario(sc, { ...common, settings: { model: settings.model, voice: settings.voice } }) : await runScenario(sc, { ...common, settings });
         // Checked and judged as saved, so grading again sees the same record.
         const plain = redactEvidence(raw, secrets());
         write(join(dir, 'run.json'), plain);

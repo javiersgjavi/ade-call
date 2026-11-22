@@ -34,7 +34,7 @@ keep the code free of personal names, machines, domains and networks.
 | `src/adapters/orca/` | Orca CLI client, terminal reads, sends and launches. |
 | `src/conversation/` | Context, persistence (`store.mts`), thread watch, time context. |
 | `src/access/browsers.mts` | Pairing codes and browser sessions. |
-| `src/eval/`, `scripts/eval.mts`, `evals/` | Paid conversation evaluations: simulated T3 world, ElevenLabs speech, closed-loop Realtime runner, checks, LLM judges ([docs/evals.md](docs/evals.md)). |
+| `src/eval/`, `scripts/eval.mts`, `evals/` | Paid conversation evaluations: simulated T3 world, ElevenLabs speech, closed-loop runners for Realtime and Gemini Live, checks, LLM judges ([docs/evals.md](docs/evals.md)). |
 | `src/resources.mts`, `resources/` | Model-facing text and its loader ([resources/README.md](resources/README.md)). |
 | `public/` | Browser UI and audio (`relayed-call.ts` and `pcm-capture.ts` for Gemini); `public/i18n.ts` holds the interface dictionaries. |
 | `scripts/`, `deploy/` | Build, checks, installer, access CLI, integration scripts, systemd units, proxy example. |
