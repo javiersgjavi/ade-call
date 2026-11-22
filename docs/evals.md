@@ -173,7 +173,9 @@ node dist/scripts/eval.mjs run --label gemini --model gemini-3.8-live --repeat 3
 
 - Spoken and recorded turns expect an answer; mark one `"silent": true` when it should
   get none: answer audio played before the next turn starts fails the critical check
-  even if no assistant transcript arrives. A saved latency without a saved playback
+  even if no assistant transcript arrives. On Gemini, whose answers are always
+  transcribed, a response with no words and no tool call (a lone "...") is a murmur,
+  not an answer, for this check and for `call.everyTurnAnswered`. A saved latency without a saved playback
   start in an older run cannot prove silence and requires a new run. This is the check
   `turns[N].silent`. Noise turns never expect one.
 - `instructions` are the owner's custom instructions, under the same rules as

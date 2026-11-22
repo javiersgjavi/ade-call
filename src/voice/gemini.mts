@@ -417,10 +417,12 @@ export class GeminiCalls {
     const user = call.user;
     user.text += text; user.message.text = user.text.trim(); user.at = now;
     // A recital of the recognition hints is shown, never a user turn; it is
-    // judged on the whole utterance so far, as its text grows.
+    // judged on the whole utterance so far, as its text grows. Until the
+    // utterance ends, text made only of hints counts, however few: a recital
+    // that has not reached its third hint must not authorize a send.
     if (call.direct) {
       const echoes = call.direct.echoes as WeakSet<object>;
-      if (isHintEcho(user.message.text, call.hints)) echoes.add(user.message); else echoes.delete(user.message);
+      if (isHintEcho(user.message.text, call.hints, { open: true })) echoes.add(user.message); else echoes.delete(user.message);
     }
     clearTimeout(user.timer);
     user.timer = setTimeout(() => { if (call.user === user) this.end(call, 'user'); }, this.gap);
@@ -442,7 +444,9 @@ export class GeminiCalls {
     const text = item.text.trim();
     if (!text) { call.direct?.forget(item.id); return; }
     const echo = role === 'user' && isHintEcho(text, call.hints);
-    call.direct?.fill(item.id, role, text, { echo });
+    const message = call.direct?.fill(item.id, role, text, { echo });
+    // The full rule decides once it ends: a lone name is a turn after all.
+    if (message && !echo) (call.direct!.echoes as WeakSet<object>).delete(message);
     this.publish('transcript', { call: call.id, role, text, order: this.slot(call, item.id), item: item.id, backend: call.backend, conversationId: call.conversationId, ...(echo ? { echo: true } : {}) });
   }
   // A send is about to use the latest user utterance: hold it (see Held).

@@ -527,6 +527,25 @@ test('a transcript that only recites the recognition hints is shown but is not a
   assert.equal(f.runs.length, 1);
 });
 
+test('a recital of the hints that has not reached its third one does not authorize a send', { timeout: 10_000 }, async t => {
+  const f = fixture(); t.after(() => f.close());
+  f.gemini.context.vocabulary = () => ['Faro', 'Codex', 'README', 'Claude'];
+  await f.start();
+  f.heard('Faro, Codex,');
+  f.call('fake_send', 'call_prefix');
+  await wait(100);
+  assert.deepEqual(f.runs, [], 'two hints of an open utterance are no turn yet');
+  f.heard(' README.');
+  await wait(2800);
+  assert.match(f.responses().find(r => r.id === 'call_prefix').response.output, /no_user_turn/);
+  assert.deepEqual(f.runs, [], 'nothing was sent');
+  // Two names that end the utterance are the user's own words: a turn.
+  f.heard('Faro, Codex.');
+  f.call('fake_send', 'call_names');
+  await wait(2800);
+  assert.equal(f.runs.length, 1);
+});
+
 test('tool parameters keep only the schema keywords Gemini accepts', () => {
   assert.deepEqual(geminiSchema({ type: 'object', additionalProperties: false, required: ['q'], properties: { q: { type: 'string', minLength: 1, description: 'Query' }, additionalProperties: { type: 'array', items: { type: 'integer', minimum: 0, const: 1 }, maxItems: 2 } } }),
     { type: 'object', required: ['q'], properties: { q: { type: 'string', minLength: 1, description: 'Query' }, additionalProperties: { type: 'array', items: { type: 'integer', minimum: 0 }, maxItems: 2 } } });
