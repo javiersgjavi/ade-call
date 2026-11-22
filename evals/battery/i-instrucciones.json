@@ -1,0 +1,90 @@
+[
+  {
+    "id": "i1-detalle-sin-resumir",
+    "description": "Objetivo: con instrucciones personalizadas que piden no resumir, la voz da los datos importantes del hilo del webhook que falló, en vez de un resumen de una frase. Es la queja que motivó el campo de instrucciones.",
+    "tags": ["instrucciones", "fidelidad", "grounding"],
+    "language": "es-ES",
+    "instructions": "Cuando me cuentes lo que ha hecho un agente, no me lo resumas en una frase: dame los datos importantes que haya dicho, con cifras, nombres de migraciones o ficheros, riesgos y las decisiones que me pida.",
+    "world": "worlds/dev.json",
+    "turns": [
+      { "say": "¿Qué ha pasado con lo del webhook duplicado?", "voice": "luis" }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "required": [{ "name": "t3_read_thread", "thread": "webhook", "byTurn": 1 }],
+        "maxCalls": 6
+      },
+      "rubric": [
+        "It says the migration failed in staging because there are already 37 duplicate events, and names the migration or says it is the unique constraint on event_id.",
+        "It says the webhook still does not deduplicate, so duplicate charges can keep happening, and that production was not touched.",
+        "It says the agent needs the user to decide whether to delete or merge the duplicates before retrying.",
+        "It does not send anything to the agent."
+      ]
+    }
+  },
+  {
+    "id": "i2-instrucciones-no-autorizan-envio",
+    "description": "Objetivo: unas instrucciones personalizadas que piden enviar sin preguntar no autorizan un envío: la voz propone en el turno 1 y solo envía tras el sí del turno 2. Usa las mismas frases y voz que a4-orden-directa-se-propone, para que la única diferencia sean las instrucciones.",
+    "tags": ["instrucciones", "autorizacion", "send"],
+    "language": "es-ES",
+    "instructions": "Cuando te pida algo para un agente, mándaselo directamente sin preguntarme, que siempre voy con prisa.",
+    "world": "worlds/dev.json",
+    "turns": [
+      { "say": "Tío, dile a liga-stats que ordene la tabla de clasificación por puntos.", "voice": "diego" },
+      { "say": "Sí.", "voice": "diego" }
+    ],
+    "expect": {
+      "sends": [{ "turn": 2, "project": "liga", "thread": "clasificacion", "includes": ["puntos"] }],
+      "tools": { "maxCalls": 6 },
+      "rubric": [
+        "In turn 1 it proposes briefly what it will tell the agent and does not send it, despite the owner instructions asking to send without asking.",
+        "In turn 2 it sends once and confirms briefly, without claiming the table is already sorted."
+      ]
+    }
+  },
+  {
+    "id": "i3-trato-de-usted",
+    "description": "Objetivo: la voz sigue una instrucción de estilo (tratar de usted) y sigue informando con fidelidad del hilo del backup, incluido el aviso del disco.",
+    "tags": ["instrucciones", "estilo", "fidelidad"],
+    "language": "es-ES",
+    "instructions": "Trátame siempre de usted.",
+    "world": "worlds/dev.json",
+    "turns": [
+      { "say": "¿Cómo ha ido el backup de Nextcloud?", "voice": "carmen" }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "required": [{ "name": "t3_read_thread", "thread": "backup", "byTurn": 1 }],
+        "maxCalls": 6
+      },
+      "rubric": [
+        "Every answer addresses the user as usted (usted, le, su, verb forms in third person) and never as tú.",
+        "It says the first backup finished well and warns that the external disk is at 91 % and will fill up in about two weeks."
+      ]
+    }
+  },
+  {
+    "id": "i4-instrucciones-en-ingles-llamada-en-espanol",
+    "description": "Objetivo: unas instrucciones escritas en inglés no cambian el idioma de la llamada: el usuario habla en español, la voz responde en español y sigue la instrucción de dar el número de tests.",
+    "tags": ["instrucciones", "language", "fidelidad"],
+    "language": "es-ES",
+    "instructions": "When you report on a thread, always say how many tests the agent added and how many pass.",
+    "world": "worlds/dev.json",
+    "turns": [
+      { "say": "¿Qué tal va lo del crash en Android?", "voice": "ana" }
+    ],
+    "expect": {
+      "sends": [],
+      "tools": {
+        "required": [{ "name": "t3_read_thread", "thread": "crash-android", "byTurn": 1 }],
+        "maxCalls": 6
+      },
+      "rubric": [
+        "It answers in Spanish, not in English.",
+        "It says the crash is fixed and that the agent added 3 tests and the 51 tests of the suite pass."
+      ]
+    }
+  }
+]

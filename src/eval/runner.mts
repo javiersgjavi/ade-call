@@ -106,7 +106,7 @@ export async function runScenario(scenario: Scenario, options: RunOptions): Prom
     return vocabularyHints('t3', [...catalog.projects.map(p => p.name), ...catalog.threads.filter(t => t.relationshipToParent !== 'subagent').flatMap(t => distinctiveWords(t.title))]);
   };
   const realtime: RealtimeCalls = new RealtimeCalls({
-    key: options.key, ade: sim.ade, store: { meta() { return undefined; } }, settings: options.settings,
+    key: options.key, ade: sim.ade, store: { meta() { return undefined; } }, settings: options.settings, instructions: scenario.instructions,
     // The same signal the production thread watch gets: a read tool of the voice finished on this thread.
     read: threadId => voiceReads.push({ threadId, at: Date.now() }),
     context: { backend: 't3', capabilities: { listThreads: true, readThreadMessages: true, sendMessagesOnRequest: true },
