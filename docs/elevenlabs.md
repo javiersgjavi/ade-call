@@ -1,5 +1,12 @@
 # ElevenLabs Realtime
 
+> **Status: not recommended yet.** In the conversation evaluations (November 2026)
+> `eleven_realtime_v1_max` answers fast (about a second) but its judgment is far
+> below GPT Realtime's: it takes a lone mistranscribed word as a yes, sends after
+> confirming only the destination, overclaims after a send, reports agent replies
+> loosely and mishears names. The engine is kept so it can be measured again when
+> ElevenLabs ships a new Realtime version; see [What has been tried](#what-has-been-tried).
+
 ADE Call can run a call on ElevenLabs Realtime instead of OpenAI Realtime or
 Gemini Live. You choose it by picking an ElevenLabs Realtime model in
 **Settings → Voice**, then one of its voices; the model decides the provider.
@@ -114,5 +121,27 @@ the shared code.
 
 The [conversation evaluations](evals.md#elevenlabs-realtime) run the battery on
 ElevenLabs with `--model eleven_realtime_v1_max` (or `_mini`): real calls with the
-production engine, a synthetic user and a simulated T3. They are paid. Treat
-ElevenLabs Realtime as experimental until it has been tried in real calls.
+production engine, a synthetic user and a simulated T3. They are paid.
+
+## What has been tried
+
+Only `eleven_realtime_v1_max` was tuned; Mini is untouched. On the send scenarios:
+
+- **Temperature 0.2** instead of the provider's 0.7: the one clear improvement.
+  Lower (0.1) did no better.
+- **Server notes as user messages** under the note header: without it, notices
+  were ignored and the microphone's silence became a phantom "Sí." user turn.
+- **The send steps** of `gemini_prompt.txt`, and `eleven_prompt.txt`, which says
+  that checking the destination is not a proposal: it stopped sending after a yes
+  to "Do you mean that thread?".
+- No effect: `reasoning` (the API ignores it); moving the send rules to the top as
+  `# Guardrails`, as ElevenLabs' prompting guide suggests (worse).
+- Not available on the Realtime API: transcription keywords or vocabulary (only
+  the language), other models or versions.
+- Not tried: rewriting the instructions under about 2000 tokens, as that guide
+  recommends.
+
+An earlier version of this provider used ElevenLabs Agents (transcription, a
+chosen LLM and speech in a chain). With Claude Haiku 5.5 it was the most reliable
+of all in the evaluations, but about twice as slow to answer; its engine is in
+the history of the branch that added this page.
