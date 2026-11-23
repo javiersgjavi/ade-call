@@ -310,7 +310,7 @@ What differs, because the provider differs:
 With `--model elevenlabs-agents`, `run` uses `src/eval/elevenlabs-runner.mts` the same
 way: the production `ElevenLabsCalls` engine holds the provider socket and the
 synthetic user is the page on the other side of its relay. `--llm` chooses the
-agent's LLM (default `elevenlabsLlm` in `config.json`, else `gemini-3.8-flash`) and
+agent's LLM (default `elevenlabsLlm` in `config.json`, else `claude-haiku-5-5`) and
 `--voice` an ElevenLabs voice; the folder's `model` is `elevenlabs-agents:LLM`. The
 ElevenLabs key is the one the speech already uses; the OpenAI key is still needed
 for the judges.

@@ -58,7 +58,7 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
   // Current values, the options of each one and where the key comes from.
   const initial = await call('/api/settings/voice', { headers: bearer });
   assert.equal(initial.status, 200);
-  assert.deepEqual(initial.body.settings, { model: 'gpt-realtime-2', voice: 'marin', reasoning: 'medium', eagerness: 'low', noiseReduction: 'near_field', transcriptionModel: 'gpt-4o-transcribe', geminiVoice: 'Kore', elevenlabsLlm: 'gemini-3.8-flash', elevenlabsVoice: 'Sarah' });
+  assert.deepEqual(initial.body.settings, { model: 'gpt-realtime-2', voice: 'marin', reasoning: 'medium', eagerness: 'low', noiseReduction: 'near_field', transcriptionModel: 'gpt-4o-transcribe', geminiVoice: 'Kore', elevenlabsLlm: 'claude-haiku-5-5', elevenlabsVoice: 'Sarah' });
   assert.deepEqual(initial.body.options.model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live', 'elevenlabs-agents', 'gpt-realtime-2'], 'a hand-configured model stays offered');
   assert.deepEqual(initial.body.options.voice, ['marin', 'cedar']);
   assert.deepEqual(initial.body.options.transcriptionModel, ['gpt-4o-transcribe', 'gpt-4o-mini-transcribe']);
@@ -75,7 +75,7 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
 
   const saved = await post('/api/settings/voice', { model: 'gpt-realtime-2.1-mini', reasoning: 'high', voice: 'cedar', eagerness: 'medium', noiseReduction: 'far_field', transcriptionModel: 'gpt-4o-mini-transcribe' });
   assert.equal(saved.status, 200);
-  assert.deepEqual(saved.body.settings, { model: 'gpt-realtime-2.1-mini', voice: 'cedar', reasoning: 'high', eagerness: 'medium', noiseReduction: 'far_field', transcriptionModel: 'gpt-4o-mini-transcribe', geminiVoice: 'Kore', elevenlabsLlm: 'gemini-3.8-flash', elevenlabsVoice: 'Sarah' });
+  assert.deepEqual(saved.body.settings, { model: 'gpt-realtime-2.1-mini', voice: 'cedar', reasoning: 'high', eagerness: 'medium', noiseReduction: 'far_field', transcriptionModel: 'gpt-4o-mini-transcribe', geminiVoice: 'Kore', elevenlabsLlm: 'claude-haiku-5-5', elevenlabsVoice: 'Sarah' });
   assert.deepEqual(saved.body.options.model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live', 'elevenlabs-agents'], 'the earlier hand-configured model is no longer current');
   const status = (await call('/api/status', { headers: bearer })).body;
   assert.deepEqual(status.voiceModel, { provider: 'realtime', model: 'gpt-realtime-2.1-mini', reasoning: 'high', eagerness: 'medium', noiseReduction: 'far_field', voice: 'cedar' }, 'applied without a restart');

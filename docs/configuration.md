@@ -38,7 +38,7 @@ All fields are strings. Only the key of the provider you use is required (`opena
 | `geminiKey` | `GEMINI_API_KEY`, else `GOOGLE_API_KEY` | A Gemini API key | Used for Gemini Live calls. The file takes priority over the variables. It can also be saved or removed from **Settings → API keys**. |
 | `geminiVoice` | `Kore` | A prebuilt Gemini voice; Settings offers `Kore`, `Puck`, `Charon`, `Aoede`, `Leda`, `Zephyr`, `Fenrir`, `Orus` | The voice you hear with a Gemini model. |
 | `elevenlabsKey` | `ELEVENLABS_API_KEY` | An ElevenLabs API key with access to Agents | Used for ElevenLabs Agents calls (and by the [evaluations](evals.md) to synthesize the user). The file takes priority over the variable. It can also be saved or removed from **Settings → API keys**. |
-| `elevenlabsLlm` | `gemini-3.8-flash` | An ElevenLabs LLM ID; Settings offers `gemini-3.8-flash`, `claude-haiku-5-5`, `claude-sonnet-5-5`, `gpt-6.2-sol`, `glm-52` | The language model that thinks and calls the tools with ElevenLabs Agents. |
+| `elevenlabsLlm` | `claude-haiku-5-5` | An ElevenLabs LLM ID; Settings offers `claude-haiku-5-5`, `gemini-3.8-flash`, `claude-sonnet-5-5`, `gpt-6.2-sol`, `glm-52` | The language model that thinks and calls the tools with ElevenLabs Agents. |
 | `elevenlabsVoice` | `Sarah` | A name Settings offers (`Sarah`, `Jessica`, `Alice`, `Lily`, `Eric`, `Brian`, `George`, `Will`) or an ElevenLabs voice ID | The voice you hear with ElevenLabs Agents. |
 | `realtimeVoice` | `marin` | A voice supported by the model | The voice you hear. |
 | `realtimeReasoning` | `low` | `minimal`, `low`, `medium`, `high`, `xhigh` | Reasoning effort. Higher values add latency and cost. |

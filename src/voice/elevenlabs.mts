@@ -31,16 +31,18 @@ import type { Socket } from './gemini.mjs';
 
 export const ELEVENLABS_MODEL = 'elevenlabs-agents';
 export const isElevenLabsModel = (model: string) => model.startsWith('elevenlabs');
-// LLMs offered for the agent: models ElevenLabs runs with tool calling, from
-// fast to strong. A value configured by hand stays offered.
-export const ELEVENLABS_LLMS = ['gemini-3.8-flash', 'claude-haiku-5-5', 'claude-sonnet-5-5', 'gpt-6.2-sol', 'glm-52'] as const;
+// LLMs offered for the agent: models ElevenLabs runs with tool calling. Claude
+// Haiku 5.5 is the default: in the evaluations it passed more scenarios than
+// Gemini 3.8 Flash, with no unauthorized send, and answered about a second sooner.
+// A value configured by hand stays offered.
+export const ELEVENLABS_LLMS = ['claude-haiku-5-5', 'gemini-3.8-flash', 'claude-sonnet-5-5', 'gpt-6.2-sol', 'glm-52'] as const;
 // Default voices of ElevenLabs (multilingual) by name; a hand-configured value
 // that is not a name here is used as a voice ID.
 export const ELEVENLABS_VOICES: Record<string, string> = {
   Sarah: 'EXAVITQu4vr4xnSDxMaL', Jessica: 'cgSgspJ2msm6clMCkdW9', Alice: 'Xb7hH8MSUJpSbSDYk0k2', Lily: 'pFZP5JQG7iQjIQuC4Bku',
   Eric: 'cjVigY5qzO86Huf0OWal', Brian: 'nPczCjzI2devNBz1zQrb', George: 'JBFqnCBsd6RMkjVDRZzb', Will: 'bIHbv24MWmeRgasZH58o'
 };
-export const ELEVENLABS_DEFAULTS = { llm: 'gemini-3.8-flash', voice: 'Sarah' } as const;
+export const ELEVENLABS_DEFAULTS = { llm: 'claude-haiku-5-5', voice: 'Sarah' } as const;
 export const ELEVENLABS_API = 'https://api.elevenlabs.io';
 // Audio formats on both legs: the page sends 16 kHz PCM and plays 24 kHz.
 export const INPUT_RATE = 16_000, OUTPUT_RATE = 24_000;

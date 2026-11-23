@@ -23,8 +23,8 @@ by hand in `config.json` stays offered.
 
 | `elevenlabsLlm` | Notes |
 | --- | --- |
-| `gemini-3.8-flash` (default) | Fast. |
-| `claude-haiku-5-5` | Fast. |
+| `claude-haiku-5-5` (default) | Fast. The best in the evaluations: more scenarios passed than Gemini 3.8 Flash, no unauthorized send, and answers about a second sooner. |
+| `gemini-3.8-flash` | Fast; in the evaluations it sometimes reported an agent's answer less faithfully and was slower to answer. |
 | `claude-sonnet-5-5` | Stronger, slower. |
 | `gpt-6.2-sol` | Stronger, slower. |
 | `glm-52` | Hosted by ElevenLabs. |
@@ -147,5 +147,8 @@ settings and key routes are tested in [test/settings-http.test.mts](../test/sett
 
 The [conversation evaluations](evals.md#elevenlabs-agents) run the battery on
 ElevenLabs with `--model elevenlabs-agents --llm LLM`: real conversations with the
-production engine, a synthetic user and a simulated T3. They are paid. Treat
-ElevenLabs Agents as experimental until it has been tried in real calls.
+production engine, a synthetic user and a simulated T3. They are paid. In the
+first full run (November 2026) Claude Haiku 5.5 did about as well as GPT Realtime,
+with a longer delay before each answer (about 2 s): the user's turn must end and
+be transcribed before the LLM starts. Treat ElevenLabs Agents as experimental
+until it has been tried in real calls.
