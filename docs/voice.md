@@ -288,9 +288,9 @@ Diagnostics and optional call recordings are covered in
 [troubleshooting.md](troubleshooting.md).
 
 The first time a browser opens the workspace, a seven-step tour
-([tour.ts](../public/tour.ts)) welcomes the user (the ADE switch, and that sent
-work keeps running after hanging up or a new session), then rings the Call
-button, the conversation and the projects. It then opens Settings on the voice
+([tour.ts](../public/tour.ts)) welcomes the user (and names the ADE switch), then rings the
+Call button (agents keep working after hanging up or a new session), the
+conversation and the projects. It then opens Settings on the voice
 model and the custom instructions (Voice tab) and on pairing a phone (Devices);
 Settings closes again when the tour ends or steps back before it. Finishing or
 skipping it (Escape also skips) is remembered in that browser's
