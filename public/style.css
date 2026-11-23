@@ -997,3 +997,7 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
 .switch:disabled { opacity: .5; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) { .switch, .switch::before { transition: none; } }
 @media (max-width: 399px) { .settings-tabs [role="tab"] { font-size: 13px; padding: 0 6px; } }
+/* Settings rows of the provider not in use (OpenAI Realtime or Gemini Live). */
+.setting[hidden], .setting-group[hidden] { display: none; }
+/* The Gemini key section follows the OpenAI one in the same panel. */
+.key-form + .settings-section-head { margin-top: 28px; }

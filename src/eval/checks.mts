@@ -110,7 +110,8 @@ export function checkRun(scenario: Scenario, run: RunRecord): Check[] {
   add('call.noProviderErrors', !run.providerErrors.length, run.providerErrors.map(e => e.code).join(', ') || 'none', false);
   // Words and recorded speech expect an answer, unless the turn says silent; noise does not.
   const answered = run.turns.filter(t => t.kind !== 'noise' && !scenario.turns[t.index - 1]?.silent);
-  const silent = answered.filter(t => t.firstAnswerMs == null && !run.transcript.some(l => l.role === 'assistant' && !l.unheard && !l.notice && l.turn === t.index));
+  // A line without a letter or digit ("...") is a murmur, not an answer.
+  const silent = answered.filter(t => t.firstAnswerMs == null && !run.transcript.some(l => l.role === 'assistant' && !l.unheard && !l.notice && l.turn === t.index && /[\p{L}\p{N}]/u.test(l.text)));
   // A turn marked silent must get no answer heard before the user speaks again.
   scenario.turns.forEach((turn, i) => {
     if (!turn.silent) return;

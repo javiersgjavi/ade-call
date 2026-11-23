@@ -31,7 +31,7 @@ export function t3Tools({ run = t3, overview = t3Overview, findThreads = t3FindT
       const includeSubagents = !!(params.parentThreadId || params.rootThreadId || params.includeSubagents);
       const data = await overview({ ...params, includeSubagents, signal });
       signal?.throwIfAborted();
-      return result(formatThreadList({ checkedAt: new Date().toISOString(), subagents: includeSubagents ? 'requested' : 'not_requested', scope: params.parentThreadId ? 'direct_children' : params.rootThreadId ? 'descendants' : includeSubagents ? 'full' : 'main_threads', projects: data.projects, discovery: data.discovery,
+      return result(formatThreadList({ checkedAt: new Date().toISOString(), subagents: includeSubagents ? 'requested' : 'not_requested', scope: params.parentThreadId ? 'direct_children' : params.rootThreadId ? 'descendants' : includeSubagents ? 'full' : 'top_level', projects: data.projects, discovery: data.discovery,
         threads: data.threads.filter(t => (!params.projectId || t.projectId === params.projectId) && (!params.parentThreadId || t.parentThreadId === params.parentThreadId) && (!params.rootThreadId || t.rootThreadId === params.rootThreadId)) }));
     } },
   { name: 't3_send_message', label: 'Send message to T3', ...toolSchema('t3_send_message'),

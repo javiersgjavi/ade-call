@@ -7,11 +7,20 @@ import { MAX_INSTRUCTIONS, updateConfig, validateInstructions, validateKey, vali
 import { REALTIME_DEFAULTS } from '../src/voice/realtime.mjs';
 
 test('voice settings accept only the offered values, and the current ones', () => {
-  const current = { ...REALTIME_DEFAULTS, voice: 'hand-picked', transcriptionModel: 'whisper-1' };
+  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore', voice: 'hand-picked', transcriptionModel: 'whisper-1' };
   assert.deepEqual(voiceOptions(current).voice, ['marin', 'cedar', 'hand-picked']);
   assert.deepEqual(validateVoiceSettings({ voice: 'hand-picked', transcriptionModel: 'gpt-4o-mini-transcribe' }, current), { ...current, transcriptionModel: 'gpt-4o-mini-transcribe' });
   assert.deepEqual(validateVoiceSettings({}, current), current);
   for (const bad of [null, [], 'low', { voice: 'alloy' }, { reasoning: '' }, { model: ['gpt-realtime-2.1'] }, JSON.parse('{"__proto__":"low"}'), { constructor: 'low' }])
+    assert.throws(() => validateVoiceSettings(bad, current), SettingsError, JSON.stringify(bad));
+});
+
+test('Gemini Live models and voices are offered next to the Realtime ones', () => {
+  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore' };
+  assert.deepEqual(voiceOptions(current).model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live', 'gemini-3.1-flash-live-preview']);
+  assert.ok(voiceOptions(current).geminiVoice.includes('Puck'));
+  assert.deepEqual(validateVoiceSettings({ model: 'gemini-3.8-live', geminiVoice: 'Puck' }, current), { ...current, model: 'gemini-3.8-live', geminiVoice: 'Puck' });
+  for (const bad of [{ geminiVoice: 'marin' }, { voice: 'Kore' }, { model: 'gemini-made-up' }])
     assert.throws(() => validateVoiceSettings(bad, current), SettingsError, JSON.stringify(bad));
 });
 

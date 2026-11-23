@@ -116,7 +116,7 @@ test('list tool accepts only a boolean includeSubagents; a parent or root still 
   assert.deepEqual(seen, []);
   // null is the same as omitted: main threads only.
   for (const params of [{}, { includeSubagents: null }, { includeSubagents: false }])
-    assert.match((await list.execute('id', params as never)).content[0].text, /^THREADS \(main_threads; subagents not queried\)/);
+    assert.match((await list.execute('id', params as never)).content[0].text, /^THREADS \(top_level; subagents not queried\)/);
   assert.match((await list.execute('id', { parentThreadId: 'parent', includeSubagents: false })).content[0].text, /^THREADS \(direct_children; subagents included\)/);
   assert.match((await list.execute('id', { includeSubagents: true })).content[0].text, /^THREADS \(full; subagents included\)/);
   assert.deepEqual(seen, [false, false, false, true, true]);

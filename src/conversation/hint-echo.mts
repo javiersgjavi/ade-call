@@ -34,7 +34,9 @@ const SEPARATORS = /[,;\n、，]+/;
 // and no other word anywhere. Speech with any word of its own ("send it to
 // pagos-api and pagos-web", "sí") is never an echo, nor is one name repeated
 // ("yes, yes, yes" with a project named Yes); a bare list of names is.
-export function isHintEcho(transcript: string, hints: readonly string[]) {
+// open: the utterance is still being transcribed, so a recital may not have
+// reached its third hint yet; any text made only of hints counts.
+export function isHintEcho(transcript: string, hints: readonly string[], { open = false } = {}) {
   // A hint with a comma in it reaches the transcriber as several.
   const known = new Set(hints.flatMap(h => h.split(SEPARATORS)).map(normalize).filter(Boolean));
   if (!known.size) return false;
@@ -42,6 +44,7 @@ export function isHintEcho(transcript: string, hints: readonly string[]) {
   for (const hint of known) for (let i = 3; i < hint.length; i++) prefixes.add(hint.slice(0, i).trim());
   const longest = Math.max(...[...known].map(h => h.split(' ').length));
   const parts = transcript.split(SEPARATORS).map(normalize).filter(Boolean);
+  if (!parts.length) return false;
   const recited = new Set<string>();
   for (const [i, part] of parts.entries()) {
     const found = hintsIn(part, known, prefixes, longest, i === parts.length - 1);
@@ -50,5 +53,5 @@ export function isHintEcho(transcript: string, hints: readonly string[]) {
     // A hint made of other hints ("Claude Codex") still counts as itself.
     if (known.has(part)) recited.add(part);
   }
-  return recited.size >= 3;
+  return open || recited.size >= 3;
 }

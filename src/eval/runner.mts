@@ -57,8 +57,8 @@ export interface RunOptions {
   connect?: (model: string) => Socket;
 }
 
-const CHUNK_MS = 100;
-const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+export const CHUNK_MS = 100;
+export const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function turnAudio(turn: Turn, scenario: Scenario, speech: Speech, voice: Voice, index: number) {
   if (turn.noise) return noise(turn.noise, turn.ms ?? 2500, index + 1);
@@ -67,17 +67,31 @@ export async function turnAudio(turn: Turn, scenario: Scenario, speech: Speech, 
   return scenario.channel === 'phone' ? phone(audio, index + 1) : audio;
 }
 
-export async function runScenario(scenario: Scenario, options: RunOptions): Promise<RunRecord> {
-  // What the user said, for the judges: v3 audio tags are performance, other brackets are words.
-  const speakable = (text: string, voice: string) => options.speech.path(text, options.voices[voice] || { id: '' }, scenario.language).model.startsWith('eleven_v3') ? spokenWords(text) : text;
-  const log = options.log || (() => {});
-  // Audio is prepared before the call: synthesis time is neither silence of
-  // the user nor part of the recording.
+// Audio is prepared before the call: synthesis time is neither silence of
+// the user nor part of the recording. A turn without samples would leave no
+// boundary for the turns after it: refused before the call.
+export async function scenarioAudio(scenario: Scenario, options: Pick<RunOptions, 'speech' | 'voices' | 'defaultVoice'>) {
   const audio: Buffer[] = [];
   for (const [i, t] of scenario.turns.entries()) audio.push(await turnAudio(t, scenario, options.speech, options.voices[t.voice || options.defaultVoice], i));
-  // A turn without samples would leave no boundary for the turns after it: refused before the call.
   const empty = audio.findIndex(pcm => pcm.length < 2);
   if (empty >= 0) throw new Error(`turn ${empty + 1} has no audio samples; nothing was called.`);
+  return audio;
+}
+// What the user said, for the judges: v3 audio tags are performance, other brackets are words.
+export const speakableText = (scenario: Scenario, options: Pick<RunOptions, 'speech' | 'voices'>) => (text: string, voice: string) =>
+  options.speech.path(text, options.voices[voice] || { id: '' }, scenario.language).model.startsWith('eleven_v3') ? spokenWords(text) : text;
+// The hints production gives speech recognition: project names and the distinctive
+// words of open main-thread titles (whole titles can be transcribed on noise).
+// Through the production catalog, with its count and size limits.
+export const simulatedVocabulary = (sim: SimulatedT3) => () => {
+  const catalog = new ProjectCatalog('t3', () => t3Projects(sim.base), ids => t3OpenThreadIndex(ids, sim.base, { dated: true })).snapshot({ refresh: true });
+  return vocabularyHints('t3', [...catalog.projects.map(p => p.name), ...catalog.threads.filter(t => t.relationshipToParent !== 'subagent').flatMap(t => distinctiveWords(t.title))]);
+};
+
+export async function runScenario(scenario: Scenario, options: RunOptions): Promise<RunRecord> {
+  const speakable = speakableText(scenario, options);
+  const log = options.log || (() => {});
+  const audio = await scenarioAudio(scenario, options);
   const sim = new SimulatedT3(scenario.world);
   const t0 = Date.now(), clock = () => Date.now() - t0;
   const record: RunRecord = { scenario: scenario.id, startedAt: new Date(t0).toISOString(), model: '', transcriptionModel: '', reasoning: '', eagerness: '', voice: '',
@@ -98,13 +112,7 @@ export async function runScenario(scenario: Scenario, options: RunOptions): Prom
   const turnAtMic = (ms: number) => turnStarts.filter(start => start <= ms + 1000).length;
   const ownTurn = (responseId?: string) => responseId && responseTurn.has(responseId) ? responseTurn.get(responseId)! : committed;
 
-  // The hints production gives speech recognition: project names and the distinctive
-  // words of open main-thread titles (whole titles can be transcribed on noise).
-  // Through the production catalog, with its count and size limits.
-  const vocabulary = () => {
-    const catalog = new ProjectCatalog('t3', () => t3Projects(sim.base), ids => t3OpenThreadIndex(ids, sim.base, { dated: true })).snapshot({ refresh: true });
-    return vocabularyHints('t3', [...catalog.projects.map(p => p.name), ...catalog.threads.filter(t => t.relationshipToParent !== 'subagent').flatMap(t => distinctiveWords(t.title))]);
-  };
+  const vocabulary = simulatedVocabulary(sim);
   const realtime: RealtimeCalls = new RealtimeCalls({
     key: options.key, ade: sim.ade, store: { meta() { return undefined; } }, settings: options.settings, instructions: scenario.instructions,
     // The same signal the production thread watch gets: a read tool of the voice finished on this thread.
@@ -561,14 +569,14 @@ export async function runScenario(scenario: Scenario, options: RunOptions): Prom
 }
 
 // The user turn in progress at a moment of the call (0 before the first).
-function turnAt(record: RunRecord, ms: number) {
+export function turnAt(record: RunRecord, ms: number) {
   let current = 0;
   for (const t of record.turns) if (t.startMs <= ms) current = t.index;
   return current;
 }
 
 // Left: what the synthetic user said; right: what the voice said, as played.
-function stereo(mic: Buffer[], micStart: number, voice: { at: number; audio: Buffer }[], durationMs: number) {
+export function stereo(mic: Buffer[], micStart: number, voice: { at: number; audio: Buffer }[], durationMs: number) {
   const samples = Math.ceil(durationMs * RATE / 1000);
   const left = Buffer.concat([Buffer.alloc((Math.round(micStart * BYTES_PER_MS) & ~1)), ...mic]), right = Buffer.alloc(samples * 2);
   for (const part of voice) { const at = Math.round(part.at * BYTES_PER_MS) & ~1; if (at < right.length) part.audio.copy(right, at, 0, Math.min(part.audio.length, right.length - at)); }

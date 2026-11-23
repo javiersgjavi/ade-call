@@ -8,6 +8,10 @@ notices reach a call in progress. The transport and the overall call sequence
 are in [architecture.md](architecture.md#a-call-end-to-end); what makes sends
 safe is in [delivery-safety.md](delivery-safety.md).
 
+A Gemini model in Settings runs the call on Gemini Live instead, with the same
+instructions, tools and send rule; the differences (audio relayed by the
+server, notes as client content, session resumption) are in [gemini.md](gemini.md).
+
 ## Session setup
 
 The server creates each call with `POST /v1/realtime/calls`, sending the

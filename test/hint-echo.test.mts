@@ -34,6 +34,11 @@ test('real speech, even with several project names, is not an echo', () => {
   assert.equal(isHintEcho('Claude, Codex, README', []), false, 'without hints nothing is an echo');
 });
 
+test('while an utterance is still open, text made only of hints is an echo, however few', () => {
+  for (const prefix of ['t3,', 'Claude, Codex', 'pagos-api, pago']) assert.equal(isHintEcho(prefix, hints, { open: true }), true, prefix);
+  for (const speech of ['Sí.', 'Claude, Codex, sí', '']) assert.equal(isHintEcho(speech, hints, { open: true }), false, speech);
+});
+
 test('the exact transcription prompt is an echo, even with a comma inside a name', () => {
   const named = vocabularyHints('t3', ['Red, Green', 'pagos-api']);
   assert.equal(isHintEcho(named.join(', '), named), true);

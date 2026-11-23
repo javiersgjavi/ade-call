@@ -156,7 +156,7 @@ test('a direct search names the parents of the subagents it left out by short ID
     subagentsMatching: { count: 4, parents } }) }).find(t => t.name === 't3_find_threads')!;
   const state = new DirectCallState(); compactCatalog(catalog, state);
   const { text } = await find.execute({ query: 'humedad' }, { requestId: 'r', signal: AbortSignal.timeout(1000), state });
-  assert.match(text, /main threads only/);
+  assert.match(text, /top-level threads only/);
   assert.match(text, /4 subagent threads also match and are not shown\. Search them with includeSubagents=true/);
   const shown = [...text.matchAll(/^- (?:"[^"]*" · )?parent (\S+)$/gm)].map(m => m[1]);
   assert.equal(shown.length, parents.length, text);
@@ -210,7 +210,8 @@ test('T3 voice instructions keep every rule area and stay compact', () => {
     assert.ok(voice.includes(area), area);
   // The search guidance for described topics and main threads added about 260 (8427 → 8689).
   // Heard-to-the-end acceptance, lone words and project matching added about 210 (8682 → 8895).
-  assert.ok(voice.length < 8950, `compact voice instructions (${voice.length} chars)`);
+  // Saying that the main thread is omitted threadId, never a listed thread, added about 60 (8930 → 8988).
+  assert.ok(voice.length < 9000, `compact voice instructions (${voice.length} chars)`);
   assert.match(voice, /Before each t3_send_message propose it in one short, natural sentence/);
   assert.match(voice, /name the thread or project only if the user did not name it or to tell candidates apart/);
   // Only a yes to the voice's proposal authorizes (also one that cuts it off); lone words and wrong matches do not.
@@ -231,7 +232,7 @@ test('T3 voice instructions keep every rule area and stay compact', () => {
   assert.match(voice, /Voice doubt only on a failure, an uncertain result or the agent's own caveat/);
   assert.doesNotMatch(voice, /ofrece (?:leer|listar|buscar|comprobar)/);
   // A described topic: several of its words, recent main threads before old subagents.
-  assert.match(voice, /For a described topic, search several of its meaningful words, not just one\. Unless they ask for a subagent, prefer recent main threads \(searches and listings leave subagents out by default\): one in the catalog or a listing that fits comes before old subagents\./);
+  assert.match(voice, /For a described topic, search several of its meaningful words, not just one\. Unless they ask for a subagent, prefer recent top-level threads \(searches and listings leave subagents out by default\): one in the catalog or a listing that fits comes before old subagents\./);
 });
 
 test('T3 direct tools are compact and only the send changes T3', () => {

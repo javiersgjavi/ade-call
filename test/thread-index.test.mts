@@ -117,7 +117,7 @@ test('search looks at main threads first and reports the subagents it left out',
     assert.deepEqual(pi.subagentsMatching!.parents, [{ threadId: 'sub-events', title: 'Review pi realtime events' }, { threadId: 'root-old', title: 'Voz en tiempo real' }]);
     assert.match(pi.note!, /No open main thread title.*does not prove/);
     const text = formatFound({ checkedAt: 'now', ...pi });
-    assert.match(text, /main threads only/);
+    assert.match(text, /top-level threads only/);
     assert.match(text, /3 subagent threads also match and are not shown\. Search them with includeSubagents=true.*\nParents of those subagents:\n- "Review pi realtime events" · parent sub-events\n- "Voz en tiempo real" · parent root-old$/m);
     assert.doesNotMatch(text, /review_pi_auth_fast/);
     // (b) Several words of what was said reach the main thread: as written, or as a candidate for the spoken plural.
@@ -174,7 +174,7 @@ test('closed threads that only approximate the query are reported as possible ca
     assert.deepEqual(written.threads.map(t => t.threadId), ['ws-new']); assert.equal(written.closedMatching, undefined);
     // null flags are the same as omitted ones, stated scope included.
     const omitted = formatFound({ checkedAt: 'now', ...t3FindThreads({ query: 'websoket' }, dir) });
-    assert.match(omitted, /open only, main threads only/);
+    assert.match(omitted, /open only, top-level threads only/);
     assert.equal(formatFound({ checkedAt: 'now', ...t3FindThreads({ query: 'websoket', includeClosed: null, includeSubagents: null } as never, dir) }), omitted);
   } finally { db.close(); rmSync(dir, { recursive: true, force: true }); }
 });
@@ -193,6 +193,6 @@ test('the find tool passes includeSubagents through and its schema defaults to m
   await testTool(find).execute('test', { query: 'Pi', includeSubagents: true });
   assert.deepEqual(seen, [{ query: 'Pi', includeSubagents: true }]);
   const schema = toolSchema('t3_find_threads');
-  assert.match(schema.description, /main threads only by default/);
+  assert.match(schema.description, /top-level threads only by default/);
   assert.match(JSON.stringify(schema.parameters), /"includeSubagents":\{"type":"boolean","description":"[^"]*false by default/);
 });

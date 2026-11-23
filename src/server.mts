@@ -1,4 +1,4 @@
-import type { StoredEvent, Publication, CallHistory, T3Response, VoiceSettingsResponse } from './shared/contracts.mjs';
+import type { StoredEvent, Publication, CallHistory, T3Response, VoiceSettingsResponse, VoiceProvider } from './shared/contracts.mjs';
 import type { Ade } from './adapters/registry.mjs';
 import { StatusError, errorMessage } from './shared/contracts.mjs';
 import http from 'node:http';
@@ -11,6 +11,9 @@ import { Recordings } from './voice/recordings.mjs';
 import { Store } from './conversation/store.mjs';
 import { clientCloseReason } from './voice/diagnostics.mjs';
 import { REALTIME_DEFAULTS, RealtimeCalls } from './voice/realtime.mjs';
+import { GEMINI_DEFAULTS, GeminiCalls, isGeminiModel, type Socket as AudioSocket } from './voice/gemini.mjs';
+import { WebSocketServer } from 'ws';
+import type { Duplex } from 'node:stream';
 import { CONFIG_FIELDS, INSTRUCTIONS_FIELD, MAX_INSTRUCTIONS, VOICE_FIELDS, readConfig, updateConfig, validateInstructions, validateKey, validateVoiceSettings, voiceOptions, type VoiceSettings } from './voice/settings.mjs';
 import { ProjectContext } from './conversation/context.mjs';
 import { ades, getAde } from './adapters/registry.mjs';
@@ -31,6 +34,10 @@ const text = (value: unknown) => typeof value === 'string' && value ? value : un
 let configKey = text(config.openaiKey);
 const envKey = text(process.env.OPENAI_API_KEY);
 const openaiKey = () => configKey || envKey;
+// The same for Gemini Live: geminiKey in config.json, else GEMINI_API_KEY or GOOGLE_API_KEY.
+let configGeminiKey = text(config.geminiKey);
+const envGeminiKey = text(process.env.GEMINI_API_KEY) || text(process.env.GOOGLE_API_KEY);
+const geminiKey = () => configGeminiKey || envGeminiKey;
 const tokenPath = join(configDir, 'access-token');
 if (!existsSync(tokenPath)) writeFileSync(tokenPath, randomBytes(32).toString('base64url'), { mode: 0o600 });
 chmodSync(tokenPath, 0o600);
@@ -41,19 +48,32 @@ const store = new Store(join(state, 'caller.sqlite'));
 const recordings = new Recordings(join(state, 'recordings'));
 const clients = new Set<http.ServerResponse>();
 const browserAccess = new BrowserAccess(join(configDir, 'browser-access.sqlite'));
+// Who created each call: a paired browser's id, or ADMINISTRATOR for the bearer token.
 const liveOwners = new Map<string, { deviceId: string; backend: string }>();
+const ADMINISTRATOR = 'administrator';
 const accessStreams = new Map<http.ServerResponse, { deviceId: string; end: () => void }>();
 const port = Number(process.env.PORT || 8787);
 let shuttingDown = false;
 // The voice settings of the next call, the same for every ADE.
-const realtimeSettings: VoiceSettings = { ...REALTIME_DEFAULTS };
+const realtimeSettings: VoiceSettings = { ...REALTIME_DEFAULTS, geminiVoice: GEMINI_DEFAULTS.voice };
 for (const field of VOICE_FIELDS) realtimeSettings[field] = text(config[CONFIG_FIELDS[field]]) || realtimeSettings[field];
 // The owner's custom instructions (Settings → Voice), appended to every call's prompt.
 let customInstructions: string | undefined;
 try { customInstructions = validateInstructions(config[INSTRUCTIONS_FIELD]); }
 catch (error) { throw new Error(`config.json ${INSTRUCTIONS_FIELD}: ${errorMessage(error)}`, { cause: error }); }
-// Voice exists only for an ADE with direct tools (src/direct).
-interface Runtime { adapter: Ade; backend: string; context: ProjectContext; discovery: Discovery; realtime: RealtimeCalls | null; watch: ThreadWatch | null }
+// The provider of the next call: the configured model decides.
+const provider = (): VoiceProvider => isGeminiModel(realtimeSettings.model) ? 'gemini' : 'realtime';
+const geminiSettings = () => ({ model: realtimeSettings.model, voice: realtimeSettings.geminiVoice });
+const providerKey = () => provider() === 'gemini' ? geminiKey() : openaiKey();
+// Voice exists only for an ADE with direct tools (src/direct). Each ADE has
+// one engine per provider; only the configured provider's starts calls.
+interface Runtime { adapter: Ade; backend: string; context: ProjectContext; discovery: Discovery; realtime: RealtimeCalls | null; gemini: GeminiCalls | null; watch: ThreadWatch | null }
+type Engine = RealtimeCalls | GeminiCalls;
+const engines = (r: Runtime) => [r.realtime, r.gemini].filter((e): e is Engine => !!e);
+const activeEngine = (r: Runtime): Engine | null => provider() === 'gemini' ? r.gemini : r.realtime;
+// The engine that holds a call, whichever provider is configured now.
+const callEngine = (r: Runtime, id: string) => engines(r).find(e => e.sessions.has(id));
+const inCall = (r: Runtime) => engines(r).some(e => e.sessions.size > 0);
 const runtimes = new Map<string, Runtime>();
 for (const adapter of Object.values(ades)) {
   const backend = adapter.id;
@@ -67,16 +87,17 @@ for (const adapter of Object.values(ades)) {
   // Follows threads that accepted a delivery, only where the ADE can read
   // their messages. Notices go to the call of the same conversation.
   const readThread = adapter.readThread;
-  const runtime: Runtime = { adapter, backend, context, discovery, realtime: null, watch: null };
+  const runtime: Runtime = { adapter, backend, context, discovery, realtime: null, gemini: null, watch: null };
   runtime.watch = readThread && adapter.capabilities.readThreadMessages ? new ThreadWatch({
     read: threadId => readThread(['thread', 'show', threadId, '--messages', '4'], { timeout: 8000 }) as Promise<T3Response>,
-    deliver: notice => notice.conversationId !== store.conversation(backend).id || !!runtime.realtime?.threadNotice(notice)
+    deliver: notice => notice.conversationId !== store.conversation(backend).id || engines(runtime).some(e => e.threadNotice(notice))
   }) : null;
   const ade = adapter.direct?.({ snapshot: () => context.snapshot });
   if (ade) {
     const delivered = (thread: { threadId: string; runId: string | null; link: string | null; project: string }, conversationId?: string) => runtime.watch?.add({ ...thread, conversationId });
     const read = (threadId: string) => runtime.watch?.markRead(threadId);
     runtime.realtime = new RealtimeCalls({ key: openaiKey(), ade, context, publish: scopedPublish, store, settings: realtimeSettings, instructions: customInstructions, delivered, read });
+    runtime.gemini = new GeminiCalls({ key: geminiKey(), ade, context, publish: scopedPublish, store, settings: geminiSettings(), instructions: customInstructions, delivered, read });
   }
   runtimes.set(backend, runtime);
 }
@@ -85,10 +106,12 @@ function runtime(id: string) {
   try { adapter = getAde(id); } catch (error) { throw new StatusError(400, errorMessage(error)); }
   return runtimes.get(adapter.id)!;
 }
-function voiceBusy() { return [...runtimes.values()].some(({ realtime }) => realtime?.busy); }
-function toolsRunning() { return [...runtimes.values()].some(({ realtime }) => realtime?.working); }
+function voiceBusy() { return [...runtimes.values()].some(r => engines(r).some(e => e.busy)); }
+function toolsRunning() { return [...runtimes.values()].some(r => engines(r).some(e => e.working)); }
 function voiceState(): VoiceSettingsResponse {
-  return { settings: { ...realtimeSettings }, options: voiceOptions(realtimeSettings), key: { set: !!openaiKey(), source: configKey ? 'config' : envKey ? 'env' : null }, busy: voiceBusy(),
+  return { settings: { ...realtimeSettings }, options: voiceOptions(realtimeSettings), busy: voiceBusy(), provider: provider(),
+    key: { set: !!openaiKey(), source: configKey ? 'config' : envKey ? 'env' : null },
+    geminiKey: { set: !!geminiKey(), source: configGeminiKey ? 'config' : envGeminiKey ? 'env' : null },
     instructions: customInstructions || '', instructionsMax: MAX_INSTRUCTIONS };
 }
 // Saved first, then applied to every ADE's next call; the callers have checked
@@ -96,7 +119,10 @@ function voiceState(): VoiceSettingsResponse {
 function saveVoice(res: http.ServerResponse, changes: Record<string, string | undefined>, apply: () => void) {
   try { updateConfig(configPath, changes); } catch (error) { return json(res, 500, { error: errorMessage(error) }); }
   apply();
-  for (const { realtime } of runtimes.values()) realtime?.configure({ settings: realtimeSettings, key: openaiKey() ?? null, instructions: customInstructions ?? null });
+  for (const { realtime, gemini } of runtimes.values()) {
+    realtime?.configure({ settings: realtimeSettings, key: openaiKey() ?? null, instructions: customInstructions ?? null });
+    gemini?.configure({ settings: geminiSettings(), key: geminiKey() ?? null, instructions: customInstructions ?? null });
+  }
   return json(res, 200, voiceState());
 }
 function broadcast(event: StoredEvent) {
@@ -114,10 +140,11 @@ function publish(type: string, data: Publication) {
 }
 // Followed threads are read more often while a call can speak their notices.
 const watchTimer = setInterval(() => {
-  for (const { backend, realtime, watch } of runtimes.values()) {
+  for (const r of runtimes.values()) {
+    const { backend, watch } = r;
     if (!watch?.watches.size) continue;
     watch.retain(store.conversation(backend).id);
-    void watch.tick(!!realtime?.sessions.size).catch(() => { /* Reads are retried on the next tick. */ });
+    void watch.tick(inCall(r)).catch(() => { /* Reads are retried on the next tick. */ });
   }
 }, 4000).unref();
 
@@ -168,14 +195,14 @@ function browserCookie(token: string, seconds = REMEMBER_SECONDS) {
 function sweepAccess() {
   for (const [stream, owner] of accessStreams) if (!browserAccess.active(owner.deviceId)) { owner.end(); accessStreams.delete(stream); }
   for (const [id, owner] of liveOwners) {
-    const { realtime } = runtime(owner.backend);
-    if (!browserAccess.active(owner.deviceId)) realtime?.close(id);
-    if (!realtime?.sessions.has(id)) liveOwners.delete(id);
+    const engine = callEngine(runtime(owner.backend), id);
+    if (owner.deviceId !== ADMINISTRATOR && !browserAccess.active(owner.deviceId)) engine?.close(id);
+    if (!callEngine(runtime(owner.backend), id)) liveOwners.delete(id);
   }
 }
 const accessTimer = setInterval(sweepAccess, 1000).unref();
 const assets = new Map<string, [string, string]>([['/', ['index.html', 'text/html; charset=utf-8']], ['/style.css', ['style.css', 'text/css']]]);
-for (const name of ['app', 'errors', 'live-health', 'live-events', 'speech-gate', 'playback-control', 'call-recording', 'recording-store', 'recording-panel', 'sounds', 'browser-list', 'pair-device', 'voice-settings', 'i18n'])
+for (const name of ['app', 'errors', 'live-health', 'live-events', 'speech-gate', 'playback-control', 'relayed-call', 'pcm-capture', 'call-recording', 'recording-store', 'recording-panel', 'sounds', 'browser-list', 'pair-device', 'voice-settings', 'i18n'])
   assets.set(`/${name}.js`, [`${name}.js`, 'text/javascript']);
 // The browser's preferred languages (navigator.languages): only well-formed BCP 47 tags, at most five.
 const browserLanguages = (value: unknown) => Array.isArray(value)
@@ -238,7 +265,11 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true });
     }
     const requestDevice = browserDevice(req);
-    const { adapter, backend, context, realtime, discovery } = runtime(url.searchParams.get('backend') || 't3');
+    const current = runtime(url.searchParams.get('backend') || 't3');
+    const { adapter, backend, context, discovery } = current;
+    // The engine of the next call, and the one that holds the call a request names.
+    const voice = activeEngine(current);
+    const of = (data: Record<string, unknown>) => callEngine(current, callId(data));
     if (req.method === 'GET' && url.pathname === '/api/recordings') {
       return json(res, 200, { recordings: await recordings.list(backend, requestDevice?.id || 'administrator') });
     }
@@ -254,9 +285,10 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { eventCursor: store.db.prepare('SELECT COALESCE(MAX(id),0) AS id FROM events').get()!.id, backend,
         ades: Object.values(ades).map(({ id, name, theme, capabilities, limitation, direct }) => ({ id, name, theme, capabilities, limitation, direct: !!direct })),
         availability: status, limitation: adapter.limitation, conversation: store.conversation(backend), lastCall: store.meta<CallHistory>(`call:${backend}`),
-        voiceReady: !!(openaiKey() && realtime), runtime: status?.state || 'unreachable',
-        voiceModel: { model: realtimeSettings.model, reasoning: realtimeSettings.reasoning, eagerness: realtimeSettings.eagerness, noiseReduction: realtimeSettings.noiseReduction, voice: realtimeSettings.voice },
-        voiceActive: [...realtime?.sessions.keys() || []],
+        voiceReady: !!(providerKey() && voice), runtime: status?.state || 'unreachable',
+        voiceModel: { provider: provider(), model: realtimeSettings.model, reasoning: realtimeSettings.reasoning, eagerness: realtimeSettings.eagerness, noiseReduction: realtimeSettings.noiseReduction,
+          voice: provider() === 'gemini' ? realtimeSettings.geminiVoice : realtimeSettings.voice },
+        voiceActive: engines(current).flatMap(e => [...e.sessions.keys()]),
         // Any ADE: a call active or connecting, or a tool still running. The
         // installer reads it before restarting the service (scripts/service-busy.mts).
         serviceBusy: voiceBusy() || toolsRunning() });
@@ -286,8 +318,12 @@ const server = http.createServer(async (req, res) => {
       try { data = await body(req, 4096); } catch { return json(res, 400, { error: 'Invalid request.' }); }
       if (!data || typeof data !== 'object') return json(res, 400, { error: 'Invalid request.' });
       if (voiceBusy()) return json(res, 409, { error: 'End the call before changing the API key.' });
+      // provider: 'gemini' for the Gemini API key; omitted or 'realtime' for the OpenAI key.
+      const keyProvider = (data as { provider?: unknown }).provider ?? 'realtime';
+      if (keyProvider !== 'realtime' && keyProvider !== 'gemini') return json(res, 400, { error: 'Unknown key provider.' });
       let key: string | undefined;
       if (data.key !== null) try { key = validateKey(data.key); } catch (error) { return json(res, 400, { error: errorMessage(error) }); }
+      if (keyProvider === 'gemini') return saveVoice(res, { geminiKey: key }, () => { configGeminiKey = key; });
       return saveVoice(res, { openaiKey: key }, () => { configKey = key; });
     }
     // What the "Conversation" panel shows: transcript turns and voice tool runs
@@ -301,7 +337,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && url.pathname === '/api/context') { await context.refresh(); return json(res, 200, context.snapshot); }
     if (req.method === 'POST' && url.pathname === '/api/conversation/new') {
       const data = await body(req);
-      if (data.backend !== backend || realtime?.creating || realtime?.sessions.size)
+      if (data.backend !== backend || engines(current).some(e => e.busy))
         return json(res, 409, { error: 'End the call before starting another session.' });
       if (data.conversationId !== store.conversation(backend).id) return json(res, 409, { error: 'The session has already changed. Reload before trying.' });
       const conversation = store.newConversation(backend);
@@ -309,7 +345,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { conversation });
     }
     if (req.method === 'POST' && url.pathname === '/api/live/interrupt') {
-      const data = await body(req); realtime?.interrupt(callId(data));
+      const data = await body(req); of(data)?.interrupt(callId(data));
       return json(res, 200, { ok: true });
     }
     if (req.method === 'GET' && url.pathname === '/api/projects') return json(res, 200, url.searchParams.has('progressive') ? await discovery.progressive(url.searchParams.get('generation')) : await discovery.read());
@@ -330,28 +366,33 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === 'POST' && url.pathname === '/api/live') {
       const data = await body(req);
-      if (!realtime) return json(res, 409, { error: unavailable(adapter) });
+      // Chosen after the body arrives: Settings may have changed the provider meanwhile.
+      const voice = activeEngine(current);
+      if (!voice) return json(res, 409, { error: unavailable(adapter) });
       if (voiceBusy() || shuttingDown || (data.conversationId && data.conversationId !== store.conversation(backend).id) || (data.backend && data.backend !== backend)) return json(res, 409, { error: 'There is another call or the destination has changed. Reload the page.' });
-      if (typeof data.sdp !== 'string' || !data.sdp.startsWith('v=')) return json(res, 400, { error: 'The audio offer is missing.' });
+      // The page names the provider it prepared audio for; a change in Settings since then needs a reload.
+      if (data.provider !== undefined && data.provider !== voice.provider) return json(res, 409, { error: 'The voice model has changed. Reload the page.' });
+      const isGemini = voice instanceof GeminiCalls;
+      if (!isGemini && (typeof data.sdp !== 'string' || !data.sdp.startsWith('v='))) return json(res, 400, { error: 'The audio offer is missing.' });
       const device = requestDevice;
       if (device && !browserAccess.active(device.id)) return json(res, 401, { error: 'Pairing revoked.' });
-      const result = await realtime.create(data.sdp, { languages: browserLanguages(data.languages), language: browserLanguages([data.language])[0] });
-      if (device) {
-        liveOwners.set(result.session.id, { deviceId: device.id, backend });
-        if (!browserAccess.active(device.id)) { realtime.close(result.session.id); return json(res, 401, { error: 'Pairing revoked.' }); }
-      }
+      const options = { languages: browserLanguages(data.languages), language: browserLanguages([data.language])[0] };
+      const result = isGemini ? await voice.create(options) : await voice.create(data.sdp as string, options);
+      // The audio socket of a relayed call accepts only this browser (or the administrator token).
+      liveOwners.set(result.session.id, { deviceId: device?.id || ADMINISTRATOR, backend });
+      if (device && !browserAccess.active(device.id)) { voice.close(result.session.id); return json(res, 401, { error: 'Pairing revoked.' }); }
       return json(res, 201, result);
     }
     if (req.method === 'POST' && url.pathname === '/api/live/ready') {
-      const data = await body(req); realtime?.ready(callId(data)); return json(res, 200, { ok: true });
+      const data = await body(req); of(data)?.ready(callId(data)); return json(res, 200, { ok: true });
     }
     if (req.method === 'POST' && url.pathname === '/api/live/heartbeat') {
-      const data = await body(req); realtime?.diagnostics(callId(data), data.diagnostics);
-      return json(res, 200, { active: !!realtime?.heartbeat(callId(data)) });
+      const data = await body(req); of(data)?.diagnostics(callId(data), data.diagnostics);
+      return json(res, 200, { active: !!of(data)?.heartbeat(callId(data)) });
     }
     if (req.method === 'POST' && url.pathname === '/api/live/close') {
-      const data = await body(req); realtime?.diagnostics(callId(data), data.diagnostics, true);
-      realtime?.close(callId(data), clientCloseReason(data.cause)); return json(res, 200, { ok: true });
+      const data = await body(req); const engine = of(data); engine?.diagnostics(callId(data), data.diagnostics, true);
+      engine?.close(callId(data), clientCloseReason(data.cause)); return json(res, 200, { ok: true });
     }
     return json(res, 404, { error: 'Not found.' });
   } catch (error) {
@@ -362,11 +403,32 @@ const server = http.createServer(async (req, res) => {
     if (!res.headersSent) json(res, error instanceof StatusError ? error.status : 500, { error: text }); else res.end();
   }
 });
+// The audio socket of a relayed call (Gemini Live). The same authentication
+// and origin rules as the API, and only the browser (or token) that created
+// the call may attach, once. Browsers always send Origin on a WebSocket.
+const audioSockets = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
+server.on('upgrade', (req: http.IncomingMessage, socket: Duplex, head: Buffer) => {
+  const refuse = (status: number, reason: string) => { socket.end(`HTTP/1.1 ${status} ${reason}\r\nConnection: close\r\nContent-Length: 0\r\n\r\n`); };
+  try {
+    const url = new URL(req.url || '/', 'http://localhost');
+    if (url.pathname !== '/api/live/stream') return refuse(404, 'Not Found');
+    if (shuttingDown) return refuse(503, 'Service Unavailable');
+    if (!authenticated(req)) return refuse(401, 'Unauthorized');
+    if (req.headers.origin ? req.headers.origin !== browserOrigin(req) : !bearerAuthenticated(req)) return refuse(403, 'Forbidden');
+    const target = runtime(url.searchParams.get('backend') || 't3'), id = url.searchParams.get('id') || '';
+    const engine = target.gemini, owner = liveOwners.get(id), device = browserDevice(req);
+    if (!engine?.sessions.has(id) || owner?.backend !== target.backend || owner.deviceId !== (device?.id || ADMINISTRATOR)) return refuse(404, 'Not Found');
+    audioSockets.handleUpgrade(req, socket, head, ws => { engine.attach(id, ws as unknown as AudioSocket); });
+  } catch { refuse(400, 'Bad Request'); }
+});
 server.requestTimeout = 60_000;
 const host = process.env.ADE_CALL_HOST || '127.0.0.1';
 server.listen(port, host, () => {
   console.log(`ADE Call ready on ${host}:${port}. Private access configured.`);
-  for (const r of runtimes.values()) console.log(`[${r.backend}] ${r.realtime ? `voice: GPT Realtime ${r.realtime.model}${openaiKey() ? '' : ' (openaiKey missing)'}` : 'no voice'}`);
+  for (const r of runtimes.values()) {
+    const engine = activeEngine(r);
+    console.log(`[${r.backend}] ${engine ? `voice: ${engine instanceof GeminiCalls ? 'Gemini Live' : 'GPT Realtime'} ${engine.model}${providerKey() ? '' : ` (${engine instanceof GeminiCalls ? 'geminiKey' : 'openaiKey'} missing)`}` : 'no voice'}`);
+  }
 });
 async function shutdown() {
   if (shuttingDown) return; shuttingDown = true;
@@ -375,7 +437,7 @@ async function shutdown() {
   // pending: uncertain if the CLI was invoked, never resumed or repeated.
   const delay = voiceBusy() || toolsRunning() ? 16_000 : 200;
   clearInterval(watchTimer); clearInterval(accessTimer);
-  for (const { realtime } of runtimes.values()) realtime?.shutdown();
+  for (const r of runtimes.values()) for (const engine of engines(r)) engine.shutdown();
   for (const client of clients) client.end();
   server.close();
   setTimeout(() => { store.close(); browserAccess.close(); process.exit(0); }, delay);

@@ -2,17 +2,19 @@ import { readFileSync, writeFileSync, renameSync, rmSync, existsSync } from 'nod
 import { dirname, join, basename } from 'node:path';
 import { randomBytes } from 'node:crypto';
 import { ENUMS, REALTIME_MODELS, type RealtimeSettings } from './realtime.mjs';
+import { GEMINI_MODELS, GEMINI_VOICES } from './gemini.mjs';
 
 // The voice settings Settings can change, server-wide, and how config.json
 // keeps them. The key is accepted here but never returned: callers only learn
 // whether one is configured and where it comes from.
-export type VoiceSettings = Required<RealtimeSettings>;
+// model picks the provider: a gemini-* model runs on Gemini Live, any other on OpenAI Realtime.
+export type VoiceSettings = Required<RealtimeSettings> & { geminiVoice: string };
 export type VoiceField = keyof VoiceSettings;
-export const VOICE_FIELDS = ['model', 'voice', 'reasoning', 'eagerness', 'noiseReduction', 'transcriptionModel'] as const satisfies readonly VoiceField[];
+export const VOICE_FIELDS = ['model', 'voice', 'reasoning', 'eagerness', 'noiseReduction', 'transcriptionModel', 'geminiVoice'] as const satisfies readonly VoiceField[];
 // The config.json name of each field.
 export const CONFIG_FIELDS: Record<VoiceField, string> = {
   model: 'realtimeModel', voice: 'realtimeVoice', reasoning: 'realtimeReasoning', eagerness: 'realtimeEagerness',
-  noiseReduction: 'realtimeNoiseReduction', transcriptionModel: 'realtimeTranscriptionModel'
+  noiseReduction: 'realtimeNoiseReduction', transcriptionModel: 'realtimeTranscriptionModel', geminiVoice: 'geminiVoice'
 };
 // Conservative lists: the voices OpenAI recommends for gpt-realtime and its
 // two gpt-4o transcription models. A value configured by hand stays offered.
@@ -23,9 +25,9 @@ export const TRANSCRIPTION_MODELS = ['gpt-4o-transcribe', 'gpt-4o-mini-transcrib
 export function voiceOptions(current: VoiceSettings): Record<VoiceField, string[]> {
   const withCurrent = (list: readonly string[], value: string) => [...new Set([...list, value])];
   return {
-    model: withCurrent(REALTIME_MODELS, current.model), voice: withCurrent(REALTIME_VOICES, current.voice),
+    model: withCurrent([...REALTIME_MODELS, ...GEMINI_MODELS], current.model), voice: withCurrent(REALTIME_VOICES, current.voice),
     reasoning: [...ENUMS.reasoning], eagerness: [...ENUMS.eagerness], noiseReduction: [...ENUMS.noiseReduction],
-    transcriptionModel: withCurrent(TRANSCRIPTION_MODELS, current.transcriptionModel)
+    transcriptionModel: withCurrent(TRANSCRIPTION_MODELS, current.transcriptionModel), geminiVoice: withCurrent(GEMINI_VOICES, current.geminiVoice)
   };
 }
 

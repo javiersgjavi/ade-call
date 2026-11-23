@@ -1,4 +1,4 @@
-import type { Capabilities, Overview, LiveResponse, Workspace, StatusResponse, CallEvent, CallsResponse, VoiceToolData, VoiceSettingsResponse, VoiceSettingField } from '../src/shared/contracts.mjs';
+import type { Capabilities, Overview, LiveResponse, Workspace, StatusResponse, CallEvent, CallsResponse, VoiceToolData, VoiceSettingsResponse, VoiceSettingField, VoiceProvider } from '../src/shared/contracts.mjs';
 import type { Snapshot } from '../src/shared/contracts.mjs';
 interface Elements {
   'refresh-browsers': HTMLElementTagNameMap['button'];
@@ -11,6 +11,12 @@ interface Elements {
   'setting-eagerness': HTMLElementTagNameMap['select'];
   'setting-noise': HTMLElementTagNameMap['select'];
   'setting-transcription': HTMLElementTagNameMap['select'];
+  'setting-gemini-voice': HTMLElementTagNameMap['select'];
+  'gemini-key-form': HTMLElementTagNameMap['form'];
+  'gemini-key': HTMLElementTagNameMap['input'];
+  'reveal-gemini-key': HTMLElementTagNameMap['button'];
+  'save-gemini-key': HTMLElementTagNameMap['button'];
+  'remove-gemini-key': HTMLElementTagNameMap['button'];
   'instructions-form': HTMLElementTagNameMap['form'];
   'custom-instructions': HTMLElementTagNameMap['textarea'];
   'save-instructions': HTMLElementTagNameMap['button'];
@@ -38,11 +44,12 @@ import { LiveHealth } from './live-health.js';
 import { bindLiveEvents, type LiveCloseCause } from './live-events.js';
 import { SpeechGate } from './speech-gate.js';
 import { PlaybackControl } from './playback-control.js';
+import { RelayedCall, streamUrl } from './relayed-call.js';
 import { RecordingPanel } from './recording-panel.js';
 import { browserRows, browserNote, type PairedBrowser } from './browser-list.js';
 import { PairDevice, type PairInvite } from './pair-device.js';
 import { play } from './sounds.js';
-import { InstructionsSync, modelName, optionLabel, VOICE_FIELDS, type VoiceValues } from './voice-settings.js';
+import { InstructionsSync, modelName, modelProvider, optionLabel, VOICE_FIELDS, type VoiceValues } from './voice-settings.js';
 import { t, locale, isMessageKey, storedPreference, storePreference, voiceLanguages } from './i18n.js';
 const recordings = new RecordingPanel();
 const $ = <K extends string>(id: K) => document.getElementById(id)! as K extends keyof Elements ? Elements[K] : HTMLElement;
@@ -53,6 +60,8 @@ let backend = adeOptions().some(option => option.dataset.ade === storedAde) ? st
 let viewGeneration = 0; let adeCapabilities: Capabilities = {}; let paletteTimer: ReturnType<typeof setTimeout>;
 let conversationId: string;
 let liveHealth: LiveHealth | null = null;
+// A call whose audio the server relays (Gemini Live), and the provider the server's next call uses.
+let relay: RelayedCall | null = null, voiceProvider: VoiceProvider = 'realtime';
 let speechGate: SpeechGate | null; let callGeneration = 0;
 let playback: PlaybackControl | null = null;
 let wakeLock: WakeLockSentinel | null | undefined;
@@ -355,7 +364,8 @@ const REASONING = ['minimal', 'low', 'medium', 'high', 'xhigh'] as const;
 function renderModel(status: Pick<StatusResponse, 'voiceModel'>) {
   const m = status.voiceModel;
   $('voice-name').textContent = m.model ? modelName(m.model) : 'GPT Realtime';
-  const level = REASONING.find(r => r === m.reasoning);
+  // Gemini Live has no reasoning setting.
+  const level = m.provider === 'gemini' ? undefined : REASONING.find(r => r === m.reasoning);
   $('voice-reasoning').textContent = level ? t('stage.reasoning', { level: t(`reasoning.${level}`) }) : '';
   $('voice-reasoning').hidden = !level;
   // The language the call speaks and transcribes: the one chosen in Settings,
@@ -370,11 +380,11 @@ function renderModel(status: Pick<StatusResponse, 'voiceModel'>) {
 // boot and after Settings changes the voice or the key.
 function showVoice(status: StatusResponse) {
   renderModel(status);
-  voiceReady = !!status.voiceReady;
+  voiceReady = !!status.voiceReady; voiceProvider = status.voiceModel.provider || 'realtime';
   const direct = !!status.ades.find(ade => ade.id === backend)?.direct;
   if (callId || stream || restarting) return;
   $('call').disabled = !voiceReady;
-  if (voiceReady) setCall('idle', ''); else setCall('unavailable', direct ? t('call.configureKey') : t('call.voiceNotYet', { ade: adeName() }));
+  if (voiceReady) setCall('idle', ''); else setCall('unavailable', direct ? t(voiceProvider === 'gemini' ? 'call.configureGeminiKey' : 'call.configureKey') : t('call.voiceNotYet', { ade: adeName() }));
 }
 async function boot() {
   const generation = ++viewGeneration;
@@ -478,7 +488,7 @@ adeSwitch.onkeydown = e => {
 function cleanup() {
   recordings.current?.event('final_diagnostics', liveDiagnostics());
   recordings.stop('call_cleanup'); recordings.idle();
-  callGeneration++; liveHealth?.close(); liveHealth = null; speechGate?.close(); speechGate = null; playback = null;
+  callGeneration++; liveHealth?.close(); liveHealth = null; relay?.close(); relay = null; speechGate?.close(); speechGate = null; playback = null;
   $('new-session').disabled = false; $('restart-session').hidden = true; $('restart-session').disabled = false;
   wakeLock?.release(); wakeLock = null;
   clearInterval(heartbeat);
@@ -491,7 +501,55 @@ function cleanup() {
   setCall('ended', '');
 }
 function liveDiagnostics() {
-  return liveHealth ? { ...liveHealth.snapshot(), ...speechGate?.diagnostics(), ...playback?.diagnostics(), localGateActive: !!speechGate?.speaking, pageHidden: document.hidden } : undefined;
+  const transport = liveHealth?.snapshot() || relay?.diagnostics();
+  return transport ? { ...transport, ...speechGate?.diagnostics(), ...playback?.diagnostics(), localGateActive: !!speechGate?.speaking, pageHidden: document.hidden } : undefined;
+}
+// Every 10 s: the keepalive the server needs (45 s without one ends the call), with diagnostics.
+function startHeartbeat(generation: number, liveId: string, health: LiveHealth | null) {
+  let heartbeatPending = false, heartbeatFailures = 0;
+  heartbeat = setInterval(() => {
+    if (generation !== callGeneration || heartbeatPending) return;
+    // Stats collection never delays the keepalive and never opens another call.
+    if (health) void health.sample().then(() => { if (generation === callGeneration) recordings.current?.event('audio_health', liveDiagnostics()); });
+    else recordings.current?.event('audio_health', liveDiagnostics());
+    const controller = new AbortController();
+    const deadline = setTimeout(() => controller.abort(), 5000);
+    heartbeatPending = true;
+    void api('/api/live/heartbeat', { id: liveId, diagnostics: liveDiagnostics() }, controller.signal).then(result => {
+      if (generation !== callGeneration) return;
+      heartbeatFailures = 0;
+      if (result.active === false) void closeCall('server_session_missing');
+    }).catch(() => {
+      if (generation === callGeneration) recordings.current?.event('heartbeat_failed');
+      if (generation === callGeneration && ++heartbeatFailures === 2) notice(t('call.serverUnconfirmed'));
+    }).finally(() => { clearTimeout(deadline); heartbeatPending = false; });
+  }, 10_000);
+}
+// The language fields of POST /api/live.
+const callLanguages = () => ({ languages: voiceLanguages(navigator, storedPreference(localStorage)), ...(storedPreference(localStorage) !== 'auto' ? { language: storedPreference(localStorage) } : {}) });
+// Gemini Live: the server opens the provider session first, then this page
+// streams audio to it over a WebSocket. There is no WebRTC leg.
+async function startRelayedCall(generation: number, acquired: MediaStream) {
+  const result = await api('/api/live', { provider: 'gemini', backend, conversationId, ...callLanguages() }) as LiveResponse;
+  if (generation !== callGeneration) { await api('/api/live/close', { id: result.session.id }); return; }
+  if (!result.transport.stream) throw new Error(t('call.prepareFailed'));
+  const liveId = callId = result.session.id;
+  recordings.current?.identify(liveId);
+  const call = relay = new RelayedCall({ url: streamUrl(result.transport.stream, backend), stream: acquired, audio: $('audio'),
+    isCurrent: () => generation === callGeneration,
+    onLive: () => {
+      play('connected'); listening(); $('hangup').disabled = false;
+      void api('/api/live/ready', { id: liveId }).catch(() => { if (generation === callGeneration) notice(t('call.greetingUnconfirmed')); });
+    },
+    onClose: cause => { void closeCall(cause); },
+    onEvent: event => { recordings.current?.event('provider_event', { type: event.type }); },
+    onAutoplayBlocked: () => { recordings.current?.event('autoplay_blocked'); $('audio').hidden = false; notice(t('call.autoplayBlocked')); } });
+  await call.start();
+  if (generation !== callGeneration) return;
+  const remote = call.remote();
+  if (remote) { recordings.current?.remoteStream(remote); speechGate?.setRemote(remote); }
+  startHeartbeat(generation, liveId, null);
+  callControls();
 }
 async function closeCall(cause: LiveCloseCause = 'user_hangup') {
   const id = callId, diagnostics = liveDiagnostics();
@@ -549,7 +607,7 @@ async function startCall() {
     const acquiredStream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
     if (generation !== callGeneration) { acquiredStream.getTracks().forEach(t => t.stop()); return; }
     stream = acquiredStream;
-    await recordings.start(stream, { provider: 'realtime', backend, conversationId });
+    await recordings.start(stream, { provider: voiceProvider, backend, conversationId });
     if (generation !== callGeneration) return;
     setCall('connecting', t('call.opening'));
     playback = new PlaybackControl(speaking => {
@@ -570,6 +628,7 @@ async function startCall() {
     const acquiredLock = await navigator.wakeLock?.request('screen').catch(() => null);
     if (generation !== callGeneration) { acquiredLock?.release(); return; }
     wakeLock = acquiredLock;
+    if (voiceProvider === 'gemini') { await startRelayedCall(generation, acquiredStream); return; }
     peer = new RTCPeerConnection();
     const health = new LiveHealth(peer, $('audio')); liveHealth = health;
     let connectionInterrupted = false;
@@ -602,29 +661,13 @@ async function startCall() {
       });
     });
     if (generation !== callGeneration) return;
-    const result = await api('/api/live', { sdp: currentPeer.localDescription!.sdp, backend, conversationId, languages: voiceLanguages(navigator, storedPreference(localStorage)), ...(storedPreference(localStorage) !== 'auto' ? { language: storedPreference(localStorage) } : {}) }) as LiveResponse;
+    const result = await api('/api/live', { provider: 'realtime', sdp: currentPeer.localDescription!.sdp, backend, conversationId, ...callLanguages() }) as LiveResponse;
     if (generation !== callGeneration) { await api('/api/live/close', { id: result.session.id }); return; }
     callId = result.session.id;
     recordings.current?.identify(callId!);
     liveEvents.setId(callId!);
-    const liveId = callId; let heartbeatPending = false, heartbeatFailures = 0;
-    heartbeat = setInterval(() => {
-      if (generation !== callGeneration || heartbeatPending) return;
-      // Stats collection never delays the keepalive and never opens another call.
-      void health.sample().then(() => { if (generation === callGeneration) recordings.current?.event('audio_health', liveDiagnostics()); });
-      const controller = new AbortController();
-      const deadline = setTimeout(() => controller.abort(), 5000);
-      heartbeatPending = true;
-      void api('/api/live/heartbeat', { id: liveId, diagnostics: liveDiagnostics() }, controller.signal).then(result => {
-        if (generation !== callGeneration) return;
-        heartbeatFailures = 0;
-        if (result.active === false) void closeCall('server_session_missing');
-      }).catch(() => {
-        if (generation === callGeneration) recordings.current?.event('heartbeat_failed');
-        if (generation === callGeneration && ++heartbeatFailures === 2) notice(t('call.serverUnconfirmed'));
-      }).finally(() => { clearTimeout(deadline); heartbeatPending = false; });
-    }, 10_000);
-    await currentPeer.setRemoteDescription({ type: 'answer', sdp: result.transport.sdp });
+    startHeartbeat(generation, callId!, health);
+    await currentPeer.setRemoteDescription({ type: 'answer', sdp: result.transport.sdp || '' });
     void health.sample();
     if (generation !== callGeneration) return;
     callControls();
@@ -683,10 +726,10 @@ const pairDevice = new PairDevice({
 });
 $('settings').addEventListener('close', () => pairDevice.dismiss());
 
-// Server-wide voice settings and OpenAI key. The server refuses changes while
+// Server-wide voice settings and the OpenAI and Gemini keys. The server refuses changes while
 // any call is active or connecting (409), so the form locks during this
 // browser's call and when the server reports one; a call keeps what it began with.
-const VOICE_SELECTS = { model: 'setting-model', reasoning: 'setting-reasoning', voice: 'setting-voice', eagerness: 'setting-eagerness', noiseReduction: 'setting-noise', transcriptionModel: 'setting-transcription' } as const;
+const VOICE_SELECTS = { model: 'setting-model', reasoning: 'setting-reasoning', voice: 'setting-voice', eagerness: 'setting-eagerness', noiseReduction: 'setting-noise', transcriptionModel: 'setting-transcription', geminiVoice: 'setting-gemini-voice' } as const;
 let voiceSaved: VoiceSettingsResponse | null = null, settingsBusy = false, settingsRequest = 0;
 const instructionsSync = new InstructionsSync();
 // Each voice choice is saved as soon as it is made, one request at a time and in order.
@@ -700,7 +743,14 @@ function rowState(field: VoiceSettingField, state: 'saving' | 'saved' | 'error' 
   clearTimeout(Number(row.dataset.timer || 0));
   if (state === 'saved') row.dataset.timer = String(setTimeout(() => rowState(field, ''), 2500));
 }
+// Only the settings of the chosen model's provider are shown; the others keep their values.
+function showProviderRows(model: string) {
+  const provider = modelProvider(model);
+  for (const row of $('voice-form').querySelectorAll<HTMLElement>('.setting[data-provider]')) row.hidden = row.dataset.provider !== provider;
+  for (const group of $('voice-form').querySelectorAll<HTMLElement>('.setting-group')) group.hidden = ![...group.querySelectorAll<HTMLElement>('.setting')].some(row => !row.hidden);
+}
 function saveVoiceField(field: VoiceSettingField, value: string) {
+  if (field === 'model') showProviderRows(value);
   pendingVoice[field] = value; rowState(field, 'saving'); formStatus('voice-status', '');
   voiceQueue = voiceQueue.then(async () => {
     if (pendingVoice[field] !== value) return; // A later choice of the same field replaces this one.
@@ -715,22 +765,23 @@ function saveVoiceField(field: VoiceSettingField, value: string) {
       if (pendingVoice[field] === value) delete pendingVoice[field];
       rowState(field, 'error');
       formStatus('voice-status', errorMessage(error), 'error');
-      if (voiceSaved) $(VOICE_SELECTS[field]).value = voiceSaved.settings[field];
+      if (voiceSaved) { $(VOICE_SELECTS[field]).value = voiceSaved.settings[field]; showProviderRows($('setting-model').value); }
       void loadVoiceSettings();
     }
   });
 }
 const localCall = () => !!(stream || callId || restarting) || stage.dataset.state === 'connecting';
-type FormStatus = 'voice-status' | 'instructions-status' | 'key-status';
+type FormStatus = 'voice-status' | 'instructions-status' | 'key-status' | 'gemini-key-status';
+type KeyButton = 'save-key' | 'remove-key' | 'save-gemini-key' | 'remove-gemini-key' | 'save-instructions';
 function formStatus(id: FormStatus, text: string, state: 'ok' | 'error' | '' = '') {
   const node = $(id); node.textContent = text; if (state) node.dataset.state = state; else delete node.dataset.state;
 }
 function lockSettings() {
-  const locked = !voiceSaved || settingsBusy || localCall(), busy = (id: 'save-key' | 'remove-key' | 'save-instructions') => $(id).hasAttribute('aria-busy');
-  const saving = busy('save-key') || busy('remove-key'), savingInstructions = busy('save-instructions');
+  const locked = !voiceSaved || settingsBusy || localCall(), busy = (...ids: KeyButton[]) => ids.some(id => $(id).hasAttribute('aria-busy'));
   for (const id of Object.values(VOICE_SELECTS)) $(id).disabled = locked;
-  for (const id of ['save-key', 'remove-key', 'openai-key'] as const) $(id).disabled = locked || saving;
-  for (const id of ['save-instructions', 'custom-instructions'] as const) $(id).disabled = locked || savingInstructions;
+  for (const id of ['save-key', 'remove-key', 'openai-key'] as const) $(id).disabled = locked || busy('save-key', 'remove-key');
+  for (const id of ['save-gemini-key', 'remove-gemini-key', 'gemini-key'] as const) $(id).disabled = locked || busy('save-gemini-key', 'remove-gemini-key');
+  for (const id of ['save-instructions', 'custom-instructions'] as const) $(id).disabled = locked || busy('save-instructions');
   const note = locked && voiceSaved ? t('settings.inCall') : '';
   if (note || $('voice-status').textContent === t('settings.inCall')) formStatus('voice-status', note);
 }
@@ -745,11 +796,17 @@ function showVoiceSettings(result: VoiceSettingsResponse) {
     // A choice still being saved keeps what the person picked.
     select.value = pendingVoice[field] ?? result.settings[field];
   }
+  showProviderRows($('setting-model').value);
   const source = result.key.source || 'none';
   $('key-state').dataset.state = source;
   $('key-state').textContent = t(source === 'config' ? 'settings.keyConfigured' : source === 'env' ? 'settings.keyEnv' : 'settings.keyMissing');
   $('key-hint').textContent = t(source === 'config' ? 'settings.keyConfiguredHint' : source === 'env' ? 'settings.keyEnvHint' : 'settings.keyMissingHint');
   $('remove-key').hidden = source !== 'config';
+  const gemini = result.geminiKey?.source || 'none';
+  $('gemini-key-state').dataset.state = gemini;
+  $('gemini-key-state').textContent = t(gemini === 'config' ? 'settings.keyConfigured' : gemini === 'env' ? 'settings.keyEnv' : 'settings.keyMissing');
+  $('gemini-key-hint').textContent = t(gemini === 'config' ? 'settings.geminiKeyConfiguredHint' : gemini === 'env' ? 'settings.geminiKeyEnvHint' : 'settings.geminiKeyMissingHint');
+  $('remove-gemini-key').hidden = gemini !== 'config';
   lockSettings();
 }
 async function loadVoiceSettings() {
@@ -766,7 +823,7 @@ async function loadVoiceSettings() {
 async function refreshVoice() {
   try { showVoice(await api('/api/status')); } catch { /* The next boot or status poll shows it. */ }
 }
-async function saveSettings(button: 'save-key' | 'remove-key' | 'save-instructions', status: FormStatus, path: '/api/settings/voice' | '/api/settings/key' | '/api/settings/instructions', data: Record<string, unknown>, done: string) {
+async function saveSettings(button: KeyButton, status: FormStatus, path: '/api/settings/voice' | '/api/settings/key' | '/api/settings/instructions', data: Record<string, unknown>, done: string) {
   $(button).setAttribute('aria-busy', 'true'); lockSettings();
   formStatus(status, t('settings.saving'));
   try {
@@ -816,6 +873,23 @@ $('remove-key').onclick = () => {
   if (!confirm(t('settings.keyConfirmRemove'))) return;
   void saveSettings('remove-key', 'key-status', '/api/settings/key', { key: null }, t('settings.keyRemoved'));
 };
+// The Gemini API key, for Gemini Live models: the same rules as the OpenAI key.
+function hideGeminiKey() { $('gemini-key').type = 'password'; $('reveal-gemini-key').setAttribute('aria-pressed', 'false'); $('reveal-gemini-key').textContent = t('login.show'); }
+$('reveal-gemini-key').onclick = () => {
+  const show = $('gemini-key').type === 'password';
+  $('gemini-key').type = show ? 'text' : 'password';
+  $('reveal-gemini-key').setAttribute('aria-pressed', String(show)); $('reveal-gemini-key').textContent = t(show ? 'login.hide' : 'login.show');
+};
+$('gemini-key-form').onsubmit = async event => {
+  event.preventDefault();
+  const key = $('gemini-key').value.trim();
+  if (!key) { formStatus('gemini-key-status', t('settings.keyEmpty'), 'error'); $('gemini-key').focus(); return; }
+  if (await saveSettings('save-gemini-key', 'gemini-key-status', '/api/settings/key', { provider: 'gemini', key }, t('settings.keySaved'))) { $('gemini-key').value = ''; hideGeminiKey(); }
+};
+$('remove-gemini-key').onclick = () => {
+  if (!confirm(t('settings.geminiKeyConfirmRemove'))) return;
+  void saveSettings('remove-gemini-key', 'gemini-key-status', '/api/settings/key', { provider: 'gemini', key: null }, t('settings.keyRemoved'));
+};
 
 // Settings: language, voice, key, call recording and paired browsers. All but
 // the language need a paired session, so they are hidden on the login screen.
@@ -825,12 +899,12 @@ $('open-settings').onclick = () => {
   $('settings').dataset.signedIn = String(signedIn);
   for (const block of $('settings').querySelectorAll<HTMLElement>('.settings-tabs, .settings-block[data-auth]')) block.hidden = !signedIn;
   showSettingsTab(signedIn ? settingsTab : 'general', false);
-  formStatus('voice-status', ''); formStatus('instructions-status', ''); formStatus('key-status', '');
+  formStatus('voice-status', ''); formStatus('instructions-status', ''); formStatus('key-status', ''); formStatus('gemini-key-status', '');
   $('settings').showModal();
   if (signedIn) { void refreshBrowsers(); void loadVoiceSettings(); watchSettingsBusy(); }
 };
 // Closing forgets a typed key that was not saved.
-$('settings').addEventListener('close', () => { $('openai-key').value = ''; hideKey(); clearInterval(settingsBusyTimer); settingsBusyWatch++; });
+$('settings').addEventListener('close', () => { $('openai-key').value = ''; hideKey(); $('gemini-key').value = ''; hideGeminiKey(); clearInterval(settingsBusyTimer); settingsBusyWatch++; });
 // While Settings is open, a call another browser starts or ends locks or
 // unlocks the form. Only the busy flag is refreshed: options and text being
 // edited stay as they are.

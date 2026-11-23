@@ -27,6 +27,11 @@ let customHeader: string | undefined;
 export const customInstructionsText = (instructions: string) =>
   render(customHeader ??= resourceText('custom_instructions.txt').trimEnd(), { instructions }, 'custom_instructions.txt');
 
+// Instructions only for Gemini Live (resources/gemini_prompt.txt): the send
+// procedure as separate steps, appended after the voice instructions.
+let geminiPrompt: string | undefined;
+export const geminiPromptText = (vars: Vars) => render(geminiPrompt ??= resourceText('gemini_prompt.txt').trimEnd(), vars, 'gemini_prompt.txt');
+
 // The language and accent a call starts in (resources/voice_language.json):
 // the one chosen in the settings, the browser's, or unknown; and the short
 // reminder sent before each response the server requests.
@@ -37,6 +42,20 @@ export function voiceLanguageText(key: VoiceLanguageText, vars: Vars = {}) {
   const template = languageTexts[key];
   if (template === undefined) throw new Error(`voice_language.json: missing text ${key}.`);
   return render(template, vars, `voice_language.json ${key}`);
+}
+
+// Notes the voice engines add to a call (resources/voice_notes.json): the
+// greeting request, the wrapper of a server note where the provider has no
+// system role (Gemini Live), the result of a tool call the provider cancelled
+// or that finished while the connection was renewed, and an agent's message in a notice.
+export type VoiceNote = 'greeting' | 'note' | 'cancelled' | 'reconnected' | 'abandoned' | 'agentMessage';
+let voiceNotes: Record<VoiceNote, string> | undefined;
+export function voiceNoteText(key: VoiceNote, vars: Vars = {}) {
+  voiceNotes ??= json<Record<VoiceNote, string>>('voice_notes.json');
+  const template = voiceNotes[key];
+  if (template === undefined) throw new Error(`voice_notes.json: missing text ${key}.`);
+  // Values are data: a {{name}} inside them is not a placeholder.
+  return render(template, vars, `voice_notes.json ${key}`);
 }
 
 // ADE-specific parts of the system prompt, keyed by ADE id.

@@ -1229,6 +1229,8 @@ test('an announcement the engine asked for is not an answer to the user, and a v
   const spoken = { ...scenario, turns: [{ say: 'hola' }], expect: {} } as Scenario;
   const lone = { ...run, turns: [{ index: 1, kind: 'say', startMs: 0, endMs: 1 }], transcript: [{ ...line, turn: 1 }] } as RunRecord;
   assert.equal(checkRun(spoken, lone).find(c => c.id === 'call.everyTurnAnswered')!.pass, false);
+  const murmur = { ...lone, transcript: [{ ...line, notice: undefined, text: '...', turn: 1 }] } as RunRecord;
+  assert.equal(checkRun(spoken, murmur).find(c => c.id === 'call.everyTurnAnswered')!.pass, false, 'a lone "..." is no answer');
   const data = mkdtempSync(join(tmpdir(), 'ade-call-eval-vanished-'));
   const sc = examples()[2], runs = join(data, 'runs', 'old'), one = join(runs, sc.id, '1');
   spawnSync('mkdir', ['-p', one]);

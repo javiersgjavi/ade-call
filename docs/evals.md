@@ -2,13 +2,13 @@
 
 The Node tests prove that the server enforces its rules. They cannot show how a
 model behaves in a call. The conversation evaluations do: scripted calls, spoken by a
-synthetic user, run against GPT Realtime with the production voice engine, then
+synthetic user, run against GPT Realtime or [Gemini Live](#gemini-live) with the production voice engine, then
 checked by code and graded by LLM judges. Run them before you change the
 prompt, the tools, the model or the turn-taking settings, and when you try a new
 model.
 
-They are paid and are not part of `npm run check`. A run uses OpenAI Realtime time
-and the judges' tokens. It also uses ElevenLabs characters, but only the first time
+They are paid and are not part of `npm run check`. A run uses the voice provider's time
+(OpenAI Realtime or Gemini Live) and the judges' tokens (OpenAI). It also uses ElevenLabs characters, but only the first time
 each phrase is spoken: audio is cached. Nothing reaches a real ADE.
 
 Agents running them follow the [conversation-evals skill](../skills/conversation-evals/SKILL.md):
@@ -51,7 +51,8 @@ how to run the battery without wasting calls and how to read the results.
    `RealtimeCalls`, the class the server uses. The microphone is streamed in real time,
    with silence between turns. The next turn starts once the voice has answered and
    finished playing, so turn taking behaves as in a call. A turn with `bargeInMs`
-   interrupts the voice instead.
+   interrupts the voice instead. A `gemini-*` model runs the same loop on Gemini
+   Live through `src/eval/gemini-runner.mts` ([below](#gemini-live)).
 4. **Deterministic checks** (`src/eval/checks.mts`): the exact list of sends, the turn
    each happened in, destination, required and forbidden fragments, required and
    forbidden tools, tool budget, timeouts, provider errors, unanswered turns,
@@ -82,8 +83,9 @@ A run **passes** when every critical check passes and every judge passes it.
 
 Build first (`npm run build`), or use `npm run eval -- …`, which builds. Phone
 scenarios and recorded turns need `ffmpeg`; `run` checks for it before any paid work. The keys
-come from `config.json` in `ADE_CALL_CONFIG` (`openaiKey`, `elevenlabsKey`) or from
-`OPENAI_API_KEY` and `ELEVENLABS_API_KEY`. Private data goes in
+come from `config.json` in `ADE_CALL_CONFIG` (`openaiKey`, `elevenlabsKey`, and
+`geminiKey` for a Gemini model) or from `OPENAI_API_KEY`, `ELEVENLABS_API_KEY` and
+`GEMINI_API_KEY` (or `GOOGLE_API_KEY`). Private data goes in
 `$ADE_CALL_STATE/evals` (`--data DIR` to change it):
 
 | Path | Contents |
@@ -109,7 +111,7 @@ Shared worlds go in a subfolder. The repository's generic examples are in
 
 | Option of `run` | Effect |
 | --- | --- |
-| `--model`, `--transcription`, `--reasoning`, `--eagerness`, `--noise-reduction`, `--voice` | Realtime settings. They default to the configuration and then to the server's defaults. |
+| `--model`, `--transcription`, `--reasoning`, `--eagerness`, `--noise-reduction`, `--voice` | Realtime settings. They default to the configuration and then to the server's defaults. A `gemini-*` model runs on Gemini Live: `--voice` is then a Gemini voice (default `geminiVoice`, then `Kore`) and the other four are refused. |
 | `--label NAME` | Name of the run folder: one folder name of letters, digits, `.`, `_` and `-`. It defaults to the model plus a timestamp. |
 | `--repeat N` | Run each scenario N times. Models are not deterministic, so compare pass rates. |
 | `--parallel N` | Concurrent calls. |
@@ -140,6 +142,7 @@ node dist/scripts/eval.mjs run --label before --repeat 3          # on master
 node dist/scripts/eval.mjs run --label after --repeat 3
 node dist/scripts/eval.mjs report ~/.local/share/ade-call/evals/runs/{before,after}
 node dist/scripts/eval.mjs run --label mini --model gpt-realtime-2.1-mini --repeat 3   # a new model
+node dist/scripts/eval.mjs run --label gemini --model gemini-3.8-live --repeat 3       # Gemini Live
 ```
 
 ## Writing scenarios
@@ -170,7 +173,9 @@ node dist/scripts/eval.mjs run --label mini --model gpt-realtime-2.1-mini --repe
 
 - Spoken and recorded turns expect an answer; mark one `"silent": true` when it should
   get none: answer audio played before the next turn starts fails the critical check
-  even if no assistant transcript arrives. A saved latency without a saved playback
+  even if no assistant transcript arrives. On Gemini, whose answers are always
+  transcribed, a response with no words and no tool call (a lone "...") is a murmur,
+  not an answer, for this check and for `call.everyTurnAnswered`. A saved latency without a saved playback
   start in an older run cannot prove silence and requires a new run. This is the check
   `turns[N].silent`. Noise turns never expect one.
 - `instructions` are the owner's custom instructions, under the same rules as
@@ -272,6 +277,33 @@ impatient, Mexican, tired and low; and English: neutral, fast, slow). Run it wit
 node dist/scripts/eval.mjs speak evals/battery --dry   # characters to synthesize once
 node dist/scripts/eval.mjs run evals/battery --label before --repeat 3
 ```
+
+## Gemini Live
+
+With a `gemini-*` model, `run` uses `src/eval/gemini-runner.mts`: the production
+`GeminiCalls` engine holds the provider socket, as on the server, and the synthetic
+user is the page on the other side of its audio relay. The microphone is resampled
+to 16 kHz and sent in 100 ms frames; the 24 kHz answer plays on the same simulated
+playhead. Instructions, tools, the send rule, server notes and notices are the
+production ones, and the record has the same shape, so the checks, judges and
+`report` read it unchanged and a Gemini folder can be compared with a Realtime one.
+The OpenAI key is still needed for the judges (not with `--no-judge`).
+
+What differs, because the provider differs:
+
+- Gemini Live has no response IDs. A response is one stretch of model output: it
+  starts with the first audio or transcript and ends at `turnComplete`, at
+  `interrupted` or at a tool call (the answer after the result is its own response).
+  It belongs to the user turn of the latest transcribed speech.
+- There are no speech events. Latency runs from the end of the turn's scripted
+  audio, not from the provider's end of speech, to the first sample of the answer
+  that played. An interruption is the provider's `interrupted`: the page drops the
+  audio it had not played, which is what is recorded as heard.
+- Transcription is the provider's own (`transcriptionModel` is `built-in`). The
+  recognition hints are the custom vocabulary of the setup on `gemini-3.8-live`, and
+  none on `gemini-3.1-flash-live-preview`. A user utterance is recorded when the
+  engine publishes it, after the user's pause; Gemini reports no failed
+  transcriptions, so that check never fires.
 
 ## What it does not prove
 
