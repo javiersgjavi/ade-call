@@ -287,15 +287,15 @@ shows a notice and lets the connection recover; it never opens another call.
 Diagnostics and optional call recordings are covered in
 [troubleshooting.md](troubleshooting.md).
 
-The first time a browser opens the workspace, a short tour
-([tour.ts](../public/tour.ts)) walks through the ADE switch, calling, that sent
-work keeps running after hanging up, the conversation and the projects. It then
-opens Settings and goes through its tabs: General, the voice models and
-providers, custom instructions, API keys and Devices; Settings closes again when
-the tour ends or steps back before it. Finishing or skipping it (Escape also
-skips) is remembered in that browser's `localStorage`; **Settings → General →
-Take the tour again** repeats it, except during a call. Steps whose part of the
-page is hidden are left out.
+The first time a browser opens the workspace, a seven-step tour
+([tour.ts](../public/tour.ts)) welcomes the user (the ADE switch, and that sent
+work keeps running after hanging up or a new session), then rings the Call
+button, the conversation and the projects. It then opens Settings on the voice
+model and the custom instructions (Voice tab) and on pairing a phone (Devices);
+Settings closes again when the tour ends or steps back before it. Finishing or
+skipping it (Escape also skips) is remembered in that browser's
+`localStorage`; **Settings → General → Take the tour again** repeats it, except
+during a call. Steps whose part of the page is hidden are left out.
 
 ## Replaying a recorded call
 
