@@ -540,3 +540,37 @@ test('pairing another device: name rule, countdown, translated refusals and rede
   assert.match(app, /\$\('settings'\)\.addEventListener\('close', \(\) => pairDevice\.dismiss\(\)\)/);
   assert.match(html, /id="pair-open" class="btn btn-accent" aria-expanded="false" aria-controls="pair-panel"/);
 });
+
+test('first-visit tour: shown once, skippable, repeatable from Settings and placed on screen', async () => {
+  const { TOUR_STEPS, TOUR_KEY, TOUR_VERSION, tourSeen, markTourSeen, placeCard, spotlight } = await import('../public/tour.js');
+  // Every step names a part of the page and has text in every language.
+  for (const step of TOUR_STEPS) {
+    if (step.target) assert.ok(step.target.startsWith('#') ? ids.has(step.target.slice(1)) : html.includes(`class="${step.target.slice(1)}"`), `missing ${step.target}`);
+    for (const [name, dictionary] of Object.entries(dictionaries)) assert.ok(dictionary[step.title] && dictionary[step.body], `${name}: ${step.title}`);
+  }
+  assert.equal(TOUR_STEPS[0].target, undefined, 'opens with a centered welcome');
+  // Seen once it ends, whether finished or skipped; blocked storage never nags.
+  const store = new Map<string, string>();
+  const storage = { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => void store.set(key, value) };
+  assert.equal(tourSeen(storage), false);
+  markTourSeen(storage); assert.equal(store.get(TOUR_KEY), TOUR_VERSION); assert.equal(tourSeen(storage), true);
+  store.set(TOUR_KEY, '0'); assert.equal(tourSeen(storage), false, 'a new tour version shows again');
+  const blocked = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } };
+  assert.equal(tourSeen(blocked), true); assert.doesNotThrow(() => markTourSeen(blocked));
+  // Placement: below, else above, else over a tall target; always inside the viewport.
+  const view = { width: 400, height: 800 }, card = { width: 360, height: 200 };
+  assert.deepEqual(placeCard(null, card, view), { top: 300, left: 20, side: 'center' });
+  assert.deepEqual(placeCard({ top: 10, left: 340, width: 44, height: 44 }, card, view), { top: 68, left: 24, side: 'below' });
+  assert.equal(placeCard({ top: 600, left: 0, width: 400, height: 150 }, card, view).side, 'above');
+  assert.deepEqual(placeCard({ top: 0, left: 0, width: 400, height: 790 }, card, view), { top: 584, left: 20, side: 'over' });
+  assert.deepEqual(spotlight({ top: -50, left: 4, width: 500, height: 100 }, view), { top: 0, left: 0, width: 400, height: 58 });
+  // Wiring: a modal dialog with skip, back and next; started on boot only if unseen;
+  // repeated from Settings, which offers it only outside a call.
+  assert.match(tag('tour'), /<dialog id="tour" class="tour" aria-labelledby="tour-title" aria-describedby="tour-body">/);
+  for (const id of ['tour-skip', 'tour-back', 'tour-next', 'tour-restart']) assert.match(tag(id), /type="button"/);
+  assert.match(app, /if \(!tourSeen\(localStorage\) && !\$\('settings'\)\.open\)\s+tour\.start\(\)/);
+  assert.match(app, /\$\('tour-restart'\)\.onclick = \(\) => \{ \$\('settings'\)\.close\(\); tour\.start\(\); \}/);
+  assert.match(app, /\$\('tour-restart'\)\.disabled = !!\(stream \|\| callId\)/);
+  assert.match(readFileSync(new URL('../src/server.mjs', import.meta.url), 'utf8'), /'tour'/, 'the module is served');
+  assert.equal(t('tour.count', { current: 2, total: 7 }), '2 of 7');
+});

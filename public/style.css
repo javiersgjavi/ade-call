@@ -1001,3 +1001,38 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
 .setting[hidden], .setting-group[hidden] { display: none; }
 /* The Gemini key section follows the OpenAI one in the same panel. */
 .key-form + .settings-section-head { margin-top: 28px; }
+
+/* ——— Tour ——— */
+/* A transparent modal over the whole viewport: the ring's spread shadow dims
+   everything but the explained part, and the card sits next to it. */
+.tour { position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none; margin: 0; padding: 0; border: 0; background: transparent; color: var(--text); overflow: hidden; }
+.tour::backdrop { background: transparent; }
+.tour-spot {
+  position: fixed;
+  border-radius: var(--r);
+  box-shadow: 0 0 0 200vmax color-mix(in srgb, var(--bg) 74%, transparent);
+  outline: 2px solid var(--accent);
+  outline-offset: 0;
+  pointer-events: none;
+}
+.tour-spot[data-empty] { outline: 0; }
+.tour-card {
+  position: fixed;
+  box-sizing: border-box;
+  width: min(380px, calc(100vw - 2 * var(--gutter)));
+  padding: 18px 20px 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+/* Moves between steps glide; the first placement does not fly in from a corner. */
+.tour[data-ready] .tour-spot { transition: top .3s var(--ease), left .3s var(--ease), width .3s var(--ease), height .3s var(--ease); }
+.tour[data-ready] .tour-card { transition: top .3s var(--ease), left .3s var(--ease); }
+.tour-count { margin: 0 0 6px; color: var(--faint); font-family: var(--mono); font-size: 12px; }
+.tour-card h2 { margin: 0 0 8px; font-family: var(--serif); font-weight: 400; font-size: 22px; line-height: 1.2; }
+.tour-card h2 + p { margin: 0; color: var(--muted); line-height: 1.5; }
+.tour-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.tour-actions .btn { padding-inline: 14px; }
+.tour-actions .tour-skip { margin-right: auto; border-color: transparent; color: var(--muted); padding-inline: 8px; }
+@media (prefers-reduced-motion: reduce) { .tour[data-ready] .tour-spot, .tour[data-ready] .tour-card { transition: none; } }

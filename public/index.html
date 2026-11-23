@@ -164,6 +164,13 @@
         </details>
       </div>
       </div>
+      <div class="settings-block" data-auth aria-labelledby="tour-settings-title">
+      <h3 id="tour-settings-title" data-i18n="tour.settingsBlock">Guided tour</h3>
+      <p id="tour-restart-hint" class="fine" data-i18n="tour.restartHint">A short walk through the page: calling, sending work to agents, the conversation and the projects.</p>
+      <div class="settings-actions">
+        <button id="tour-restart" class="btn btn-ghost" type="button" aria-describedby="tour-restart-hint" data-i18n="tour.restart">Take the tour again</button>
+      </div>
+      </div>
     </section>
     <section class="settings-section settings-panel" data-auth data-panel="voice" id="voice-settings" role="tabpanel" aria-labelledby="tab-voice" hidden>
       <p id="voice-hint" class="fine settings-lead" data-i18n="settings.voiceHint">For the whole server and every paired browser. Each change is saved at once and applies from the next call.</p>
@@ -327,6 +334,19 @@
         <button type="button" id="logout" class="btn btn-ghost btn-danger" data-i18n="browsers.logout">Unpair this browser</button>
       </div>
     </section>
+    </div>
+  </dialog>
+  <dialog id="tour" class="tour" aria-labelledby="tour-title" aria-describedby="tour-body">
+    <div id="tour-spot" class="tour-spot" aria-hidden="true"></div>
+    <div id="tour-card" class="tour-card">
+      <p id="tour-count" class="tour-count"></p>
+      <h2 id="tour-title"></h2>
+      <p id="tour-body"></p>
+      <div class="tour-actions">
+        <button id="tour-skip" class="btn btn-ghost tour-skip" type="button" data-i18n="tour.skip">Skip tour</button>
+        <button id="tour-back" class="btn btn-ghost" type="button" data-i18n="tour.back">Back</button>
+        <button id="tour-next" class="btn btn-accent" type="button" data-i18n="tour.next">Next</button>
+      </div>
     </div>
   </dialog>
 </body>

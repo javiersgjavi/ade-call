@@ -254,7 +254,30 @@ const en = {
   'ade.switchDuringCall': 'End the call before switching ADE.',
   'api.unreachable': 'The server could not be reached. Check the connection and try again.',
   'api.httpError': 'Error {status}',
-  'api.viewChanged': 'The view changed; the result stays in its original conversation.'
+  'api.viewChanged': 'The view changed; the result stays in its original conversation.',
+
+  'tour.count': '{current} of {total}',
+  'tour.skip': 'Skip tour',
+  'tour.back': 'Back',
+  'tour.next': 'Next',
+  'tour.done': 'Got it',
+  'tour.welcomeTitle': 'Welcome to ADE Call',
+  'tour.welcomeBody': 'Talk by voice with the coding agents of your ADE: ask how they are doing, have a thread read to you or give an agent its next task. Here are the basics in under a minute.',
+  'tour.adeTitle': 'Your ADE',
+  'tour.adeBody': 'The ADE the voice works with. If you use both T3 Code and Orca, switch here; each one keeps its own conversation.',
+  'tour.callTitle': 'Call and talk',
+  'tour.callBody': 'Press Call, allow the microphone and speak naturally. You can interrupt the voice at any time; Mute and Hang up appear during the call.',
+  'tour.sendTitle': 'Nothing is sent without asking you',
+  'tour.sendBody': 'The voice reads projects and threads freely, but before sending work to an agent it tells you what it will send and waits for your yes. Work already sent keeps running in the ADE even if you hang up or close this page.',
+  'tour.conversationTitle': 'Conversation',
+  'tour.conversationBody': 'What you said, what the voice answered and each tool it used, with its result. New session starts over, without the history of earlier calls.',
+  'tour.projectsTitle': 'Projects',
+  'tour.projectsBody': 'The projects of your ADE and the threads this conversation is working with. Ask the voice about any of them by name.',
+  'tour.settingsTitle': 'Settings',
+  'tour.settingsBody': 'Language, voice model, API keys and paired devices, to call from your phone too. Each call uses paid time on your API key. You can repeat this tour from Settings → General.',
+  'tour.settingsBlock': 'Guided tour',
+  'tour.restartHint': 'A short walk through the page: calling, sending work to agents, the conversation and the projects.',
+  'tour.restart': 'Take the tour again'
 } as const;
 
 export type MessageKey = keyof typeof en;
@@ -512,7 +535,30 @@ const es: Dictionary = {
   'ade.switchDuringCall': 'Termina la llamada antes de cambiar de ADE.',
   'api.unreachable': 'No se pudo contactar con el servidor. Comprueba la conexión y vuelve a intentarlo.',
   'api.httpError': 'Error {status}',
-  'api.viewChanged': 'La vista cambió; el resultado se queda en su conversación original.'
+  'api.viewChanged': 'La vista cambió; el resultado se queda en su conversación original.',
+
+  'tour.count': '{current} de {total}',
+  'tour.skip': 'Saltar tour',
+  'tour.back': 'Atrás',
+  'tour.next': 'Siguiente',
+  'tour.done': 'Entendido',
+  'tour.welcomeTitle': 'Te damos la bienvenida a ADE Call',
+  'tour.welcomeBody': 'Habla por voz con los agentes de programación de tu ADE: pregunta cómo van, pide que te lean un hilo o dale a un agente su siguiente tarea. Aquí tienes lo básico en menos de un minuto.',
+  'tour.adeTitle': 'Tu ADE',
+  'tour.adeBody': 'El ADE con el que trabaja la voz. Si usas T3 Code y Orca, cambia aquí; cada uno conserva su propia conversación.',
+  'tour.callTitle': 'Llama y habla',
+  'tour.callBody': 'Pulsa Llamar, permite el micrófono y habla con naturalidad. Puedes interrumpir a la voz cuando quieras; durante la llamada aparecen Silenciar y Colgar.',
+  'tour.sendTitle': 'No se envía nada sin preguntarte',
+  'tour.sendBody': 'La voz lee proyectos e hilos libremente, pero antes de enviar trabajo a un agente te dice qué va a enviar y espera tu sí. El trabajo ya enviado sigue en marcha en el ADE aunque cuelgues o cierres esta página.',
+  'tour.conversationTitle': 'Conversación',
+  'tour.conversationBody': 'Lo que dijiste, lo que respondió la voz y cada herramienta que usó, con su resultado. Nueva sesión empieza de cero, sin el historial de las llamadas anteriores.',
+  'tour.projectsTitle': 'Proyectos',
+  'tour.projectsBody': 'Los proyectos de tu ADE y los hilos con los que trabaja esta conversación. Pregúntale a la voz por cualquiera de ellos por su nombre.',
+  'tour.settingsTitle': 'Ajustes',
+  'tour.settingsBody': 'Idioma, modelo de voz, claves API y dispositivos vinculados, para llamar también desde el móvil. Cada llamada consume tiempo de pago de tu clave API. Puedes repetir este tour desde Ajustes → General.',
+  'tour.settingsBlock': 'Tour guiado',
+  'tour.restartHint': 'Un recorrido corto por la página: llamar, enviar trabajo a los agentes, la conversación y los proyectos.',
+  'tour.restart': 'Hacer el tour de nuevo'
 };
 
 // To add a language, add its dictionary here under its primary subtag.

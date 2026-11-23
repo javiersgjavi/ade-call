@@ -202,7 +202,7 @@ function sweepAccess() {
 }
 const accessTimer = setInterval(sweepAccess, 1000).unref();
 const assets = new Map<string, [string, string]>([['/', ['index.html', 'text/html; charset=utf-8']], ['/style.css', ['style.css', 'text/css']]]);
-for (const name of ['app', 'errors', 'live-health', 'live-events', 'speech-gate', 'playback-control', 'relayed-call', 'pcm-capture', 'call-recording', 'recording-store', 'recording-panel', 'sounds', 'browser-list', 'pair-device', 'voice-settings', 'i18n'])
+for (const name of ['app', 'errors', 'live-health', 'live-events', 'speech-gate', 'playback-control', 'relayed-call', 'pcm-capture', 'call-recording', 'recording-store', 'recording-panel', 'sounds', 'browser-list', 'pair-device', 'voice-settings', 'tour', 'i18n'])
   assets.set(`/${name}.js`, [`${name}.js`, 'text/javascript']);
 // The browser's preferred languages (navigator.languages): only well-formed BCP 47 tags, at most five.
 const browserLanguages = (value: unknown) => Array.isArray(value)
