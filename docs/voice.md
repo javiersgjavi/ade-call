@@ -287,6 +287,13 @@ shows a notice and lets the connection recover; it never opens another call.
 Diagnostics and optional call recordings are covered in
 [troubleshooting.md](troubleshooting.md).
 
+The first time a browser opens the workspace, a short tour
+([tour.ts](../public/tour.ts)) walks through the ADE switch, calling, how work
+is sent to agents, the conversation, the projects and Settings. Finishing or
+skipping it (Escape also skips) is remembered in that browser's
+`localStorage`; **Settings → General → Take the tour again** repeats it, except
+during a call. Steps whose part of the page is hidden are left out.
+
 ## Replaying a recorded call
 
 `node dist/scripts/replay-realtime.mjs RECORDING OUTPUT [--eagerness low]`
