@@ -72,8 +72,8 @@ created the call, once. See [access.md](access.md).
 ## Setup
 
 The `setup` message carries the instructions built by
-[`directInstructions()`](../src/direct/prompt.mts) with a Gemini-only part,
-[resources/gemini_prompt.txt](../resources/gemini_prompt.txt), that restates the
+[`directInstructions()`](../src/direct/prompt.mts) with a part shared only with
+[ElevenLabs Realtime](elevenlabs.md), [resources/gemini_prompt.txt](../resources/gemini_prompt.txt), that restates the
 send rule as separate steps (in the conversation evaluations Gemini proposed and
 sent in one response, or sent a direct order without proposing it), then the
 owner's custom instructions as with Realtime; the ADE's tools as

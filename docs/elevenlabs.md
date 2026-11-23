@@ -69,8 +69,10 @@ refusal, such as an unknown voice, fails the call with the provider's reason.
 ## The session
 
 The session is OpenAI's: the instructions built by
-[`directInstructions()`](../src/direct/prompt.mts) with the owner's custom
-instructions, the ADE's tools with the schemas from
+[`directInstructions()`](../src/direct/prompt.mts) with the send steps of
+[resources/gemini_prompt.txt](../resources/gemini_prompt.txt) (as with Gemini: in the
+evaluations the model sent without proposing the message, or on a lone
+mistranscribed word) and the owner's custom instructions, the ADE's tools with the schemas from
 [resources/tools.json](../resources/tools.json), semantic turn detection that
 interrupts the answer, and the voice. What differs:
 

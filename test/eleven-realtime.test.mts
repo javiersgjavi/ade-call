@@ -54,7 +54,8 @@ test('a call opens a relayed session with the provider\'s audio format, its voic
   assert.equal(result.transport.sdp, undefined, 'no WebRTC leg');
   assert.deepEqual(f.models, ['eleven_realtime_v1_mini']);
   const update = f.upstream.sent.find(m => m.type === 'session.update')!.session;
-  assert.equal(update.instructions, directInstructions(f.ade, { language: { tag: 'es-ES', source: 'browser' } as never }).slice(0, update.instructions.length));
+  assert.equal(update.instructions, directInstructions(f.ade, { language: { tag: 'es-ES', source: 'browser' } as never, provider: 'elevenlabs' }));
+  assert.match(update.instructions, /SENDING STEPS/, 'the send steps, as with Gemini');
   assert.deepEqual(update.audio.input.format, { type: 'audio/pcm', rate: 24000 });
   assert.deepEqual(update.audio.input.transcription, { language: 'es' });
   assert.equal(update.audio.input.turn_detection.type, 'semantic_vad');

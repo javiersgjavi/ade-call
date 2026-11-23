@@ -67,7 +67,7 @@ export class ElevenRealtimeCalls extends RealtimeCalls {
     this.hints = [];
     return {
       type: 'realtime', model: this.model, output_modalities: ['audio'],
-      instructions: directInstructions(this.ade, { callStart: this.context.timing?.(), capabilities: { backend: this.context.backend, capabilities: this.context.capabilities }, language, custom: this.instructions }),
+      instructions: directInstructions(this.ade, { callStart: this.context.timing?.(), capabilities: { backend: this.context.backend, capabilities: this.context.capabilities }, language, custom: this.instructions, provider: 'elevenlabs' }),
       audio: {
         input: {
           format: { type: 'audio/pcm', rate: PROVIDER_RATE },
