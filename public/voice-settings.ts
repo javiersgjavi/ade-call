@@ -3,16 +3,17 @@ import { t, locale, type MessageKey } from './i18n.js';
 
 // The server-wide voice settings edited in Settings (GET/POST /api/settings/voice).
 // The options come from the server; this only names them for people.
-export const VOICE_FIELDS = ['model', 'reasoning', 'elevenlabsLlm', 'voice', 'geminiVoice', 'elevenlabsVoice', 'eagerness', 'noiseReduction', 'transcriptionModel'] as const satisfies readonly VoiceSettingField[];
+export const VOICE_FIELDS = ['model', 'reasoning', 'voice', 'geminiVoice', 'elevenlabsVoice', 'eagerness', 'noiseReduction', 'transcriptionModel'] as const satisfies readonly VoiceSettingField[];
 export type VoiceValues = Record<VoiceSettingField, string>;
 
 // "gpt-realtime-2.1-mini" → "GPT Realtime 2.1 Mini", "gemini-3.8-live" → "Gemini 3.8 Live",
 // "claude-sonnet-5-5" → "Claude Sonnet 5.5": readable at a glance.
-const WORDS: Record<string, string> = { gpt: 'GPT', glm: 'GLM', elevenlabs: 'ElevenLabs' };
-export const modelName = (id: string) => id.replace(/^(claude-[a-z]+)-(\d+)-(\d+)$/, '$1-$2.$3').replace(/^glm-(\d)(\d)$/, 'glm-$1.$2')
-  .split('-').filter(Boolean).map(part => WORDS[part] || part[0].toUpperCase() + part.slice(1)).join(' ');
-// The provider a model runs on, as the server decides it (isGeminiModel, isElevenLabsModel in src/voice).
-export const modelProvider = (model: string) => model.startsWith('gemini-') ? 'gemini' : model.startsWith('elevenlabs') ? 'elevenlabs' : 'realtime';
+// "gpt-realtime-2.1-mini" → "GPT Realtime 2.1 Mini", "gemini-3.8-live" → "Gemini 3.8 Live",
+// "eleven_realtime_v1_max" → "ElevenLabs Realtime v1 Max": readable at a glance.
+const WORDS: Record<string, string> = { gpt: 'GPT', eleven: 'ElevenLabs' };
+export const modelName = (id: string) => id.split(/[-_]/).filter(Boolean).map(part => WORDS[part] || (/^v\d/.test(part) ? part : part[0].toUpperCase() + part.slice(1))).join(' ');
+// The provider a model runs on, as the server decides it (isGeminiModel, isElevenRealtimeModel in src/voice).
+export const modelProvider = (model: string) => model.startsWith('gemini-') ? 'gemini' : model.startsWith('eleven_realtime') ? 'elevenlabs' : 'realtime';
 const capital = (text: string) => text.charAt(0).toLocaleUpperCase(locale()) + text.slice(1);
 const LABELS: Partial<Record<string, MessageKey>> = {
   'reasoning:minimal': 'reasoning.minimal', 'reasoning:low': 'reasoning.low', 'reasoning:medium': 'reasoning.medium', 'reasoning:high': 'reasoning.high', 'reasoning:xhigh': 'reasoning.xhigh',
@@ -24,7 +25,7 @@ const LABELS: Partial<Record<string, MessageKey>> = {
 export function optionLabel(field: VoiceSettingField, value: string) {
   const key = LABELS[`${field}:${value}`];
   if (key) return capital(t(key));
-  if (field === 'model' || field === 'elevenlabsLlm') return modelName(value);
+  if (field === 'model') return modelName(value);
   if (field === 'voice' || field === 'geminiVoice' || field === 'elevenlabsVoice') return capital(value);
   return value;
 }

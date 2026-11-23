@@ -305,34 +305,17 @@ What differs, because the provider differs:
   transcriptions, so that check never fires.
 
 
-## ElevenLabs Agents
+## ElevenLabs Realtime
 
-With `--model elevenlabs-agents`, `run` uses `src/eval/elevenlabs-runner.mts` the same
-way: the production `ElevenLabsCalls` engine holds the provider socket and the
-synthetic user is the page on the other side of its relay. `--llm` chooses the
-agent's LLM (default `elevenlabsLlm` in `config.json`, else `claude-haiku-5-5`) and
-`--voice` an ElevenLabs voice; the folder's `model` is `elevenlabs-agents:LLM`. The
-ElevenLabs key is the one the speech already uses; the OpenAI key is still needed
-for the judges.
-
-The evaluations keep their own agent and tools in the account, named **ADE Call
-(evaluations)**, apart from the service's; their IDs are in
-`$ADE_CALL_STATE/evals/elevenlabs-agent.json`.
-
-What differs from Gemini Live:
-
-- A response starts with the first audio or text and ends at
-  `agent_response_complete`, at an interruption, at a tool call or when the user's
-  next transcript arrives. Its text is the provider's `agent_response`, corrected
-  when the user cut it.
-- Transcription and turn detection are the provider's own (`transcriptionModel`
-  is `built-in`). The recognition hints are the call's ASR keywords. A user turn
-  is recorded when ElevenLabs sends its transcript, once per turn.
-- The LLM answers a tool result after a second or more, so after a result the
-  voice is not quiet until it answers or 10 s pass; otherwise the scenario would
-  move on, or end, before the answer.
-- Latency runs, as with Gemini, from the end of the turn's scripted audio to the
-  first sample of the answer that played.
+With an `eleven_realtime_*` `--model`, `run` uses the Realtime runner itself: the
+provider speaks OpenAI's protocol over a WebSocket, which is how the runner already
+talks to OpenAI. The engine is `ElevenRealtimeCalls`, and the socket goes to
+ElevenLabs with the ElevenLabs key (the one the speech already uses); the OpenAI
+key is still needed for the judges. `--voice` takes an ElevenLabs voice name. The
+reasoning, eagerness, noise reduction and transcription flags are OpenAI's and are
+refused. Server notes are recognized whether they are system messages (OpenAI) or
+user messages under the note header (ElevenLabs), and expressive tags are removed
+from the transcript.
 
 ## What it does not prove
 

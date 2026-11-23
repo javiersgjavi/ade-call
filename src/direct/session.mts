@@ -88,20 +88,15 @@ export class DirectSession {
   // waiting for its transcript is not a turn) and no echo of the hints.
   turns() { return this.history.filter(m => m.text && !this.echoes.has(m)); }
   // Why a send must not run now, or null when the turn authorizes it.
-  // through: only the conversation up to this item counts (see run's arrival).
-  sendRefusal(through?: { at: Message | undefined }) {
-    let history = this.turns();
-    if (through) { const end = through.at ? history.indexOf(through.at) : -1; history = history.slice(0, end + 1); }
+  sendRefusal() {
+    const history = this.turns();
     // A send needs words of the user since the previous send.
     if (!userTurnSince(history, this.submittedThrough)) return 'NOT SENT (no_user_turn): there is no new request from the user. Nothing was sent; ask or listen.';
     return null;
   }
   // Runs one function call at most once per call ID. beforeSend lets the voice
   // wait for the transcript that authorizes a send; false abandons the call.
-  // arrival: the latest conversation item when the provider asked for the call,
-  // for a provider whose transcripts always precede the calls they authorize:
-  // words transcribed after the call arrived never authorize it.
-  async run(item: FunctionCall, { requestId, signal, beforeSend, arrival }: { requestId: string; signal: AbortSignal; beforeSend?: () => Promise<boolean>; arrival?: { at: Message | undefined } }): Promise<ToolRun | null> {
+  async run(item: FunctionCall, { requestId, signal, beforeSend }: { requestId: string; signal: AbortSignal; beforeSend?: () => Promise<boolean> }): Promise<ToolRun | null> {
     const callId = item.call_id, tool = this.ade.tools.find(t => t.name === item.name);
     if (!callId || this.toolIds.has(callId)) return null;
     this.toolIds.add(callId);
@@ -121,14 +116,14 @@ export class DirectSession {
     let params = args, authorizedFrom: Message | undefined, consumed: Message | undefined;
     if (tool.sends) {
       if (beforeSend && !await beforeSend()) return null;
-      const refusal = this.sendRefusal(arrival);
+      const refusal = this.sendRefusal();
       if (refusal) return { callId, name, args, status: 'refused', output: refusal };
       // IDs and arguments are checked before the authorization is used: a bad
       // short ID sends nothing and leaves the user's yes for a corrected call.
       try { params = tool.prepare ? tool.prepare(args, this.state) : args; } catch (error) { return notSent(error); }
       if (!tool.keepsAuthorization) {
         authorizedFrom = this.submittedThrough;
-        consumed = this.submittedThrough = arrival ? arrival.at : this.turns().at(-1);
+        consumed = this.submittedThrough = this.turns().at(-1);
       }
     }
     try {

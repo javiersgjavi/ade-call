@@ -1,63 +1,32 @@
-# ElevenLabs Agents
+# ElevenLabs Realtime
 
-ADE Call can run a call on ElevenLabs Agents (Conversational AI) instead of
-OpenAI Realtime or Gemini Live. You choose it by picking **ElevenLabs Agents** as
-the model in **Settings → Voice**, then the language model (LLM) that thinks and
-calls the tools, and an ElevenLabs voice. Everything above the provider stays the
-same: the same instructions, the same ADE tools, the same
-[send rule](delivery-safety.md#the-send-rule), the same conversation panel and
-thread notices. The code is in [src/voice/elevenlabs.mts](../src/voice/elevenlabs.mts)
-(server); the page uses the same audio relay as
-[Gemini Live](gemini.md#how-a-call-works) ([public/relayed-call.ts](../public/relayed-call.ts)).
+ADE Call can run a call on ElevenLabs Realtime instead of OpenAI Realtime or
+Gemini Live. You choose it by picking an ElevenLabs Realtime model in
+**Settings → Voice**, then one of its voices; the model decides the provider.
+Everything above the provider stays the same: the same instructions, the same ADE
+tools, the same [send rule](delivery-safety.md#the-send-rule), the same
+conversation panel and thread notices. The code is in
+[src/voice/eleven-realtime.mts](../src/voice/eleven-realtime.mts) (server); the
+page uses the same audio relay as [Gemini Live](gemini.md#how-a-call-works)
+([public/relayed-call.ts](../public/relayed-call.ts)).
 
-ElevenLabs transcribes your voice, runs the chosen LLM and speaks its answer with
-its own voices. The LLM calls the ADE tools itself, as ElevenLabs "client
-tools": ElevenLabs asks this server to run each one, the server runs it and
-answers, and the LLM waits for the result before it speaks about it. No other
-model or agent sits between the voice and the tools.
+ElevenLabs Realtime is a speech-to-speech model that speaks OpenAI Realtime's
+protocol: the same session, events, function calls and semantic turn detection.
+So the engine is OpenAI's ([src/voice/realtime.mts](../src/voice/realtime.mts)),
+extended only where the provider differs. The voice model calls the ADE tools
+itself; nothing else sits between it and the tools.
 
-## Language models and voices
+## Models and voices
 
-Settings offers these LLMs, all run by ElevenLabs with tool calling; a value set
-by hand in `config.json` stays offered.
-
-| `elevenlabsLlm` | Notes |
+| Model | Notes |
 | --- | --- |
-| `claude-haiku-5-5` (default) | Fast. The best in the evaluations: more scenarios passed than Gemini 3.8 Flash, no unauthorized send, and answers about a second sooner. |
-| `gemini-3.8-flash` | Fast; in the evaluations it sometimes reported an agent's answer less faithfully and was slower to answer. |
-| `claude-sonnet-5-5` | Stronger, slower. |
-| `gpt-6.2-sol` | Stronger, slower. |
-| `glm-52` | Hosted by ElevenLabs. |
+| `eleven_realtime_v1_max` (default ElevenLabs choice) | Reasons before it answers; ElevenLabs recommends it for multi-step work with tools. |
+| `eleven_realtime_v1_mini` | Cheaper and a little faster; weaker with tools. |
 
-The voices are ElevenLabs' multilingual default voices by name (`Sarah`,
-`Jessica`, `Alice`, `Lily`, `Eric`, `Brian`, `George`, `Will`); any other value
-in `elevenlabsVoice` is used as a voice ID. ElevenLabs bills the call minutes of
-your plan and the LLM at cost; see its pricing page.
-
-## The agent in your account
-
-A conversation needs an agent in the ElevenLabs account of the key. On the first
-call the server creates the ADE's tools as client tools and one agent named
-**ADE Call** with them attached, and keeps their IDs in its state (the `meta`
-table of `caller.sqlite`, with a fingerprint of the key's account, never the key).
-Later calls reuse them. When the tools change (another ADE, a new version of
-ADE Call), the changed tools are created again, the agent is updated and the
-replaced tools are removed. An agent deleted in the dashboard is created again
-on the next call, and so are its tools if ElevenLabs says they are gone too; a
-busy or failing provider (429, 5xx, no connection) fails the call and keeps the
-saved IDs, so nothing is duplicated. Do not edit the agent by hand: the next
-change overwrites it.
-
-The agent is created with:
-
-- no first message (the server asks for the greeting, as with the other providers);
-- no built-in tools (no end call, no transfer);
-- turn timeout and silence hang-up off: the agent never re-engages you or hangs up for silence;
-- 16 kHz PCM in and 24 kHz PCM out (the relay's formats), plain speech without
-  expressive tags, a maximum of one hour per conversation;
-- authentication on (a conversation opens only with a signed URL);
-- overrides allowed for the prompt, the LLM, the language, the voice and the
-  recognition keywords, which each call sets.
+The voices are ElevenLabs' multilingual default voices, by the names the API
+accepts (`sarah`, `jessica`, `alice`, `lily`, `eric`, `brian`, `george`, `will`). A
+value set by hand in `elevenlabsVoice` stays offered. The ElevenLabs key needs
+access to Agents; ElevenLabs bills the minutes of your plan.
 
 ## How a call works
 
@@ -69,86 +38,69 @@ sequenceDiagram
   participant E as ElevenLabs
   participant A as ADE CLI
   B->>S: POST /api/live (provider elevenlabs)
-  S->>E: tools and agent (only when they changed)
-  S->>E: GET signed URL
-  S->>E: WebSocket + conversation_initiation_client_data
-  E-->>S: conversation_initiation_metadata
+  S->>E: WebSocket (key in a header) + session.update (instructions, tools, voice)
+  S->>E: notes: history, catalog
   S-->>B: 201 (call id, stream path)
   B->>S: WebSocket /api/live/stream
   B->>S: POST /api/live/ready
-  S->>E: user_message: greet (a server note)
-  E-->>S: audio, agent_response
+  S->>E: note: greet + response.create
+  E-->>S: response.output_audio.delta, transcripts
   S-->>B: audio
-  B->>S: microphone PCM
-  S->>E: user_audio_chunk
-  E-->>S: user_transcript
-  E->>S: client_tool_call
+  B->>S: microphone PCM (16 kHz)
+  S->>E: input_audio_buffer.append (24 kHz)
+  E->>S: function call
   S->>A: tool via DirectAde
-  S->>E: client_tool_result
+  S->>E: function_call_output + response.create
 ```
 
-The server holds the provider socket and the key, and relays the audio, for the
-same reason as with Gemini: whoever holds the socket receives the tool calls.
-The signed URL carries a short-lived token and is never logged; errors that could
-quote it, or the key, are replaced by a generic message or redacted.
+There is no WebRTC leg: the Realtime API is WebSocket only. The server holds the
+provider socket with the key and relays the audio, as with Gemini Live, so the
+page never sees the key or a tool call. The page captures 16 kHz PCM; the server
+resamples it to the 24 kHz the provider takes, and the answer comes back at
+24 kHz. When the provider's voice activity detection hears you over the answer,
+the page drops the audio it had queued; **Interrupt** also cancels the response.
 
-Each call sends, as overrides: the instructions built by
-[`directInstructions()`](../src/direct/prompt.mts) with the send steps of
-[resources/gemini_prompt.txt](../resources/gemini_prompt.txt) (as with Gemini: in
-the evaluations the LLM sent a direct order without proposing it) and the owner's
-custom instructions, followed by the resume of the conversation and the catalog as
-server notes; the LLM; the language of the call (its primary subtag); the voice;
-and up to 50 of your project and thread names as recognition keywords.
+## The session
 
-The greeting request, notices to announce and the language reminder go as
-`user_message`, which asks the LLM for a reply; quiet notices go as
-`contextual_update`. Both are wrapped in the header that says they are server
-notes and never authorize a send ([resources/voice_notes.json](../resources/voice_notes.json)).
-They never enter the send rule's history: only transcripts of your voice do,
-and a transcript identical to a note the server sent is ignored.
+The session is OpenAI's: the instructions built by
+[`directInstructions()`](../src/direct/prompt.mts) with the owner's custom
+instructions, the ADE's tools with the schemas from
+[resources/tools.json](../resources/tools.json), semantic turn detection that
+interrupts the answer, and the voice. What differs:
+
+- Audio is `audio/pcm` at 24 kHz in both directions.
+- Transcription is the provider's own, fixed to the call's language (its
+  primary subtag); there is no transcription model to choose and no hint list.
+- Reasoning, noise reduction and the transcription model are OpenAI settings;
+  Settings hides them while an ElevenLabs model is chosen. Turn taking uses the
+  `realtimeEagerness` value.
+- ElevenLabs drops `system` messages, and asking for a response with nothing new
+  in the conversation turns the microphone's silence into a user turn (it was
+  transcribed as "Sí." in the evaluations). So the resume, the catalog, the
+  greeting request, notices and the language reminder go as user messages
+  wrapped in the header that says they are server notes and never authorize a
+  send ([resources/voice_notes.json](../resources/voice_notes.json)). They never
+  enter the send rule's history: only transcripts of your voice do.
+- The voices add expressive tags to their transcripts ("[happy]"); the server
+  removes them from what it shows and keeps.
 
 ## The send rule with ElevenLabs
 
-The rule is the one in [delivery-safety.md](delivery-safety.md); only the
-events that feed it differ.
-
-- ElevenLabs decides where your turn ends and then sends its transcript
-  (`user_transcript`) once, before the LLM answers. Each transcript is a user
-  turn. As with the other providers, one that only recites the recognition
-  keywords is shown but is not a turn ([hint-echo.mts](../src/conversation/hint-echo.mts)).
-- Each `client_tool_call` runs once per `tool_call_id` through
-  `DirectSession.run()`. Because a turn's transcript always arrives before the
-  LLM answers it, a sending tool with no new user words is refused at once with
-  `NOT SENT (no_user_turn)`: unlike with Gemini, it does not wait for a late
-  transcript, so words you say after the request never authorize it. An ID the
-  provider asks for again gets the same result and never runs again.
-- ElevenLabs cannot cancel a tool call. A send that ran, or may have, is not
-  undone: hanging up or interrupting never cancels ADE work.
-
-## Limits of the provider
-
-- A conversation cannot be resumed: if ElevenLabs closes it (an error, the one
-  hour limit), the call ends with a notice, and ADE work keeps running.
-- Barge-in is ElevenLabs' own turn detection; **Interrupt** only empties the
-  page's playback. When you speak over the agent, ElevenLabs cuts its response
-  and the conversation keeps what was actually spoken.
-- Reasoning, turn taking, noise reduction and the transcription model are OpenAI
-  settings; Settings hides them while ElevenLabs Agents is chosen.
+It is the one in [delivery-safety.md](delivery-safety.md), applied by the same
+code as with OpenAI: a user turn takes its place when the provider commits your
+audio, its transcript authorizes at most one send, a sending tool waits up to
+2.5 s for a transcript still pending, and each call ID runs once.
 
 ## What has been verified
 
-The engine is tested offline with a simulated REST API and simulated sockets
-([test/elevenlabs.test.mts](../test/elevenlabs.test.mts)): tool schemas, the agent
-and tools created once and updated when they change, recovery from an agent or
-tools deleted in the dashboard, the overrides of a call, a refused conversation,
-the send rule with notes and keyword recitals, duplicate call IDs, the audio
-relay, pings, interruptions, corrections and quiet and spoken notices. The
-settings and key routes are tested in [test/settings-http.test.mts](../test/settings-http.test.mts).
+The engine is tested offline with simulated sockets
+([test/eleven-realtime.test.mts](../test/eleven-realtime.test.mts)): the session
+and its audio format, notes as user messages that never count as turns, the send
+rule, the audio relay both ways and its resampling, barge-in and interrupt,
+expressive tags, closing, and a missing key. The OpenAI engine's own tests cover
+the shared code.
 
-The [conversation evaluations](evals.md#elevenlabs-agents) run the battery on
-ElevenLabs with `--model elevenlabs-agents --llm LLM`: real conversations with the
-production engine, a synthetic user and a simulated T3. They are paid. In the
-first full run (November 2026) Claude Haiku 5.5 did about as well as GPT Realtime,
-with a longer delay before each answer (about 2 s): the user's turn must end and
-be transcribed before the LLM starts. Treat ElevenLabs Agents as experimental
-until it has been tried in real calls.
+The [conversation evaluations](evals.md#elevenlabs-realtime) run the battery on
+ElevenLabs with `--model eleven_realtime_v1_max` (or `_mini`): real calls with the
+production engine, a synthetic user and a simulated T3. They are paid. Treat
+ElevenLabs Realtime as experimental until it has been tried in real calls.

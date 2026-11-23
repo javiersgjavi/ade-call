@@ -1,4 +1,4 @@
-import type { Publish, LiveResponse } from '../shared/contracts.mjs';
+import type { Publish, LiveResponse, VoiceProvider } from '../shared/contracts.mjs';
 import type { VoiceContext } from './types.mjs';
 import type { DeliveredThread, DirectAde } from '../direct/contract.mjs';
 import { StatusError, errorMessage } from '../shared/contracts.mjs';
@@ -18,6 +18,8 @@ import { voiceNoteText } from '../resources.mjs';
 // and the send gate. Turn taking, noise reduction and the transcription model
 // are configurable, and the provider truncates interrupted audio itself.
 // This engine knows no ADE: it runs whatever DirectAde it is given.
+// The session sent to the provider; subclasses (ElevenLabs Realtime) shape it differently.
+export type RealtimeSession = { instructions: string; model: string } & Record<string, unknown>;
 export type Eagerness = 'low' | 'medium' | 'high' | 'auto';
 export interface RealtimeSettings {
   model?: string; voice?: string; reasoning?: string; eagerness?: string; noiseReduction?: string; transcriptionModel?: string;
@@ -85,7 +87,7 @@ export const ENUMS = {
 const TRANSCRIPT_WAIT_MS = 2500;
 
 export class RealtimeCalls {
-  readonly provider = 'realtime';
+  readonly provider: VoiceProvider = 'realtime';
   key: string | undefined; ade: DirectAde; publish: Publish; store: RealtimeOptions['store']; context: VoiceContext;
   // The owner's custom instructions; changed by configure().
   instructions: string | undefined;
@@ -118,7 +120,7 @@ export class RealtimeCalls {
   // instructions name it and its accent; transcription is fixed to its ISO
   // 639-1 code. Without one the voice waits for the user and the provider
   // detects the spoken language.
-  session(language?: CallLanguage) {
+  session(language?: CallLanguage): RealtimeSession {
     const code = transcriptionCode(language);
     // Kept for the call it configures: a transcript reciting them is not a turn.
     const hints = this.hints = this.transcriptionModel.startsWith('gpt-4o') ? this.context.vocabulary().slice(0, 80) : [];
@@ -228,7 +230,7 @@ export class RealtimeCalls {
     return call;
   }
   async start(call: RealtimeCall, { update = false, extra = {}, languages = [], language }: { update?: boolean; extra?: Record<string, unknown>; languages?: string[]; language?: string } = {}) {
-    await this.attach(call);
+    await this.sideband(call);
     // Closed while the sideband connected (shutdown()): it is not announced.
     if (call.closed) throw new StatusError(503, 'The call ended while it was connecting.');
     const spoken = callLanguage(language, languages);
@@ -243,10 +245,10 @@ export class RealtimeCalls {
     if (typeof catalog === 'string') this.system(call, catalog);
     else void catalog.then(text => { if (call.direct === direct) this.system(call, text); }, () => { /* The ADE reports its own failure. */ });
     // The stored event keeps which language the call started in and why.
-    this.publish('voice', { status: 'connected', id: call.id, provider: 'realtime', backend: call.backend, conversationId: call.conversationId, ...(spoken ? { language: spoken.tag, languageSource: spoken.source } : {}) });
+    this.publish('voice', { status: 'connected', id: call.id, provider: this.provider, backend: call.backend, conversationId: call.conversationId, ...(spoken ? { language: spoken.tag, languageSource: spoken.source } : {}) });
     return call;
   }
-  attach(call: RealtimeCall) {
+  sideband(call: RealtimeCall) {
     return new Promise<void>((resolve, reject) => {
       const socket = call.socket = this.connect(call.id);
       socket.once('open', () => { call.attached = true; resolve(); });
@@ -262,7 +264,7 @@ export class RealtimeCalls {
       socket.on('close', () => {
         if (!call.closed) {
           this.finish(call);
-          this.publish('voice', { status: 'disconnected', reason: 'The provider\'s control channel closed.', id: call.id, provider: 'realtime', backend: call.backend, conversationId: call.conversationId });
+          this.publish('voice', { status: 'disconnected', reason: 'The provider\'s control channel closed.', id: call.id, provider: this.provider, backend: call.backend, conversationId: call.conversationId });
           if (call.attached) { call.hungUp = true; this.hangup(call.id); }
         }
         this.sessions.delete(call.id);
@@ -374,8 +376,10 @@ export class RealtimeCalls {
     this.send(call, { type: 'conversation.item.create', item: { type: 'function_call_output', call_id: callId, output } });
     if (speak) { call.queue.push({ text: '', speak: true, reply: true }); this.flush(call); }
   }
+  // A server note as a conversation item: a system message here.
+  note(text: string): Record<string, unknown> { return { type: 'message', role: 'system', content: [{ type: 'input_text', text }] }; }
   system(call: RealtimeCall, text: string, speak = false) {
-    if (!speak) { this.send(call, { type: 'conversation.item.create', item: { type: 'message', role: 'system', content: [{ type: 'input_text', text }] } }); return; }
+    if (!speak) { this.send(call, { type: 'conversation.item.create', item: this.note(text) }); return; }
     call.queue.push({ text, speak }); this.flush(call);
   }
   // A tool output answers what the user just asked: it is spoken as soon as
@@ -390,10 +394,10 @@ export class RealtimeCalls {
     const reply = this.replies(call);
     if (!this.idle(call, reply)) return this.later(call, reply ? 100 : 500);
     const items = call.queue.splice(0);
-    for (const { text } of items) if (text) this.send(call, { type: 'conversation.item.create', item: { type: 'message', role: 'system', content: [{ type: 'input_text', text }] } });
+    for (const { text } of items) if (text) this.send(call, { type: 'conversation.item.create', item: this.note(text) });
     if (!items.some(item => item.speak)) return;
     // Right after English data, so the reply keeps the user's language and accent.
-    this.send(call, { type: 'conversation.item.create', item: { type: 'message', role: 'system', content: [{ type: 'input_text', text: languageReminder() }] } });
+    this.send(call, { type: 'conversation.item.create', item: this.note(languageReminder()) });
     call.responding = true; this.send(call, { type: 'response.create' });
   }
   later(call: RealtimeCall, ms = 500) {
@@ -458,7 +462,7 @@ export class RealtimeCalls {
     const call = this.sessions.get(id);
     if (!call || call.closed) return;
     call.closing = true; this.finish(call); this.sessions.delete(id);
-    this.publish('voice', { status: 'closed', id, reason, provider: 'realtime', backend: call.backend, conversationId: call.conversationId });
+    this.publish('voice', { status: 'closed', id, reason, provider: this.provider, backend: call.backend, conversationId: call.conversationId });
     call.hungUp = true; this.hangup(id);
     call.socket?.close();
   }

@@ -17,7 +17,6 @@ interface Elements {
   'reveal-gemini-key': HTMLElementTagNameMap['button'];
   'save-gemini-key': HTMLElementTagNameMap['button'];
   'remove-gemini-key': HTMLElementTagNameMap['button'];
-  'setting-elevenlabs-llm': HTMLElementTagNameMap['select'];
   'setting-elevenlabs-voice': HTMLElementTagNameMap['select'];
   'elevenlabs-key-form': HTMLElementTagNameMap['form'];
   'elevenlabs-key': HTMLElementTagNameMap['input'];
@@ -67,7 +66,7 @@ let backend = adeOptions().some(option => option.dataset.ade === storedAde) ? st
 let viewGeneration = 0; let adeCapabilities: Capabilities = {}; let paletteTimer: ReturnType<typeof setTimeout>;
 let conversationId: string;
 let liveHealth: LiveHealth | null = null;
-// A call whose audio the server relays (Gemini Live, ElevenLabs Agents), and the provider the server's next call uses.
+// A call whose audio the server relays (Gemini Live, ElevenLabs Realtime), and the provider the server's next call uses.
 let relay: RelayedCall | null = null, voiceProvider: VoiceProvider = 'realtime';
 let speechGate: SpeechGate | null; let callGeneration = 0;
 let playback: PlaybackControl | null = null;
@@ -370,8 +369,8 @@ async function refreshThreads(current: () => boolean) {
 const REASONING = ['minimal', 'low', 'medium', 'high', 'xhigh'] as const;
 function renderModel(status: Pick<StatusResponse, 'voiceModel'>) {
   const m = status.voiceModel;
-  $('voice-name').textContent = m.model ? modelName(m.model) + (m.llm ? ` · ${optionLabel('elevenlabsLlm', m.llm)}` : '') : 'GPT Realtime';
-  // Gemini Live and ElevenLabs Agents have no reasoning setting.
+  $('voice-name').textContent = m.model ? modelName(m.model) : 'GPT Realtime';
+  // Gemini Live and ElevenLabs Realtime have no reasoning setting.
   const level = m.provider !== 'realtime' ? undefined : REASONING.find(r => r === m.reasoning);
   $('voice-reasoning').textContent = level ? t('stage.reasoning', { level: t(`reasoning.${level}`) }) : '';
   $('voice-reasoning').hidden = !level;
@@ -534,7 +533,7 @@ function startHeartbeat(generation: number, liveId: string, health: LiveHealth |
 }
 // The language fields of POST /api/live.
 const callLanguages = () => ({ languages: voiceLanguages(navigator, storedPreference(localStorage)), ...(storedPreference(localStorage) !== 'auto' ? { language: storedPreference(localStorage) } : {}) });
-// Gemini Live and ElevenLabs Agents: the server opens the provider session
+// Gemini Live and ElevenLabs Realtime: the server opens the provider session
 // first, then this page streams audio to it over a WebSocket. There is no WebRTC leg.
 async function startRelayedCall(generation: number, acquired: MediaStream) {
   const result = await api('/api/live', { provider: voiceProvider, backend, conversationId, ...callLanguages() }) as LiveResponse;
@@ -737,7 +736,7 @@ $('settings').addEventListener('close', () => pairDevice.dismiss());
 // any call is active or connecting (409), so the form locks during this
 // browser's call and when the server reports one; a call keeps what it began with.
 const VOICE_SELECTS = { model: 'setting-model', reasoning: 'setting-reasoning', voice: 'setting-voice', eagerness: 'setting-eagerness', noiseReduction: 'setting-noise', transcriptionModel: 'setting-transcription', geminiVoice: 'setting-gemini-voice',
-  elevenlabsLlm: 'setting-elevenlabs-llm', elevenlabsVoice: 'setting-elevenlabs-voice' } as const;
+  elevenlabsVoice: 'setting-elevenlabs-voice' } as const;
 let voiceSaved: VoiceSettingsResponse | null = null, settingsBusy = false, settingsRequest = 0;
 const instructionsSync = new InstructionsSync();
 // Each voice choice is saved as soon as it is made, one request at a time and in order.
@@ -904,7 +903,7 @@ $('remove-gemini-key').onclick = () => {
   if (!confirm(t('settings.geminiKeyConfirmRemove'))) return;
   void saveSettings('remove-gemini-key', 'gemini-key-status', '/api/settings/key', { provider: 'gemini', key: null }, t('settings.keyRemoved'));
 };
-// The ElevenLabs API key, for ElevenLabs Agents: the same rules again.
+// The ElevenLabs API key, for ElevenLabs Realtime: the same rules again.
 function hideElevenLabsKey() { $('elevenlabs-key').type = 'password'; $('reveal-elevenlabs-key').setAttribute('aria-pressed', 'false'); $('reveal-elevenlabs-key').textContent = t('login.show'); }
 $('reveal-elevenlabs-key').onclick = () => {
   const show = $('elevenlabs-key').type === 'password';

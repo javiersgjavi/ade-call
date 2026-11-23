@@ -16,7 +16,7 @@ The state belongs to one ADE installation. Project, thread and receipt IDs are s
 
 ## config.json
 
-All fields are strings. Only the key of the provider you use is required (`openaiKey`, `geminiKey` with a Gemini model, or `elevenlabsKey` with ElevenLabs Agents); every other field has a default. Unknown fields are ignored.
+All fields are strings. Only the key of the provider you use is required (`openaiKey`, `geminiKey` with a Gemini model, or `elevenlabsKey` with an ElevenLabs Realtime model); every other field has a default. Unknown fields are ignored.
 
 ```json
 {
@@ -34,12 +34,11 @@ All fields are strings. Only the key of the provider you use is required (`opena
 | Field | Default | Allowed values | Effect |
 | --- | --- | --- | --- |
 | `openaiKey` | `OPENAI_API_KEY` | An OpenAI API key | Used to create Realtime calls. The file takes priority over the variable. It can also be saved or removed from **Settings → API keys**. |
-| `realtimeModel` | `gpt-realtime-2.1` | Any Realtime model your key can use; Settings offers `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gemini-3.8-live` and `elevenlabs-agents` | The voice model. A `gemini-*` model runs the call on [Gemini Live](gemini.md) and `elevenlabs-agents` on [ElevenLabs Agents](elevenlabs.md); the other `realtime*` fields then do not apply. Mini is faster and cheaper; the full model reasons better. |
+| `realtimeModel` | `gpt-realtime-2.1` | Any Realtime model your key can use; Settings offers `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gemini-3.8-live`, `eleven_realtime_v1_max` and `eleven_realtime_v1_mini` | The voice model. A `gemini-*` model runs the call on [Gemini Live](gemini.md) and an `eleven_realtime_*` one on [ElevenLabs Realtime](elevenlabs.md); the other `realtime*` fields then do not apply. Mini is faster and cheaper; the full model reasons better. |
 | `geminiKey` | `GEMINI_API_KEY`, else `GOOGLE_API_KEY` | A Gemini API key | Used for Gemini Live calls. The file takes priority over the variables. It can also be saved or removed from **Settings → API keys**. |
 | `geminiVoice` | `Kore` | A prebuilt Gemini voice; Settings offers `Kore`, `Puck`, `Charon`, `Aoede`, `Leda`, `Zephyr`, `Fenrir`, `Orus` | The voice you hear with a Gemini model. |
-| `elevenlabsKey` | `ELEVENLABS_API_KEY` | An ElevenLabs API key with access to Agents | Used for ElevenLabs Agents calls (and by the [evaluations](evals.md) to synthesize the user). The file takes priority over the variable. It can also be saved or removed from **Settings → API keys**. |
-| `elevenlabsLlm` | `claude-haiku-5-5` | An ElevenLabs LLM ID; Settings offers `claude-haiku-5-5`, `gemini-3.8-flash`, `claude-sonnet-5-5`, `gpt-6.2-sol`, `glm-52` | The language model that thinks and calls the tools with ElevenLabs Agents. |
-| `elevenlabsVoice` | `Sarah` | A name Settings offers (`Sarah`, `Jessica`, `Alice`, `Lily`, `Eric`, `Brian`, `George`, `Will`) or an ElevenLabs voice ID | The voice you hear with ElevenLabs Agents. |
+| `elevenlabsKey` | `ELEVENLABS_API_KEY` | An ElevenLabs API key with access to Agents | Used for ElevenLabs Realtime calls (and by the [evaluations](evals.md) to synthesize the user). The file takes priority over the variable. It can also be saved or removed from **Settings → API keys**. |
+| `elevenlabsVoice` | `sarah` | A voice name; Settings offers `sarah`, `jessica`, `alice`, `lily`, `eric`, `brian`, `george`, `will` | The voice you hear with an ElevenLabs Realtime model. |
 | `realtimeVoice` | `marin` | A voice supported by the model | The voice you hear. |
 | `realtimeReasoning` | `low` | `minimal`, `low`, `medium`, `high`, `xhigh` | Reasoning effort. Higher values add latency and cost. |
 | `realtimeEagerness` | `low` | `low`, `medium`, `high`, `auto` | Semantic turn detection. `low` waits longer, up to about 8 s, when your sentence sounds unfinished. |
@@ -82,7 +81,7 @@ The **Settings** panel, behind the gear button in the header, has four tabs:
 - **General**
   - **Language**: **Browser** (the rule in [Interface language](#interface-language)) or a fixed language. The choice is stored in this browser's `localStorage` under `ui-language` and reloads the page, or waits until the current call ends. It is also sent with the next call: the voice transcribes, greets and speaks in it with a native accent (with **Browser**, the browser's first preference is used the same way). The voice still answers in whatever language you actually speak.
   - **Call recording**: the switch for [diagnostic recordings](troubleshooting.md#diagnostic-recordings).
-- **Voice**: model, reasoning, voice (`marin`, `cedar`), turn taking, noise reduction and transcription model (`gpt-4o-transcribe`, `gpt-4o-mini-transcribe`). With a Gemini model only the model and the Gemini voice are shown; with ElevenLabs Agents, the model, the language model and the ElevenLabs voice. Each choice is saved as soon as it changes, with no Save button; the row marks it as saved and the call screen shows the new model and reasoning at once. A value written by hand in `config.json` outside these lists stays offered while it is the current one. Below them, **Custom instructions** is a text box saved with its own button into `customInstructions`; saving it empty removes the field, and then nothing is added to the prompt. They apply to every provider.
+- **Voice**: model, reasoning, voice (`marin`, `cedar`), turn taking, noise reduction and transcription model (`gpt-4o-transcribe`, `gpt-4o-mini-transcribe`). With a Gemini model only the model and the Gemini voice are shown; with an ElevenLabs Realtime model, the model, the ElevenLabs voice and turn taking. Each choice is saved as soon as it changes, with no Save button; the row marks it as saved and the call screen shows the new model and reasoning at once. A value written by hand in `config.json` outside these lists stays offered while it is the current one. Below them, **Custom instructions** is a text box saved with its own button into `customInstructions`; saving it empty removes the field, and then nothing is added to the prompt. They apply to every provider.
 - **API keys**: for OpenAI, Gemini and ElevenLabs, says whether a key is saved in `config.json`, comes from the environment (`OPENAI_API_KEY`; `GEMINI_API_KEY` or `GOOGLE_API_KEY`; `ELEVENLABS_API_KEY`) or is missing. It never shows a key. **Save key** writes `openaiKey`, `geminiKey` or `elevenlabsKey`; **Remove saved key** deletes it, and the server then falls back to the environment if it has one. `POST /api/settings/key` takes `provider: "gemini"` or `provider: "elevenlabs"` for those keys.
 - **Devices**: paired browsers and links for another device; see [Access](access.md#list-and-revoke).
 
@@ -94,7 +93,7 @@ What each control keeps after reloading the page or restarting the service:
 | --- | --- | --- | --- |
 | Language | This browser's `localStorage` (`ui-language`) | At once (the page reloads), or when the call ends | Kept in this browser; other browsers keep their own. |
 | Call recording | Nowhere: the open page only | Every call of that page | Off. Turn it on again before the next call. |
-| Voice: model, reasoning, voice, turn taking, noise reduction, transcription, Gemini voice, ElevenLabs LLM and voice | `config.json` (`realtimeModel`, `realtimeReasoning`, `realtimeVoice`, `realtimeEagerness`, `realtimeNoiseReduction`, `realtimeTranscriptionModel`, `geminiVoice`, `elevenlabsLlm`, `elevenlabsVoice`) | Next call, no restart | Kept, for every paired browser and after a restart. |
+| Voice: model, reasoning, voice, turn taking, noise reduction, transcription, Gemini voice, ElevenLabs voice | `config.json` (`realtimeModel`, `realtimeReasoning`, `realtimeVoice`, `realtimeEagerness`, `realtimeNoiseReduction`, `realtimeTranscriptionModel`, `geminiVoice`, `elevenlabsVoice`) | Next call, no restart | Kept, for every paired browser and after a restart. |
 | Custom instructions | `config.json` (`customInstructions`) | Next call, no restart | Kept, for every paired browser and after a restart. |
 | API keys | `config.json` (`openaiKey`, `geminiKey`, `elevenlabsKey`) | Next call, no restart | Kept; the page shows whether it is set, never the key. |
 | Paired browsers | `browser-access.sqlite` in the configuration directory | At once | Kept. A link created for another device is shown only until Settings closes. |

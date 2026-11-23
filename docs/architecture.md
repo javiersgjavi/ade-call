@@ -63,7 +63,7 @@ With a Gemini model the call runs on [Gemini Live](gemini.md), which has no
 WebRTC leg and no sideband. The server opens the provider WebSocket itself and
 relays the audio over a second, authenticated WebSocket to the page
 (`/api/live/stream`): audio does pass through the server then, and tool calls
-still arrive only on the server's socket. [ElevenLabs Agents](elevenlabs.md) uses
+still arrive only on the server's socket. [ElevenLabs Realtime](elevenlabs.md) uses
 the same relay.
 
 **Application traffic** between the page and the server is plain HTTPS: JSON

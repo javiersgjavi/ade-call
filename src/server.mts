@@ -12,7 +12,7 @@ import { Store } from './conversation/store.mjs';
 import { clientCloseReason } from './voice/diagnostics.mjs';
 import { REALTIME_DEFAULTS, RealtimeCalls } from './voice/realtime.mjs';
 import { GEMINI_DEFAULTS, GeminiCalls, isGeminiModel, type Socket as AudioSocket } from './voice/gemini.mjs';
-import { ELEVENLABS_DEFAULTS, ElevenLabsCalls, isElevenLabsModel } from './voice/elevenlabs.mjs';
+import { ELEVEN_REALTIME_DEFAULTS, ElevenRealtimeCalls, isElevenRealtimeModel } from './voice/eleven-realtime.mjs';
 import { WebSocketServer } from 'ws';
 import type { Duplex } from 'node:stream';
 import { CONFIG_FIELDS, INSTRUCTIONS_FIELD, MAX_INSTRUCTIONS, VOICE_FIELDS, readConfig, updateConfig, validateInstructions, validateKey, validateVoiceSettings, voiceOptions, type VoiceSettings } from './voice/settings.mjs';
@@ -39,7 +39,7 @@ const openaiKey = () => configKey || envKey;
 let configGeminiKey = text(config.geminiKey);
 const envGeminiKey = text(process.env.GEMINI_API_KEY) || text(process.env.GOOGLE_API_KEY);
 const geminiKey = () => configGeminiKey || envGeminiKey;
-// And for ElevenLabs Agents: elevenlabsKey in config.json, else ELEVENLABS_API_KEY.
+// And for ElevenLabs Realtime: elevenlabsKey in config.json, else ELEVENLABS_API_KEY.
 let configElevenLabsKey = text(config.elevenlabsKey);
 const envElevenLabsKey = text(process.env.ELEVENLABS_API_KEY);
 const elevenlabsKey = () => configElevenLabsKey || envElevenLabsKey;
@@ -60,23 +60,24 @@ const accessStreams = new Map<http.ServerResponse, { deviceId: string; end: () =
 const port = Number(process.env.PORT || 8787);
 let shuttingDown = false;
 // The voice settings of the next call, the same for every ADE.
-const realtimeSettings: VoiceSettings = { ...REALTIME_DEFAULTS, geminiVoice: GEMINI_DEFAULTS.voice, elevenlabsLlm: ELEVENLABS_DEFAULTS.llm, elevenlabsVoice: ELEVENLABS_DEFAULTS.voice };
+const realtimeSettings: VoiceSettings = { ...REALTIME_DEFAULTS, geminiVoice: GEMINI_DEFAULTS.voice, elevenlabsVoice: ELEVEN_REALTIME_DEFAULTS.voice };
 for (const field of VOICE_FIELDS) realtimeSettings[field] = text(config[CONFIG_FIELDS[field]]) || realtimeSettings[field];
 // The owner's custom instructions (Settings → Voice), appended to every call's prompt.
 let customInstructions: string | undefined;
 try { customInstructions = validateInstructions(config[INSTRUCTIONS_FIELD]); }
 catch (error) { throw new Error(`config.json ${INSTRUCTIONS_FIELD}: ${errorMessage(error)}`, { cause: error }); }
 // The provider of the next call: the configured model decides.
-const provider = (): VoiceProvider => isGeminiModel(realtimeSettings.model) ? 'gemini' : isElevenLabsModel(realtimeSettings.model) ? 'elevenlabs' : 'realtime';
+const provider = (): VoiceProvider => isGeminiModel(realtimeSettings.model) ? 'gemini' : isElevenRealtimeModel(realtimeSettings.model) ? 'elevenlabs' : 'realtime';
 const geminiSettings = () => ({ model: realtimeSettings.model, voice: realtimeSettings.geminiVoice });
-const elevenlabsSettings = () => ({ llm: realtimeSettings.elevenlabsLlm, voice: realtimeSettings.elevenlabsVoice });
+// The model only when it is one of ElevenLabs': the engine falls back to its default otherwise.
+const elevenlabsSettings = () => ({ model: isElevenRealtimeModel(realtimeSettings.model) ? realtimeSettings.model : undefined, voice: realtimeSettings.elevenlabsVoice });
 const providerKey = () => ({ gemini: geminiKey, elevenlabs: elevenlabsKey, realtime: openaiKey })[provider()]();
 // Voice exists only for an ADE with direct tools (src/direct). Each ADE has
 // one engine per provider; only the configured provider's starts calls.
-interface Runtime { adapter: Ade; backend: string; context: ProjectContext; discovery: Discovery; realtime: RealtimeCalls | null; gemini: GeminiCalls | null; elevenlabs: ElevenLabsCalls | null; watch: ThreadWatch | null }
-type Engine = RealtimeCalls | GeminiCalls | ElevenLabsCalls;
+interface Runtime { adapter: Ade; backend: string; context: ProjectContext; discovery: Discovery; realtime: RealtimeCalls | null; gemini: GeminiCalls | null; elevenlabs: ElevenRealtimeCalls | null; watch: ThreadWatch | null }
+type Engine = RealtimeCalls | GeminiCalls | ElevenRealtimeCalls;
 // The engines whose audio this server relays (/api/live/stream).
-type Relayed = GeminiCalls | ElevenLabsCalls;
+type Relayed = GeminiCalls | ElevenRealtimeCalls;
 const engines = (r: Runtime) => [r.realtime, r.gemini, r.elevenlabs].filter((e): e is Engine => !!e);
 const activeEngine = (r: Runtime): Engine | null => ({ gemini: r.gemini, elevenlabs: r.elevenlabs, realtime: r.realtime })[provider()];
 // The engine that holds a call, whichever provider is configured now.
@@ -106,7 +107,7 @@ for (const adapter of Object.values(ades)) {
     const read = (threadId: string) => runtime.watch?.markRead(threadId);
     runtime.realtime = new RealtimeCalls({ key: openaiKey(), ade, context, publish: scopedPublish, store, settings: realtimeSettings, instructions: customInstructions, delivered, read });
     runtime.gemini = new GeminiCalls({ key: geminiKey(), ade, context, publish: scopedPublish, store, settings: geminiSettings(), instructions: customInstructions, delivered, read });
-    runtime.elevenlabs = new ElevenLabsCalls({ key: elevenlabsKey(), ade, context, publish: scopedPublish, store, settings: elevenlabsSettings(), instructions: customInstructions, delivered, read });
+    runtime.elevenlabs = new ElevenRealtimeCalls({ key: elevenlabsKey(), ade, context, publish: scopedPublish, store, settings: elevenlabsSettings(), instructions: customInstructions, delivered, read });
   }
   runtimes.set(backend, runtime);
 }
@@ -298,8 +299,7 @@ const server = http.createServer(async (req, res) => {
         availability: status, limitation: adapter.limitation, conversation: store.conversation(backend), lastCall: store.meta<CallHistory>(`call:${backend}`),
         voiceReady: !!(providerKey() && voice), runtime: status?.state || 'unreachable',
         voiceModel: { provider: provider(), model: realtimeSettings.model, reasoning: realtimeSettings.reasoning, eagerness: realtimeSettings.eagerness, noiseReduction: realtimeSettings.noiseReduction,
-          voice: ({ gemini: realtimeSettings.geminiVoice, elevenlabs: realtimeSettings.elevenlabsVoice, realtime: realtimeSettings.voice })[provider()],
-          ...(provider() === 'elevenlabs' ? { llm: realtimeSettings.elevenlabsLlm } : {}) },
+          voice: ({ gemini: realtimeSettings.geminiVoice, elevenlabs: realtimeSettings.elevenlabsVoice, realtime: realtimeSettings.voice })[provider()] },
         voiceActive: engines(current).flatMap(e => [...e.sessions.keys()]),
         // Any ADE: a call active or connecting, or a tool still running. The
         // installer reads it before restarting the service (scripts/service-busy.mts).
@@ -385,12 +385,12 @@ const server = http.createServer(async (req, res) => {
       if (voiceBusy() || shuttingDown || (data.conversationId && data.conversationId !== store.conversation(backend).id) || (data.backend && data.backend !== backend)) return json(res, 409, { error: 'There is another call or the destination has changed. Reload the page.' });
       // The page names the provider it prepared audio for; a change in Settings since then needs a reload.
       if (data.provider !== undefined && data.provider !== voice.provider) return json(res, 409, { error: 'The voice model has changed. Reload the page.' });
-      const isRelayed = !(voice instanceof RealtimeCalls);
+      const isRelayed = voice instanceof GeminiCalls || voice instanceof ElevenRealtimeCalls;
       if (!isRelayed && (typeof data.sdp !== 'string' || !data.sdp.startsWith('v='))) return json(res, 400, { error: 'The audio offer is missing.' });
       const device = requestDevice;
       if (device && !browserAccess.active(device.id)) return json(res, 401, { error: 'Pairing revoked.' });
       const options = { languages: browserLanguages(data.languages), language: browserLanguages([data.language])[0] };
-      const result = isRelayed ? await voice.create(options) : await voice.create(data.sdp as string, options);
+      const result = voice instanceof ElevenRealtimeCalls ? await voice.createRelayed(options) : voice instanceof GeminiCalls ? await voice.create(options) : await voice.create(data.sdp as string, options);
       // The audio socket of a relayed call accepts only this browser (or the administrator token).
       liveOwners.set(result.session.id, { deviceId: device?.id || ADMINISTRATOR, backend });
       if (device && !browserAccess.active(device.id)) { voice.close(result.session.id); return json(res, 401, { error: 'Pairing revoked.' }); }
@@ -416,7 +416,7 @@ const server = http.createServer(async (req, res) => {
     if (!res.headersSent) json(res, error instanceof StatusError ? error.status : 500, { error: text }); else res.end();
   }
 });
-// The audio socket of a relayed call (Gemini Live, ElevenLabs Agents). The same authentication
+// The audio socket of a relayed call (Gemini Live, ElevenLabs Realtime). The same authentication
 // and origin rules as the API, and only the browser (or token) that created
 // the call may attach, once. Browsers always send Origin on a WebSocket.
 const audioSockets = new WebSocketServer({ noServer: true, maxPayload: 64 * 1024 });
@@ -440,7 +440,7 @@ server.listen(port, host, () => {
   console.log(`ADE Call ready on ${host}:${port}. Private access configured.`);
   for (const r of runtimes.values()) {
     const engine = activeEngine(r);
-    const name = engine instanceof GeminiCalls ? 'Gemini Live' : engine instanceof ElevenLabsCalls ? `ElevenLabs Agents (${engine.llm})` : 'GPT Realtime';
+    const name = engine instanceof GeminiCalls ? 'Gemini Live' : engine instanceof ElevenRealtimeCalls ? 'ElevenLabs Realtime' : 'GPT Realtime';
     const keyName = ({ gemini: 'geminiKey', elevenlabs: 'elevenlabsKey', realtime: 'openaiKey' })[provider()];
     console.log(`[${r.backend}] ${engine ? `voice: ${name} ${engine.model}${providerKey() ? '' : ` (${keyName} missing)`}` : 'no voice'}`);
   }

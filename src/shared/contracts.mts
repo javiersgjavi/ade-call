@@ -74,14 +74,14 @@ export class StatusError extends Error {
 export interface StatusResponse {
   runtime: string; availability?: { error?: string }; ades: { id: string; name: string; capabilities: Capabilities; direct: boolean }[];
   conversation: Conversation; lastCall?: CallHistory; limitation?: string;
-  voiceReady: boolean; voiceModel: { provider: VoiceProvider; model: string; reasoning: string; eagerness: string; noiseReduction: string; voice: string; llm?: string };
+  voiceReady: boolean; voiceModel: { provider: VoiceProvider; model: string; reasoning: string; eagerness: string; noiseReduction: string; voice: string };
   eventCursor: number; voiceActive: string[]; serviceBusy: boolean;
 }
 // GET/POST /api/settings/voice and POST /api/settings/key: the server-wide voice
 // settings, the values each one accepts and whether a key exists (never the key).
-// geminiVoice applies when the model is a Gemini Live model; elevenlabsLlm and elevenlabsVoice to
-// ElevenLabs Agents; the others, except model, to OpenAI Realtime.
-export type VoiceSettingField = 'model' | 'voice' | 'reasoning' | 'eagerness' | 'noiseReduction' | 'transcriptionModel' | 'geminiVoice' | 'elevenlabsLlm' | 'elevenlabsVoice';
+// geminiVoice applies when the model is a Gemini Live model, elevenlabsVoice to an ElevenLabs
+// Realtime one; the others, except model, to OpenAI Realtime.
+export type VoiceSettingField = 'model' | 'voice' | 'reasoning' | 'eagerness' | 'noiseReduction' | 'transcriptionModel' | 'geminiVoice' | 'elevenlabsVoice';
 export type KeyState = { set: boolean; source: 'config' | 'env' | null };
 export interface VoiceSettingsResponse {
   settings: Record<VoiceSettingField, string>; options: Record<VoiceSettingField, string[]>;

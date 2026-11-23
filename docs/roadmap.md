@@ -119,12 +119,11 @@ or unique call IDs should not be allowed to expose sending tools.
 ### ElevenLabs and Gemini
 
 Both now exist as engines of their own, without this refactor:
-[Gemini Live](gemini.md) and [ElevenLabs Agents](elevenlabs.md) hold the provider
+[Gemini Live](gemini.md) and [ElevenLabs Realtime](elevenlabs.md) hold the provider
 socket on the server and relay the audio through the same authenticated
-WebSocket. ElevenLabs answers the open questions this section used to list: each
-tool call has a provider-assigned `tool_call_id`, and a user turn's transcript
-arrives once, before the LLM answers it. The `VoiceProvider` split above would
-remove the code the three engines repeat (notes, notices, tool dispatch).
+WebSocket. ElevenLabs Realtime speaks OpenAI's protocol, so its engine extends
+OpenAI's instead of repeating it. The `VoiceProvider` split above would remove
+the code Gemini's engine still repeats (notes, notices, tool dispatch).
 
 ## 2. Orca integration
 

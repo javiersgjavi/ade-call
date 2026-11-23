@@ -1,6 +1,6 @@
 // Conversation evaluations of the voice: scripted calls spoken by a synthetic
 // user (ElevenLabs), run closed loop against GPT Realtime, Gemini Live (a
-// gemini-* --model) or ElevenLabs Agents (--model elevenlabs-agents [--llm L])
+// gemini-* --model) or ElevenLabs Realtime (an eleven_realtime_* --model)
 // with the production engine over a simulated T3, checked
 // deterministically and graded by LLM judges. Paid (the voice provider, the
 // OpenAI judges, ElevenLabs the first time a phrase is spoken). Nothing reaches a real ADE. See docs/evals.md.
@@ -23,8 +23,7 @@ import { Speech, audioFile, spokenWords, wav, type Voice } from '../src/eval/spe
 import { runScenario, type RunRecord } from '../src/eval/runner.mjs';
 import { runGeminiScenario } from '../src/eval/gemini-runner.mjs';
 import { GEMINI_VOICES, isGeminiModel } from '../src/voice/gemini.mjs';
-import { runElevenLabsScenario } from '../src/eval/elevenlabs-runner.mjs';
-import { ELEVENLABS_DEFAULTS, ELEVENLABS_VOICES, isElevenLabsModel } from '../src/voice/elevenlabs.mjs';
+import { ElevenRealtimeCalls, ELEVEN_REALTIME_VOICES, connectElevenRealtime, isElevenRealtimeModel } from '../src/voice/eleven-realtime.mjs';
 import { ENUMS, pick } from '../src/voice/realtime.mjs';
 import { checkRun, latencySummary, median, type Check } from '../src/eval/checks.mjs';
 import { judge, judgementPasses, type Judgement } from '../src/eval/judge.mjs';
@@ -39,7 +38,7 @@ const SELECT = ['data', 'only', 'tag'], SPEAKER = ['speaker', 'voice-id', 'tts-m
 const OPTIONS: Record<string, string[]> = {
   extract: ['data', 'db', 'out', 'language'],
   speak: [...SELECT, ...SPEAKER, 'dry'],
-  run: [...SELECT, ...SPEAKER, 'out', 'model', 'llm', 'voice', 'reasoning', 'eagerness', 'noise-reduction', 'transcription', 'label', 'repeat', 'parallel', 'judge', 'judge-reasoning', 'no-judge', 'min-pass'],
+  run: [...SELECT, ...SPEAKER, 'out', 'model', 'voice', 'reasoning', 'eagerness', 'noise-reduction', 'transcription', 'label', 'repeat', 'parallel', 'judge', 'judge-reasoning', 'no-judge', 'min-pass'],
   judge: [...SELECT, 'judge', 'judge-reasoning', 'min-pass'],
   report: ['min-pass']
 };
@@ -265,12 +264,9 @@ async function run() {
   // Gemini Live with its own voice, and the Realtime settings do not apply.
   const model = flag('model', config.realtimeModel);
   if (model !== undefined && (typeof model !== 'string' || !model.trim())) fail('model must be a nonblank string.');
-  const gemini = !!model && isGeminiModel(model), eleven = !!model && isElevenLabsModel(model);
-  const relayed = gemini ? 'Gemini Live' : eleven ? 'ElevenLabs Agents' : '';
+  const gemini = !!model && isGeminiModel(model), eleven = !!model && isElevenRealtimeModel(model);
+  const relayed = gemini ? 'Gemini Live' : eleven ? 'ElevenLabs Realtime' : '';
   if (relayed) for (const option of ['reasoning', 'eagerness', 'noise-reduction', 'transcription']) if (flags.has(option)) fail(`--${option} is a GPT Realtime setting; ${relayed} has no such setting.`);
-  if (flags.has('llm') && !eleven) fail('--llm chooses the LLM of ElevenLabs Agents (--model elevenlabs-agents).');
-  const llm = eleven ? flag('llm', config.elevenlabsLlm) || ELEVENLABS_DEFAULTS.llm : undefined;
-  if (llm !== undefined && (typeof llm !== 'string' || !/^[\w.@-]+$/.test(llm))) fail('--llm must be an ElevenLabs LLM ID.');
   const settings: { model?: string; voice?: string; reasoning?: string; eagerness?: string; noiseReduction?: string; transcriptionModel?: string } = gemini
     ? { model, voice: flag('voice', config.geminiVoice) }
     : eleven ? { model, voice: flag('voice', config.elevenlabsVoice) }
@@ -281,7 +277,7 @@ async function run() {
     if (value !== undefined && (typeof value !== 'string' || !value.trim())) fail(`${field} must be a nonblank string.`);
   }
   if (gemini && settings.voice !== undefined && !(GEMINI_VOICES as readonly string[]).includes(settings.voice)) fail(`${settings.voice} is not a Gemini voice (${GEMINI_VOICES.join(', ')}).`);
-  if (eleven && settings.voice !== undefined && !(settings.voice in ELEVENLABS_VOICES)) fail(`${settings.voice} is not an ElevenLabs voice here (${Object.keys(ELEVENLABS_VOICES).join(', ')}).`);
+  if (eleven && settings.voice !== undefined && !(ELEVEN_REALTIME_VOICES as readonly string[]).includes(settings.voice)) fail(`${settings.voice} is not an ElevenLabs Realtime voice (${ELEVEN_REALTIME_VOICES.join(', ')}).`);
   // Checked as the server checks them, before anything is synthesized or called.
   if (!relayed) try { pick(settings.reasoning, ENUMS.reasoning, '', 'reasoning'); pick(settings.eagerness, ENUMS.eagerness, '', 'eagerness'); pick(settings.noiseReduction, ENUMS.noiseReduction, '', 'noise reduction'); }
   catch (error) { fail((error as Error).message); }
@@ -296,7 +292,7 @@ async function run() {
   }
   const v = voices(list), s = speech();
   const repeat = count('repeat', '1'), parallel = count('parallel', '1'), gate = minPass();
-  const label = flag('label', `${settings.model || 'default'}${llm ? `-${llm}` : ''}-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 23)}`)!;
+  const label = flag('label', `${settings.model || 'default'}-${new Date().toISOString().replace(/[:.]/g, '-').slice(0, 23)}`)!;
   // One folder inside runs/: no separators, no "." or "..".
   if (!/^[\w.-]+$/.test(label) || /^\.+$/.test(label)) fail(`--label must be a single folder name (letters, digits, ".", "_", "-"): ${JSON.stringify(label)}.`);
   const target = resolve(flag('out', join(dataDir, 'runs', label))!);
@@ -306,9 +302,6 @@ async function run() {
   // The voice provider's key; the judges always use OpenAI's.
   const key = gemini ? geminiKey() || fail('The Gemini key is missing (geminiKey in config.json, GEMINI_API_KEY or GOOGLE_API_KEY).')
     : eleven ? elevenKey() || fail('The ElevenLabs key is missing (elevenlabsKey in config.json or ELEVENLABS_API_KEY).') : openaiKey();
-  // The agent and tools the evaluations keep in the ElevenLabs account, apart from the service's.
-  const agentFile = join(dataDir, 'elevenlabs-agent.json');
-  const agentState = { get: () => { try { return JSON.parse(readFileSync(agentFile, 'utf8')); } catch { return undefined; } }, set: (value: unknown) => { ensure(dataDir); write(agentFile, value); } };
   if (judges.length) openaiKey();
   // A run folder holds one invocation: old results never fill in for failed runs.
   if (existsSync(target) && readdirSync(target).length) fail(`${target} already has results: choose another --label or --out.`);
@@ -339,7 +332,8 @@ async function run() {
       try {
         const common = { key, speech: s, voices: v.all, defaultVoice: v.default, log: parallel > 1 ? undefined : (line: string) => console.log(line) };
         const { audio, ...raw } = gemini ? await runGeminiScenario(sc, { ...common, settings: { model: settings.model, voice: settings.voice } })
-          : eleven ? await runElevenLabsScenario(sc, { ...common, settings: { llm, voice: settings.voice }, agentState })
+          // ElevenLabs Realtime speaks OpenAI's protocol: the Realtime runner, with its engine and socket.
+          : eleven ? await runScenario(sc, { ...common, settings: { model: settings.model, voice: settings.voice }, engine: options => new ElevenRealtimeCalls(options), connect: m => connectElevenRealtime(key, m) })
           : await runScenario(sc, { ...common, settings });
         // Checked and judged as saved, so grading again sees the same record.
         const plain = redactEvidence(raw, secrets());
