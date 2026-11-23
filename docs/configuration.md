@@ -34,7 +34,7 @@ All fields are strings. Only the key of the provider you use is required (`opena
 | Field | Default | Allowed values | Effect |
 | --- | --- | --- | --- |
 | `openaiKey` | `OPENAI_API_KEY` | An OpenAI API key | Used to create Realtime calls. The file takes priority over the variable. It can also be saved or removed from **Settings → API keys**. |
-| `realtimeModel` | `gpt-realtime-2.1` | Any Realtime model your key can use; Settings offers `gpt-realtime-2.1`, `gpt-realtime-2.1-mini`, `gemini-3.8-live` and `gemini-3.1-flash-live-preview` | The voice model. A `gemini-*` model runs the call on [Gemini Live](gemini.md); the other `realtime*` fields then do not apply. Mini is faster and cheaper; the full model reasons better. |
+| `realtimeModel` | `gpt-realtime-2.1` | Any Realtime model your key can use; Settings offers `gpt-realtime-2.1`, `gpt-realtime-2.1-mini` and `gemini-3.8-live` | The voice model. A `gemini-*` model runs the call on [Gemini Live](gemini.md); the other `realtime*` fields then do not apply. Mini is faster and cheaper; the full model reasons better. |
 | `geminiKey` | `GEMINI_API_KEY`, else `GOOGLE_API_KEY` | A Gemini API key | Used for Gemini Live calls. The file takes priority over the variables. It can also be saved or removed from **Settings → API keys**. |
 | `geminiVoice` | `Kore` | A prebuilt Gemini voice; Settings offers `Kore`, `Puck`, `Charon`, `Aoede`, `Leda`, `Zephyr`, `Fenrir`, `Orus` | The voice you hear with a Gemini model. |
 | `realtimeVoice` | `marin` | A voice supported by the model | The voice you hear. |

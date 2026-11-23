@@ -17,7 +17,6 @@ calling. No other model or agent sits between the voice and the tools.
 | Model | Function calling | Notes |
 | --- | --- | --- |
 | `gemini-3.8-live` (default Gemini choice) | Synchronous: the tools are declared `BLOCKING`, so the model waits for each result before it speaks about it, as with Realtime. | Interleaved reasoning built in; no reasoning setting. |
-| `gemini-3.1-flash-live-preview` | Always synchronous; the declarations carry no `behavior`. | Legacy preview. |
 
 `gemini-3.8-live-extended-thinking` is not offered: it only supports
 asynchronous function calling.

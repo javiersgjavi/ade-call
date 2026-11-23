@@ -300,8 +300,7 @@ What differs, because the provider differs:
   that played. An interruption is the provider's `interrupted`: the page drops the
   audio it had not played, which is what is recorded as heard.
 - Transcription is the provider's own (`transcriptionModel` is `built-in`). The
-  recognition hints are the custom vocabulary of the setup on `gemini-3.8-live`, and
-  none on `gemini-3.1-flash-live-preview`. A user utterance is recorded when the
+  recognition hints are the custom vocabulary of the setup. A user utterance is recorded when the
   engine publishes it, after the user's pause; Gemini reports no failed
   transcriptions, so that check never fires.
 

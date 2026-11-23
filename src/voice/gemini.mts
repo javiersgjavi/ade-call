@@ -23,9 +23,9 @@ import { isHintEcho } from '../conversation/hint-echo.mjs';
 // This engine knows no ADE: it runs whatever DirectAde it is given.
 
 // Live models Settings offers. gemini-3.8-live calls functions synchronously
-// when its declarations say BLOCKING; gemini-3.1-flash-live-preview is always
-// synchronous. Both take 16 kHz PCM in and give 24 kHz PCM out.
-export const GEMINI_MODELS = ['gemini-3.8-live', 'gemini-3.1-flash-live-preview'] as const;
+// when its declarations say BLOCKING; it takes 16 kHz PCM in and gives 24 kHz
+// PCM out.
+export const GEMINI_MODELS = ['gemini-3.8-live'] as const;
 export const isGeminiModel = (model: string) => model.startsWith('gemini-');
 // Prebuilt voices of the Live native audio models (a short, varied subset).
 export const GEMINI_VOICES = ['Kore', 'Puck', 'Charon', 'Aoede', 'Leda', 'Zephyr', 'Fenrir', 'Orus'] as const;
@@ -170,16 +170,15 @@ export class GeminiCalls {
   // directions with transcripts. The language is not set: native audio models
   // follow the instructions and the user.
   setup(language?: ReturnType<typeof callLanguage>) {
-    const blocking = this.model.startsWith('gemini-3.8');
-    const vocabulary = this.hints(blocking);
+    const vocabulary = this.hints();
     return {
       model: `models/${this.model}`,
       generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: this.voice } } } },
       systemInstruction: { parts: [{ text: directInstructions(this.ade, { callStart: this.context.timing?.(), capabilities: { backend: this.context.backend, capabilities: this.context.capabilities }, language, custom: this.instructions, provider: 'gemini' }) }] },
       // BLOCKING: the model waits for each result before it speaks about it,
-      // as with Realtime. 3.1 is synchronous already and takes no behavior.
-      tools: [{ functionDeclarations: this.ade.tools.map(({ name, description, parameters }) => ({ name, description, parameters: geminiSchema(parameters), ...(blocking ? { behavior: 'BLOCKING' } : {}) })) }],
-      inputAudioTranscription: blocking && vocabulary.length ? { customVocabulary: vocabulary } : {},
+      // as with Realtime.
+      tools: [{ functionDeclarations: this.ade.tools.map(({ name, description, parameters }) => ({ name, description, parameters: geminiSchema(parameters), behavior: 'BLOCKING' })) }],
+      inputAudioTranscription: vocabulary.length ? { customVocabulary: vocabulary } : {},
       outputAudioTranscription: {},
       // History and catalog go first as client content; they never trigger a reply.
       historyConfig: { initialHistoryInClientContent: true },
@@ -187,8 +186,8 @@ export class GeminiCalls {
       sessionResumption: {}
     };
   }
-  // The names given to transcription as custom vocabulary (3.8 only).
-  hints(blocking = this.model.startsWith('gemini-3.8')) { return blocking ? this.context.vocabulary().slice(0, 100) : []; }
+  // The names given to transcription as custom vocabulary.
+  hints() { return this.context.vocabulary().slice(0, 100); }
   // Creates the provider session and returns where the browser streams audio.
   // The call is ready for audio when this answers.
   async create({ languages = [], language }: { languages?: string[]; language?: string } = {}): Promise<LiveResponse> {

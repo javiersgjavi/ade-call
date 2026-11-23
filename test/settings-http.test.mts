@@ -59,7 +59,7 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
   const initial = await call('/api/settings/voice', { headers: bearer });
   assert.equal(initial.status, 200);
   assert.deepEqual(initial.body.settings, { model: 'gpt-realtime-2', voice: 'marin', reasoning: 'medium', eagerness: 'low', noiseReduction: 'near_field', transcriptionModel: 'gpt-4o-transcribe', geminiVoice: 'Kore' });
-  assert.deepEqual(initial.body.options.model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live', 'gemini-3.1-flash-live-preview', 'gpt-realtime-2'], 'a hand-configured model stays offered');
+  assert.deepEqual(initial.body.options.model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live', 'gpt-realtime-2'], 'a hand-configured model stays offered');
   assert.deepEqual(initial.body.options.voice, ['marin', 'cedar']);
   assert.deepEqual(initial.body.options.transcriptionModel, ['gpt-4o-transcribe', 'gpt-4o-mini-transcribe']);
   assert.deepEqual(initial.body.options.reasoning, ['minimal', 'low', 'medium', 'high', 'xhigh']);
@@ -76,7 +76,7 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
   const saved = await post('/api/settings/voice', { model: 'gpt-realtime-2.1-mini', reasoning: 'high', voice: 'cedar', eagerness: 'medium', noiseReduction: 'far_field', transcriptionModel: 'gpt-4o-mini-transcribe' });
   assert.equal(saved.status, 200);
   assert.deepEqual(saved.body.settings, { model: 'gpt-realtime-2.1-mini', voice: 'cedar', reasoning: 'high', eagerness: 'medium', noiseReduction: 'far_field', transcriptionModel: 'gpt-4o-mini-transcribe', geminiVoice: 'Kore' });
-  assert.deepEqual(saved.body.options.model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live', 'gemini-3.1-flash-live-preview'], 'the earlier hand-configured model is no longer current');
+  assert.deepEqual(saved.body.options.model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live'], 'the earlier hand-configured model is no longer current');
   const status = (await call('/api/status', { headers: bearer })).body;
   assert.deepEqual(status.voiceModel, { provider: 'realtime', model: 'gpt-realtime-2.1-mini', reasoning: 'high', eagerness: 'medium', noiseReduction: 'far_field', voice: 'cedar' }, 'applied without a restart');
   assert.deepEqual((await call('/api/status?backend=orca', { headers: bearer })).body.voiceModel.model, 'gpt-realtime-2.1-mini', 'the same for every ADE');

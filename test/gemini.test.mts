@@ -86,14 +86,6 @@ test('creates a Gemini Live session with the ADE tools, its instructions, transc
   assert.equal(f.published.find(e => e.type === 'voice')!.data.provider, 'gemini');
   assert.equal(f.browser.events[0].type, 'session.started');
   assert.equal(f.gemini.busy, true);
-});
-
-test('gemini-3.1-flash-live-preview declares tools without a behavior: it is always synchronous', async t => {
-  const f = fixture({ model: 'gemini-3.1-flash-live-preview' }); t.after(() => f.close());
-  await f.start();
-  const { setup } = f.upstream().sent[0];
-  assert.equal(setup.model, 'models/gemini-3.1-flash-live-preview');
-  assert.equal(setup.tools[0].functionDeclarations[0].behavior, undefined);
   assert.ok(isGeminiModel('gemini-3.8-live') && !isGeminiModel('gpt-realtime-2.1'));
 });
 
