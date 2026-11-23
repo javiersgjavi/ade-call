@@ -35,8 +35,8 @@ export function markTourSeen(storage: Pick<Storage, 'setItem'>) {
 
 export type Box = { top: number; left: number; width: number; height: number };
 // The card goes below the target, else above it, else at the top or bottom
-// edge of the screen over a target too tall for either; without a target, centered. It is
-// always kept inside the viewport.
+// edge of the screen over a target too tall for either; without a target,
+// centered. It is always kept inside the viewport.
 export function placeCard(target: Box | null, card: { width: number; height: number }, view: { width: number; height: number }, gap = 14, margin = 16) {
   const clamp = (value: number, max: number) => Math.max(margin, Math.min(value, max - margin));
   const left = (center: number) => clamp(center - card.width / 2, view.width - card.width);
