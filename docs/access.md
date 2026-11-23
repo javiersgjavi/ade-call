@@ -92,7 +92,7 @@ Changing to a different address revokes every paired browser and deletes every p
 - **Before an address is configured**, the page and pairing work only over loopback HTTP: the `Host` header must be `localhost`, `127.0.0.1` or `[::1]` and the TCP peer must be a loopback address.
 - **After it is configured**, the server accepts a session cookie only when the request's `Host` header matches the configured host and port.
 - Every request that changes something (any method other than `GET`) from a browser must carry an `Origin` header equal to the configured origin. Requests without a matching origin get `403`.
-- The audio WebSocket of a [Gemini Live](gemini.md) call (`/api/live/stream`) needs the same cookie or bearer token, an `Origin` equal to the configured origin (or the bearer token when there is none), and the call must belong to that browser or token; it attaches once.
+- The audio WebSocket of a [Gemini Live](gemini.md) or [ElevenLabs Agents](elevenlabs.md) call (`/api/live/stream`) needs the same cookie or bearer token, an `Origin` equal to the configured origin (or the bearer token when there is none), and the call must belong to that browser or token; it attaches once.
 - Pairing attempts are limited to 20 per minute per TCP peer. Behind a proxy, all clients share the proxy's address and therefore one budget. This is deliberate: the server does not trust `X-Forwarded-For`.
 - `X-Forwarded-Proto`, `X-Forwarded-Host` and client IP addresses are never used to grant access.
 

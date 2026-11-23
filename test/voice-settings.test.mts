@@ -7,7 +7,7 @@ import { MAX_INSTRUCTIONS, updateConfig, validateInstructions, validateKey, vali
 import { REALTIME_DEFAULTS } from '../src/voice/realtime.mjs';
 
 test('voice settings accept only the offered values, and the current ones', () => {
-  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore', voice: 'hand-picked', transcriptionModel: 'whisper-1' };
+  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore', elevenlabsLlm: 'gemini-3.8-flash', elevenlabsVoice: 'Sarah', voice: 'hand-picked', transcriptionModel: 'whisper-1' };
   assert.deepEqual(voiceOptions(current).voice, ['marin', 'cedar', 'hand-picked']);
   assert.deepEqual(validateVoiceSettings({ voice: 'hand-picked', transcriptionModel: 'gpt-4o-mini-transcribe' }, current), { ...current, transcriptionModel: 'gpt-4o-mini-transcribe' });
   assert.deepEqual(validateVoiceSettings({}, current), current);
@@ -16,11 +16,22 @@ test('voice settings accept only the offered values, and the current ones', () =
 });
 
 test('Gemini Live models and voices are offered next to the Realtime ones', () => {
-  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore' };
-  assert.deepEqual(voiceOptions(current).model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live']);
+  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore', elevenlabsLlm: 'gemini-3.8-flash', elevenlabsVoice: 'Sarah' };
+  assert.deepEqual(voiceOptions(current).model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live', 'elevenlabs-agents']);
   assert.ok(voiceOptions(current).geminiVoice.includes('Puck'));
   assert.deepEqual(validateVoiceSettings({ model: 'gemini-3.8-live', geminiVoice: 'Puck' }, current), { ...current, model: 'gemini-3.8-live', geminiVoice: 'Puck' });
   for (const bad of [{ geminiVoice: 'marin' }, { voice: 'Kore' }, { model: 'gemini-made-up' }])
+    assert.throws(() => validateVoiceSettings(bad, current), SettingsError, JSON.stringify(bad));
+});
+
+test('ElevenLabs Agents is offered with its LLMs and voices', () => {
+  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore', elevenlabsLlm: 'hand-llm', elevenlabsVoice: 'Sarah' };
+  const options = voiceOptions(current);
+  assert.ok(options.elevenlabsLlm.includes('claude-sonnet-5-5') && options.elevenlabsLlm.includes('hand-llm'), 'a hand-configured LLM stays offered');
+  assert.ok(options.elevenlabsVoice.includes('George'));
+  assert.deepEqual(validateVoiceSettings({ model: 'elevenlabs-agents', elevenlabsLlm: 'claude-haiku-5-5', elevenlabsVoice: 'George' }, current),
+    { ...current, model: 'elevenlabs-agents', elevenlabsLlm: 'claude-haiku-5-5', elevenlabsVoice: 'George' });
+  for (const bad of [{ elevenlabsLlm: 'gpt-realtime-2.1' }, { elevenlabsVoice: 'Kore' }])
     assert.throws(() => validateVoiceSettings(bad, current), SettingsError, JSON.stringify(bad));
 });
 

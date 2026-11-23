@@ -53,7 +53,7 @@ export type Publish = (type: string, data: Publication) => unknown;
 export interface LiveEvent { type: string; delta?: string; error?: { code?: string } }
 // transport: the SDP answer of a WebRTC call (OpenAI Realtime), or the path of
 // the server's audio socket for a relayed call (Gemini Live).
-export type VoiceProvider = 'realtime' | 'gemini';
+export type VoiceProvider = 'realtime' | 'gemini' | 'elevenlabs';
 export interface LiveResponse { session: { id: string }; transport: { sdp?: string; stream?: string }; error?: { code?: string; message?: string } }
 export interface OrcaResponse {
   repos?: { id: string; displayName: string; path: string }[];
@@ -74,18 +74,20 @@ export class StatusError extends Error {
 export interface StatusResponse {
   runtime: string; availability?: { error?: string }; ades: { id: string; name: string; capabilities: Capabilities; direct: boolean }[];
   conversation: Conversation; lastCall?: CallHistory; limitation?: string;
-  voiceReady: boolean; voiceModel: { provider: VoiceProvider; model: string; reasoning: string; eagerness: string; noiseReduction: string; voice: string };
+  voiceReady: boolean; voiceModel: { provider: VoiceProvider; model: string; reasoning: string; eagerness: string; noiseReduction: string; voice: string; llm?: string };
   eventCursor: number; voiceActive: string[]; serviceBusy: boolean;
 }
 // GET/POST /api/settings/voice and POST /api/settings/key: the server-wide voice
 // settings, the values each one accepts and whether a key exists (never the key).
-// geminiVoice applies when the model is a Gemini Live model; the others, except model, to OpenAI Realtime.
-export type VoiceSettingField = 'model' | 'voice' | 'reasoning' | 'eagerness' | 'noiseReduction' | 'transcriptionModel' | 'geminiVoice';
+// geminiVoice applies when the model is a Gemini Live model; elevenlabsLlm and elevenlabsVoice to
+// ElevenLabs Agents; the others, except model, to OpenAI Realtime.
+export type VoiceSettingField = 'model' | 'voice' | 'reasoning' | 'eagerness' | 'noiseReduction' | 'transcriptionModel' | 'geminiVoice' | 'elevenlabsLlm' | 'elevenlabsVoice';
 export type KeyState = { set: boolean; source: 'config' | 'env' | null };
 export interface VoiceSettingsResponse {
   settings: Record<VoiceSettingField, string>; options: Record<VoiceSettingField, string[]>;
-  // key: the OpenAI key; geminiKey: the Gemini API key. provider: the one the model in use needs.
-  key: KeyState; geminiKey: KeyState; provider: VoiceProvider; busy: boolean;
+  // key: the OpenAI key; geminiKey: the Gemini API key; elevenlabsKey: the ElevenLabs API key.
+  // provider: the one the model in use needs.
+  key: KeyState; geminiKey: KeyState; elevenlabsKey: KeyState; provider: VoiceProvider; busy: boolean;
   // The owner's custom instructions ('' when none) and their maximum length.
   instructions: string; instructionsMax: number;
 }

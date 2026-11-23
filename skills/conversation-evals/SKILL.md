@@ -11,8 +11,9 @@ paid calls, and how to turn the results into a verdict.
 
 ## Before running
 
-- **It is paid.** Every run is a voice call (GPT Realtime, or Gemini Live with a
-  `gemini-*` `--model`, which needs the Gemini key) plus one judge request; a spoken
+- **It is paid.** Every run is a voice call (GPT Realtime; Gemini Live with a
+  `gemini-*` `--model`, which needs the Gemini key; or ElevenLabs Agents with
+  `--model elevenlabs-agents --llm LLM`, which uses the ElevenLabs key) plus one judge request; a spoken
   line not yet in the cache is also an ElevenLabs synthesis. The battery
   ([evals/battery](../../evals/battery)) is about 50 scenarios, so `--repeat 3` is
   about 150 calls and takes roughly two and a half hours one call at a time. Say the

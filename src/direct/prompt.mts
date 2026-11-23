@@ -39,7 +39,7 @@ export const languageReminder = () => voiceLanguageText('reminder');
 // ADE with its capabilities and the language the call starts in.
 // custom: the owner's instructions from Settings; appended last, and only when not blank.
 // provider: 'gemini' adds the Gemini part (resources/gemini_prompt.txt) before them.
-export interface SessionValues { callStart?: unknown; capabilities?: unknown; language?: CallLanguage; custom?: string; provider?: 'realtime' | 'gemini' }
+export interface SessionValues { callStart?: unknown; capabilities?: unknown; language?: CallLanguage; custom?: string; provider?: 'realtime' | 'gemini' | 'elevenlabs' }
 
 // The instructions of a voice call: resources/system_prompt_voice.txt
 // filled with the ADE's own parts (resources/ade_prompts.json). The server

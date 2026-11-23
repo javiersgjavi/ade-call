@@ -116,29 +116,15 @@ unchanged against the engine); M per additional provider, plus real-call
 evaluation for each. A provider whose protocol cannot guarantee per-item ordering
 or unique call IDs should not be allowed to expose sending tools.
 
-### First candidate: ElevenLabs
+### ElevenLabs and Gemini
 
-ElevenLabs Agents offer an OpenAI-Realtime-compatible WebSocket API, which makes
-it the cheapest second provider to try. A workable design, already sketched in
-a prototype against an earlier version of this server:
-
-- The server asks ElevenLabs for a short-lived client credential and opens the
-  upstream socket itself, so neither the API key nor the credential reaches the
-  browser.
-- Audio is proxied instead of browser-direct: the page sends PCM16 at 24 kHz over
-  a same-origin, authenticated and origin-checked WebSocket, and the server relays
-  the provider's audio back. An AudioWorklet resamples and plays it.
-- The browser can only send audio and lifecycle commands (close, interrupt,
-  "playback cut at N ms"); tool calls come only from the provider, as today.
-- A function call is held while a user transcript is still pending, so a send
-  never binds to an earlier turn, and each `call_id` is claimed before it runs.
-- On barge-in the page reports how much audio was actually played, and the
-  server truncates the assistant item to that point.
-
-Open questions before it can expose sending tools: whether the provider
-guarantees per-item ordering and unique call IDs, how its turn detection
-behaves on a phone, and the real latency added by proxying audio through the
-server. None of this has been verified with a real ElevenLabs call.
+Both now exist as engines of their own, without this refactor:
+[Gemini Live](gemini.md) and [ElevenLabs Agents](elevenlabs.md) hold the provider
+socket on the server and relay the audio through the same authenticated
+WebSocket. ElevenLabs answers the open questions this section used to list: each
+tool call has a provider-assigned `tool_call_id`, and a user turn's transcript
+arrives once, before the LLM answers it. The `VoiceProvider` split above would
+remove the code the three engines repeat (notes, notices, tool dispatch).
 
 ## 2. Orca integration
 
