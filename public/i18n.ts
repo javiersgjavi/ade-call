@@ -274,7 +274,7 @@ const en = {
   'tour.instructionsTitle': 'Custom instructions',
   'tour.instructionsBody': 'Your own instructions for the voice, added to every call. For example: “When an agent answers, tell me everything important it says.”',
   'tour.devicesTitle': 'Use it from your phone',
-  'tour.devicesBody': 'Pair your phone here with a single-use link or code. You can repeat this tour from Settings → General.',
+  'tour.devicesBody': 'Pair your phone here with a single-use link or code; the phone must reach this server over HTTPS. You can repeat this tour from Settings → General.',
   'tour.settingsBlock': 'Guided tour',
   'tour.restartHint': 'A short walk through the page: calling, the conversation, the projects and the main settings.',
   'tour.restart': 'Take the tour again'
@@ -555,7 +555,7 @@ const es: Dictionary = {
   'tour.instructionsTitle': 'Instrucciones personalizadas',
   'tour.instructionsBody': 'Tus propias instrucciones para la voz, añadidas en cada llamada. Por ejemplo: «Cuando un agente responda, cuéntame todo lo importante que diga».',
   'tour.devicesTitle': 'Úsalo desde el móvil',
-  'tour.devicesBody': 'Vincula aquí tu móvil con un enlace o código de un solo uso. Puedes repetir este tour desde Ajustes → General.',
+  'tour.devicesBody': 'Vincula aquí tu móvil con un enlace o código de un solo uso; el móvil tiene que llegar a este servidor por HTTPS. Puedes repetir este tour desde Ajustes → General.',
   'tour.settingsBlock': 'Tour guiado',
   'tour.restartHint': 'Un recorrido corto por la página: llamar, la conversación, los proyectos y los ajustes principales.',
   'tour.restart': 'Hacer el tour de nuevo'

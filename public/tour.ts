@@ -34,8 +34,8 @@ export function markTourSeen(storage: Pick<Storage, 'setItem'>) {
 }
 
 export type Box = { top: number; left: number; width: number; height: number };
-// The card goes below the target, else above it, else at the bottom of the
-// screen over a target too tall for either; without a target, centered. It is
+// The card goes below the target, else above it, else at the top or bottom
+// edge of the screen over a target too tall for either; without a target, centered. It is
 // always kept inside the viewport.
 export function placeCard(target: Box | null, card: { width: number; height: number }, view: { width: number; height: number }, gap = 14, margin = 16) {
   const clamp = (value: number, max: number) => Math.max(margin, Math.min(value, max - margin));
@@ -44,7 +44,10 @@ export function placeCard(target: Box | null, card: { width: number; height: num
   const center = target.left + target.width / 2, bottom = target.top + target.height;
   if (bottom + gap + card.height <= view.height - margin) return { top: bottom + gap, left: left(center), side: 'below' as const };
   if (target.top - gap - card.height >= margin) return { top: target.top - gap - card.height, left: left(center), side: 'above' as const };
-  return { top: clamp(view.height - card.height, view.height - card.height), left: left(center), side: 'over' as const };
+  // Neither fits: the top or the bottom of the screen, whichever hides less of the target.
+  const low = clamp(view.height - card.height, view.height - card.height), high = margin;
+  const hidden = (top: number) => Math.max(0, Math.min(bottom, top + card.height) - Math.max(target.top, top));
+  return { top: hidden(high) < hidden(low) ? high : low, left: left(center), side: 'over' as const };
 }
 // The ringed area: the target with some air, cut to the viewport.
 export function spotlight(target: Box, view: { width: number; height: number }, pad = 8): Box {

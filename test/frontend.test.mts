@@ -572,6 +572,9 @@ test('first-visit tour: shown once, skippable, repeatable from Settings and plac
   assert.deepEqual(placeCard({ top: 10, left: 340, width: 44, height: 44 }, card, view), { top: 68, left: 24, side: 'below' });
   assert.equal(placeCard({ top: 600, left: 0, width: 400, height: 150 }, card, view).side, 'above');
   assert.deepEqual(placeCard({ top: 0, left: 0, width: 400, height: 790 }, card, view), { top: 584, left: 20, side: 'over' });
+  // A tall target low on a small phone (custom instructions at 375×667): the card goes to the top edge, clear of it.
+  const phone = { width: 375, height: 667 }, ring = { top: 266, left: 8, width: 359, height: 376 }, tall = placeCard(ring, { width: 343, height: 245 }, phone);
+  assert.equal(tall.side, 'over'); assert.ok(tall.top + 245 <= ring.top, `card ends at ${tall.top + 245}`);
   assert.deepEqual(spotlight({ top: -50, left: 4, width: 500, height: 100 }, view), { top: 0, left: 0, width: 400, height: 58 });
   // Wiring: a modal dialog with skip, back and next; started on boot only if unseen;
   // repeated from Settings, which offers it only outside a call.
