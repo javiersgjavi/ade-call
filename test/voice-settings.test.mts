@@ -7,7 +7,7 @@ import { MAX_INSTRUCTIONS, updateConfig, validateInstructions, validateKey, vali
 import { REALTIME_DEFAULTS } from '../src/voice/realtime.mjs';
 
 test('voice settings accept only the offered values, and the current ones', () => {
-  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore', voice: 'hand-picked', transcriptionModel: 'whisper-1' };
+  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore', elevenlabsVoice: 'sarah', voice: 'hand-picked', transcriptionModel: 'whisper-1' };
   assert.deepEqual(voiceOptions(current).voice, ['marin', 'cedar', 'hand-picked']);
   assert.deepEqual(validateVoiceSettings({ voice: 'hand-picked', transcriptionModel: 'gpt-4o-mini-transcribe' }, current), { ...current, transcriptionModel: 'gpt-4o-mini-transcribe' });
   assert.deepEqual(validateVoiceSettings({}, current), current);
@@ -16,11 +16,20 @@ test('voice settings accept only the offered values, and the current ones', () =
 });
 
 test('Gemini Live models and voices are offered next to the Realtime ones', () => {
-  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore' };
-  assert.deepEqual(voiceOptions(current).model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live']);
+  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore', elevenlabsVoice: 'sarah' };
+  assert.deepEqual(voiceOptions(current).model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live', 'eleven_realtime_v1_max', 'eleven_realtime_v1_mini']);
   assert.ok(voiceOptions(current).geminiVoice.includes('Puck'));
   assert.deepEqual(validateVoiceSettings({ model: 'gemini-3.8-live', geminiVoice: 'Puck' }, current), { ...current, model: 'gemini-3.8-live', geminiVoice: 'Puck' });
   for (const bad of [{ geminiVoice: 'marin' }, { voice: 'Kore' }, { model: 'gemini-made-up' }])
+    assert.throws(() => validateVoiceSettings(bad, current), SettingsError, JSON.stringify(bad));
+});
+
+test('ElevenLabs Realtime is offered with its models and voices', () => {
+  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore', elevenlabsVoice: 'hand-voice' };
+  const options = voiceOptions(current);
+  assert.ok(options.elevenlabsVoice.includes('george') && options.elevenlabsVoice.includes('hand-voice'), 'a hand-configured voice stays offered');
+  assert.deepEqual(validateVoiceSettings({ model: 'eleven_realtime_v1_mini', elevenlabsVoice: 'george' }, current), { ...current, model: 'eleven_realtime_v1_mini', elevenlabsVoice: 'george' });
+  for (const bad of [{ elevenlabsVoice: 'Kore' }, { model: 'eleven_realtime_v9' }])
     assert.throws(() => validateVoiceSettings(bad, current), SettingsError, JSON.stringify(bad));
 });
 

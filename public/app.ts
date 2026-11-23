@@ -17,6 +17,12 @@ interface Elements {
   'reveal-gemini-key': HTMLElementTagNameMap['button'];
   'save-gemini-key': HTMLElementTagNameMap['button'];
   'remove-gemini-key': HTMLElementTagNameMap['button'];
+  'setting-elevenlabs-voice': HTMLElementTagNameMap['select'];
+  'elevenlabs-key-form': HTMLElementTagNameMap['form'];
+  'elevenlabs-key': HTMLElementTagNameMap['input'];
+  'reveal-elevenlabs-key': HTMLElementTagNameMap['button'];
+  'save-elevenlabs-key': HTMLElementTagNameMap['button'];
+  'remove-elevenlabs-key': HTMLElementTagNameMap['button'];
   'instructions-form': HTMLElementTagNameMap['form'];
   'custom-instructions': HTMLElementTagNameMap['textarea'];
   'save-instructions': HTMLElementTagNameMap['button'];
@@ -60,7 +66,7 @@ let backend = adeOptions().some(option => option.dataset.ade === storedAde) ? st
 let viewGeneration = 0; let adeCapabilities: Capabilities = {}; let paletteTimer: ReturnType<typeof setTimeout>;
 let conversationId: string;
 let liveHealth: LiveHealth | null = null;
-// A call whose audio the server relays (Gemini Live), and the provider the server's next call uses.
+// A call whose audio the server relays (Gemini Live, ElevenLabs Realtime), and the provider the server's next call uses.
 let relay: RelayedCall | null = null, voiceProvider: VoiceProvider = 'realtime';
 let speechGate: SpeechGate | null; let callGeneration = 0;
 let playback: PlaybackControl | null = null;
@@ -364,8 +370,8 @@ const REASONING = ['minimal', 'low', 'medium', 'high', 'xhigh'] as const;
 function renderModel(status: Pick<StatusResponse, 'voiceModel'>) {
   const m = status.voiceModel;
   $('voice-name').textContent = m.model ? modelName(m.model) : 'GPT Realtime';
-  // Gemini Live has no reasoning setting.
-  const level = m.provider === 'gemini' ? undefined : REASONING.find(r => r === m.reasoning);
+  // Gemini Live and ElevenLabs Realtime have no reasoning setting.
+  const level = m.provider !== 'realtime' ? undefined : REASONING.find(r => r === m.reasoning);
   $('voice-reasoning').textContent = level ? t('stage.reasoning', { level: t(`reasoning.${level}`) }) : '';
   $('voice-reasoning').hidden = !level;
   // The language the call speaks and transcribes: the one chosen in Settings,
@@ -384,7 +390,7 @@ function showVoice(status: StatusResponse) {
   const direct = !!status.ades.find(ade => ade.id === backend)?.direct;
   if (callId || stream || restarting) return;
   $('call').disabled = !voiceReady;
-  if (voiceReady) setCall('idle', ''); else setCall('unavailable', direct ? t(voiceProvider === 'gemini' ? 'call.configureGeminiKey' : 'call.configureKey') : t('call.voiceNotYet', { ade: adeName() }));
+  if (voiceReady) setCall('idle', ''); else setCall('unavailable', direct ? t(voiceProvider === 'gemini' ? 'call.configureGeminiKey' : voiceProvider === 'elevenlabs' ? 'call.configureElevenLabsKey' : 'call.configureKey') : t('call.voiceNotYet', { ade: adeName() }));
 }
 async function boot() {
   const generation = ++viewGeneration;
@@ -527,10 +533,10 @@ function startHeartbeat(generation: number, liveId: string, health: LiveHealth |
 }
 // The language fields of POST /api/live.
 const callLanguages = () => ({ languages: voiceLanguages(navigator, storedPreference(localStorage)), ...(storedPreference(localStorage) !== 'auto' ? { language: storedPreference(localStorage) } : {}) });
-// Gemini Live: the server opens the provider session first, then this page
-// streams audio to it over a WebSocket. There is no WebRTC leg.
+// Gemini Live and ElevenLabs Realtime: the server opens the provider session
+// first, then this page streams audio to it over a WebSocket. There is no WebRTC leg.
 async function startRelayedCall(generation: number, acquired: MediaStream) {
-  const result = await api('/api/live', { provider: 'gemini', backend, conversationId, ...callLanguages() }) as LiveResponse;
+  const result = await api('/api/live', { provider: voiceProvider, backend, conversationId, ...callLanguages() }) as LiveResponse;
   if (generation !== callGeneration) { await api('/api/live/close', { id: result.session.id }); return; }
   if (!result.transport.stream) throw new Error(t('call.prepareFailed'));
   const liveId = callId = result.session.id;
@@ -628,7 +634,7 @@ async function startCall() {
     const acquiredLock = await navigator.wakeLock?.request('screen').catch(() => null);
     if (generation !== callGeneration) { acquiredLock?.release(); return; }
     wakeLock = acquiredLock;
-    if (voiceProvider === 'gemini') { await startRelayedCall(generation, acquiredStream); return; }
+    if (voiceProvider !== 'realtime') { await startRelayedCall(generation, acquiredStream); return; }
     peer = new RTCPeerConnection();
     const health = new LiveHealth(peer, $('audio')); liveHealth = health;
     let connectionInterrupted = false;
@@ -726,10 +732,11 @@ const pairDevice = new PairDevice({
 });
 $('settings').addEventListener('close', () => pairDevice.dismiss());
 
-// Server-wide voice settings and the OpenAI and Gemini keys. The server refuses changes while
+// Server-wide voice settings and the OpenAI, Gemini and ElevenLabs keys. The server refuses changes while
 // any call is active or connecting (409), so the form locks during this
 // browser's call and when the server reports one; a call keeps what it began with.
-const VOICE_SELECTS = { model: 'setting-model', reasoning: 'setting-reasoning', voice: 'setting-voice', eagerness: 'setting-eagerness', noiseReduction: 'setting-noise', transcriptionModel: 'setting-transcription', geminiVoice: 'setting-gemini-voice' } as const;
+const VOICE_SELECTS = { model: 'setting-model', reasoning: 'setting-reasoning', voice: 'setting-voice', eagerness: 'setting-eagerness', noiseReduction: 'setting-noise', transcriptionModel: 'setting-transcription', geminiVoice: 'setting-gemini-voice',
+  elevenlabsVoice: 'setting-elevenlabs-voice' } as const;
 let voiceSaved: VoiceSettingsResponse | null = null, settingsBusy = false, settingsRequest = 0;
 const instructionsSync = new InstructionsSync();
 // Each voice choice is saved as soon as it is made, one request at a time and in order.
@@ -746,7 +753,7 @@ function rowState(field: VoiceSettingField, state: 'saving' | 'saved' | 'error' 
 // Only the settings of the chosen model's provider are shown; the others keep their values.
 function showProviderRows(model: string) {
   const provider = modelProvider(model);
-  for (const row of $('voice-form').querySelectorAll<HTMLElement>('.setting[data-provider]')) row.hidden = row.dataset.provider !== provider;
+  for (const row of $('voice-form').querySelectorAll<HTMLElement>('.setting[data-provider]')) row.hidden = !row.dataset.provider!.split(' ').includes(provider);
   for (const group of $('voice-form').querySelectorAll<HTMLElement>('.setting-group')) group.hidden = ![...group.querySelectorAll<HTMLElement>('.setting')].some(row => !row.hidden);
 }
 function saveVoiceField(field: VoiceSettingField, value: string) {
@@ -771,8 +778,8 @@ function saveVoiceField(field: VoiceSettingField, value: string) {
   });
 }
 const localCall = () => !!(stream || callId || restarting) || stage.dataset.state === 'connecting';
-type FormStatus = 'voice-status' | 'instructions-status' | 'key-status' | 'gemini-key-status';
-type KeyButton = 'save-key' | 'remove-key' | 'save-gemini-key' | 'remove-gemini-key' | 'save-instructions';
+type FormStatus = 'voice-status' | 'instructions-status' | 'key-status' | 'gemini-key-status' | 'elevenlabs-key-status';
+type KeyButton = 'save-key' | 'remove-key' | 'save-gemini-key' | 'remove-gemini-key' | 'save-elevenlabs-key' | 'remove-elevenlabs-key' | 'save-instructions';
 function formStatus(id: FormStatus, text: string, state: 'ok' | 'error' | '' = '') {
   const node = $(id); node.textContent = text; if (state) node.dataset.state = state; else delete node.dataset.state;
 }
@@ -781,6 +788,7 @@ function lockSettings() {
   for (const id of Object.values(VOICE_SELECTS)) $(id).disabled = locked;
   for (const id of ['save-key', 'remove-key', 'openai-key'] as const) $(id).disabled = locked || busy('save-key', 'remove-key');
   for (const id of ['save-gemini-key', 'remove-gemini-key', 'gemini-key'] as const) $(id).disabled = locked || busy('save-gemini-key', 'remove-gemini-key');
+  for (const id of ['save-elevenlabs-key', 'remove-elevenlabs-key', 'elevenlabs-key'] as const) $(id).disabled = locked || busy('save-elevenlabs-key', 'remove-elevenlabs-key');
   for (const id of ['save-instructions', 'custom-instructions'] as const) $(id).disabled = locked || busy('save-instructions');
   const note = locked && voiceSaved ? t('settings.inCall') : '';
   if (note || $('voice-status').textContent === t('settings.inCall')) formStatus('voice-status', note);
@@ -807,6 +815,11 @@ function showVoiceSettings(result: VoiceSettingsResponse) {
   $('gemini-key-state').textContent = t(gemini === 'config' ? 'settings.keyConfigured' : gemini === 'env' ? 'settings.keyEnv' : 'settings.keyMissing');
   $('gemini-key-hint').textContent = t(gemini === 'config' ? 'settings.geminiKeyConfiguredHint' : gemini === 'env' ? 'settings.geminiKeyEnvHint' : 'settings.geminiKeyMissingHint');
   $('remove-gemini-key').hidden = gemini !== 'config';
+  const eleven = result.elevenlabsKey?.source || 'none';
+  $('elevenlabs-key-state').dataset.state = eleven;
+  $('elevenlabs-key-state').textContent = t(eleven === 'config' ? 'settings.keyConfigured' : eleven === 'env' ? 'settings.keyEnv' : 'settings.keyMissing');
+  $('elevenlabs-key-hint').textContent = t(eleven === 'config' ? 'settings.elevenlabsKeyConfiguredHint' : eleven === 'env' ? 'settings.elevenlabsKeyEnvHint' : 'settings.elevenlabsKeyMissingHint');
+  $('remove-elevenlabs-key').hidden = eleven !== 'config';
   lockSettings();
 }
 async function loadVoiceSettings() {
@@ -890,6 +903,23 @@ $('remove-gemini-key').onclick = () => {
   if (!confirm(t('settings.geminiKeyConfirmRemove'))) return;
   void saveSettings('remove-gemini-key', 'gemini-key-status', '/api/settings/key', { provider: 'gemini', key: null }, t('settings.keyRemoved'));
 };
+// The ElevenLabs API key, for ElevenLabs Realtime: the same rules again.
+function hideElevenLabsKey() { $('elevenlabs-key').type = 'password'; $('reveal-elevenlabs-key').setAttribute('aria-pressed', 'false'); $('reveal-elevenlabs-key').textContent = t('login.show'); }
+$('reveal-elevenlabs-key').onclick = () => {
+  const show = $('elevenlabs-key').type === 'password';
+  $('elevenlabs-key').type = show ? 'text' : 'password';
+  $('reveal-elevenlabs-key').setAttribute('aria-pressed', String(show)); $('reveal-elevenlabs-key').textContent = t(show ? 'login.hide' : 'login.show');
+};
+$('elevenlabs-key-form').onsubmit = async event => {
+  event.preventDefault();
+  const key = $('elevenlabs-key').value.trim();
+  if (!key) { formStatus('elevenlabs-key-status', t('settings.keyEmpty'), 'error'); $('elevenlabs-key').focus(); return; }
+  if (await saveSettings('save-elevenlabs-key', 'elevenlabs-key-status', '/api/settings/key', { provider: 'elevenlabs', key }, t('settings.keySaved'))) { $('elevenlabs-key').value = ''; hideElevenLabsKey(); }
+};
+$('remove-elevenlabs-key').onclick = () => {
+  if (!confirm(t('settings.elevenlabsKeyConfirmRemove'))) return;
+  void saveSettings('remove-elevenlabs-key', 'elevenlabs-key-status', '/api/settings/key', { provider: 'elevenlabs', key: null }, t('settings.keyRemoved'));
+};
 
 // Settings: language, voice, key, call recording and paired browsers. All but
 // the language need a paired session, so they are hidden on the login screen.
@@ -899,12 +929,12 @@ $('open-settings').onclick = () => {
   $('settings').dataset.signedIn = String(signedIn);
   for (const block of $('settings').querySelectorAll<HTMLElement>('.settings-tabs, .settings-block[data-auth]')) block.hidden = !signedIn;
   showSettingsTab(signedIn ? settingsTab : 'general', false);
-  formStatus('voice-status', ''); formStatus('instructions-status', ''); formStatus('key-status', ''); formStatus('gemini-key-status', '');
+  formStatus('voice-status', ''); formStatus('instructions-status', ''); formStatus('key-status', ''); formStatus('gemini-key-status', ''); formStatus('elevenlabs-key-status', '');
   $('settings').showModal();
   if (signedIn) { void refreshBrowsers(); void loadVoiceSettings(); watchSettingsBusy(); }
 };
 // Closing forgets a typed key that was not saved.
-$('settings').addEventListener('close', () => { $('openai-key').value = ''; hideKey(); $('gemini-key').value = ''; hideGeminiKey(); clearInterval(settingsBusyTimer); settingsBusyWatch++; });
+$('settings').addEventListener('close', () => { $('openai-key').value = ''; hideKey(); $('gemini-key').value = ''; hideGeminiKey(); $('elevenlabs-key').value = ''; hideElevenLabsKey(); clearInterval(settingsBusyTimer); settingsBusyWatch++; });
 // While Settings is open, a call another browser starts or ends locks or
 // unlocks the form. Only the busy flag is refreshed: options and text being
 // edited stay as they are.

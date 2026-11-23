@@ -2,7 +2,11 @@
 // text for a model that speaks or writes it back to the user.
 
 export const clean = (value: unknown) => String(value ?? '').replace(/\s+/g, ' ').trim();
-export const redact = (text: string) => text.replace(/(?:sk-[\w-]+|AIza[\w-]+)/g, '[credential omitted]');
+// Keys (OpenAI sk-, ElevenLabs sk_, Google AIza), whole tokens only so that
+// names such as disk-usage or task_queue stay, and the value of a token in a
+// URL's query (a signed conversation URL).
+export const redact = (text: string) => text.replace(/([?&](?:token|conversation_signature|key)=)[^\s"'&#<>]+/gi, '$1[credential omitted]')
+  .replace(/(?<![A-Za-z0-9-])(?:sk-[\w-]{10,}|sk_[A-Za-z0-9]{10,}|AIza[\w-]{10,})/g, '[credential omitted]');
 
 const timeZone = () => process.env.ADE_CALL_TIME_ZONE || Intl.DateTimeFormat().resolvedOptions().timeZone;
 // A local "YYYY-MM-DD HH:MM", or '' for a missing or invalid date. Numbers are

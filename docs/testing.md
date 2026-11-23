@@ -1,6 +1,6 @@
 # Testing
 
-The test suite runs offline. It simulates the OpenAI Realtime and Gemini Live APIs, the WebSockets,
+The test suite runs offline. It simulates the OpenAI Realtime, Gemini Live and ElevenLabs Realtime APIs, the WebSockets,
 the T3 and Orca CLIs and T3's SQLite database, so it needs no API key and no ADE
 installed. It proves that the server enforces its rules; it cannot prove how a model
 behaves in a real call, including whether it sends only after the user accepts
@@ -29,7 +29,8 @@ without it on `PATH` they are skipped, and the rest of the suite still runs.
 | --- | --- | --- |
 | HTTP and access | `http`, `browser-http`, `browser-access` | Authentication on every route, origin and CSRF checks, single-use expiring pairing codes stored as hashes, session renewal and revocation, codes created from the page (`POST /api/browsers/pair`: authorization, Origin, names, no address taken from `Host`, single redemption, the pending cap), origin changes revoking old sessions, attempt throttling, MIME types and the page's CSP. |
 | Settings | `settings-http`, `voice-settings`, `realtime` | Voice settings and key endpoints with bearer and cookie authentication and Origin, strict validation of every field and of the key format, values applied without a restart to `/api/status`, every ADE and the next call, refused while a call is active or connecting, `config.json` replaced atomically with mode `0600` keeping unknown fields and never overwritten when invalid, a saved key over `OPENAI_API_KEY`, and no key or key fragment in any response or log. |
-| Gemini Live | `gemini`, `settings-http` | Setup with the ADE tools declared `BLOCKING` (none on 3.1), history and catalog as client content first, the key only on the server, audio relayed both ways, interruptions, streamed transcripts, the send rule and one execution per call ID, a late yes, cancelled sends told to the model, session resumption on `goAway`, hang-up, and the audio socket's authentication and origin checks. Not a real call: see [gemini.md](gemini.md#what-has-been-verified). |
+| Gemini Live | `gemini`, `settings-http` | Setup with the ADE tools declared `BLOCKING`, history and catalog as client content first, the key only on the server, audio relayed both ways, interruptions, streamed transcripts, the send rule and one execution per call ID, a late yes, cancelled sends told to the model, session resumption on `goAway`, hang-up, and the audio socket's authentication and origin checks. Not a real call: see [gemini.md](gemini.md#what-has-been-verified). |
+| ElevenLabs Realtime | `eleven-realtime`, `settings-http` | The session with the provider's audio format and voice, server notes as user messages that never count as turns, the send rule, the audio relay both ways with resampling, barge-in and interrupt, expressive tags, closing, a missing key, and key redaction. Not a real call: see [elevenlabs.md](elevenlabs.md#what-has-been-verified). |
 | Voice engine | `realtime`, `live-events`, `call-lifecycle`, `interruptions`, `voice-result` | WebRTC session setup with an invented ADE, turn-taking settings, the send rule, one execution per call ID, waiting for the transcript that authorizes a send, interruptions before and after dispatch, oversized answers. Also checks the engine imports no T3 or Orca code. |
 | Send authorization | `intent`, `tool-guidance`, `hint-echo` | Authorization comes only from the latest user turn; a transcript that only recites the recognition hints is not a turn; distinct call IDs give distinct request IDs; a reused request ID with other content is rejected. |
 | Delivery safety | `t3`, `uncertain-delivery`, `tool-failure` | Deduplication across reconnects and restarts, a pending row blocking concurrent duplicates, uncertain deliveries never retried, verification by the reference line only in a user message of the right thread, release by user decision, replacing an archived main thread. |
@@ -68,7 +69,7 @@ Build first (`npm run build`). The browser scripts need Playwright's Chromium
 | --- | --- | --- |
 | `dist/scripts/verify-recording-browser.mjs` | Chromium with synthetic tones; intercepted HTTP; temporary archive. | Free, no provider, no personal state. |
 | `dist/scripts/smoke-browser.mjs` | A running server, its access token, Chromium. Loads the UI and lists projects. | Free without `TEST_VOICE`. With `TEST_VOICE=1` it places a real call: paid. |
-| `dist/scripts/eval.mjs` | Scripted conversations spoken by ElevenLabs voices, run against GPT Realtime or Gemini Live over a simulated T3, checked by code and graded by LLM judges ([evals](evals.md)). | Paid. |
+| `dist/scripts/eval.mjs` | Scripted conversations spoken by ElevenLabs voices, run against GPT Realtime, Gemini Live or ElevenLabs Realtime over a simulated T3, checked by code and graded by LLM judges ([evals](evals.md)). | Paid. |
 | `dist/scripts/replay-realtime.mjs` | A diagnostic recording, `ffmpeg`, the configured `openaiKey`, real read-only T3 CLI. Sends are simulated. | Paid. |
 | `dist/scripts/measure-startup.mjs` | An isolated server with a simulated CLI. `--real` reads the local T3. | Free. |
 | `dist/scripts/measure-projects.mjs` | Adapter discovery timing. `--real` reads the local T3 and Orca; `--http` goes through an isolated server. | Free. |

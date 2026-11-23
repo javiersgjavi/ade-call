@@ -304,6 +304,19 @@ What differs, because the provider differs:
   engine publishes it, after the user's pause; Gemini reports no failed
   transcriptions, so that check never fires.
 
+
+## ElevenLabs Realtime
+
+With an `eleven_realtime_*` `--model`, `run` uses the Realtime runner itself: the
+provider speaks OpenAI's protocol over a WebSocket, which is how the runner already
+talks to OpenAI. The engine is `ElevenRealtimeCalls`, and the socket goes to
+ElevenLabs with the ElevenLabs key (the one the speech already uses); the OpenAI
+key is still needed for the judges. `--voice` takes an ElevenLabs voice name. The
+reasoning, eagerness, noise reduction and transcription flags are OpenAI's and are
+refused. Server notes are recognized whether they are system messages (OpenAI) or
+user messages under the note header (ElevenLabs), and expressive tags are removed
+from the transcript.
+
 ## What it does not prove
 
 - **Synthetic speech.** ElevenLabs voices are clean and regular. Real phones add echo,

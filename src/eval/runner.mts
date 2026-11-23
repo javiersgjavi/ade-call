@@ -1,7 +1,7 @@
 import type { Scenario, Turn } from './scenario.mjs';
 import type { Voice } from './speech.mjs';
 import WebSocket from 'ws';
-import { RealtimeCalls, type RealtimeSettings, type Socket } from '../voice/realtime.mjs';
+import { RealtimeCalls, type RealtimeOptions, type RealtimeSettings, type Socket } from '../voice/realtime.mjs';
 import { SimulatedT3 } from './world.mjs';
 import { redactEvidence } from './redact.mjs';
 import { finalKind } from '../conversation/thread-watch.mjs';
@@ -12,6 +12,8 @@ import { distinctiveWords, vocabularyHints } from '../conversation/context.mjs';
 import { requestIdFor } from '../direct/session.mjs';
 import { BYTES_PER_MS, RATE, Speech, audioFile, noise, phone, spokenWords } from './speech.mjs';
 import { evalText } from './judge.mjs';
+import { voiceNoteText } from '../resources.mjs';
+import { plainTranscript } from '../voice/eleven-realtime.mjs';
 import { resolve, dirname } from 'node:path';
 
 // Runs one scenario as a closed-loop call against GPT Realtime: the production
@@ -55,9 +57,18 @@ export interface RunOptions {
   noResponseMs?: number;
   transcriptionTimeoutMs?: number;
   connect?: (model: string) => Socket;
+  // The engine to run (default RealtimeCalls): ElevenLabs Realtime extends it.
+  engine?: (options: RealtimeOptions) => RealtimeCalls;
 }
 
 export const CHUNK_MS = 100;
+// The text of a server note the engine adds to the conversation, or null.
+const NOTE_HEADER = voiceNoteText('note', { text: '' });
+export function serverNote(item?: { role?: string; content?: { text?: string }[] }) {
+  const text = item?.content?.map(c => c.text || '').join('\n') || '';
+  if (item?.role === 'system') return text;
+  return item?.role === 'user' && text.startsWith(NOTE_HEADER) ? text.slice(NOTE_HEADER.length) : null;
+}
 export const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function turnAudio(turn: Turn, scenario: Scenario, speech: Speech, voice: Voice, index: number) {
@@ -113,7 +124,7 @@ export async function runScenario(scenario: Scenario, options: RunOptions): Prom
   const ownTurn = (responseId?: string) => responseId && responseTurn.has(responseId) ? responseTurn.get(responseId)! : committed;
 
   const vocabulary = simulatedVocabulary(sim);
-  const realtime: RealtimeCalls = new RealtimeCalls({
+  const realtime: RealtimeCalls = (options.engine || (o => new RealtimeCalls(o)))({
     key: options.key, ade: sim.ade, store: { meta() { return undefined; } }, settings: options.settings, instructions: scenario.instructions,
     // The same signal the production thread watch gets: a read tool of the voice finished on this thread.
     read: threadId => voiceReads.push({ threadId, at: Date.now() }),
@@ -162,13 +173,12 @@ export async function runScenario(scenario: Scenario, options: RunOptions): Prom
       if (update.type === 'session.update') { const prompt = update.session?.audio?.input?.transcription?.prompt; record.vocabulary = prompt ? prompt.split(', ') : []; }
     }
     const event = JSON.parse(data) as { type?: string; event_id?: string; response?: { metadata?: Record<string, string> }; item?: { type?: string; call_id?: string; output?: unknown; role?: string; content?: { text?: string }[] } };
-    if (event.type === 'conversation.item.create' && event.item?.role === 'system') {
-      const text = event.item.content?.map(c => c.text || '').join('\n');
-      if (text?.startsWith('T3 CATALOG ')) record.initialCatalog ??= text;
-    }
+    // A server note: a system message, or (ElevenLabs Realtime) a user message under the note header.
+    const note = event.type === 'conversation.item.create' ? serverNote(event.item) : null;
+    if (note?.startsWith('T3 CATALOG ')) record.initialCatalog ??= note;
     // A quiet notice asks for no announcement: it is numbered but never waited on.
-    if (event.type === 'conversation.item.create' && event.item?.role === 'system' && event.item.content?.some(c => c.text?.startsWith('System notice:'))) {
-      const n = ++noticesGiven, given = event.item.content?.map(c => c.text || '').join('\n') || '';
+    if (note?.startsWith('System notice:')) {
+      const n = ++noticesGiven, given = note;
       const line = quietLine ?? spokenLines.shift();
       if (line) Object.assign(line, { index: n, given, ms: clock() });
       if (!quietLine) waiting.push(n);
@@ -353,7 +363,8 @@ export async function runScenario(scenario: Scenario, options: RunOptions): Prom
           }
           break;
         case 'response.output_audio_transcript.done':
-          if (event.transcript?.trim()) record.transcript.push({ ms: now, role: 'assistant', text: event.transcript.trim(), turn: ownTurn(event.response_id), item: event.item_id, response: event.response_id });
+          // Expressive tags ElevenLabs voices ("[happy]") are not words.
+          if (plainTranscript(event.transcript || '')) record.transcript.push({ ms: now, role: 'assistant', text: plainTranscript(event.transcript!), turn: ownTurn(event.response_id), item: event.item_id, response: event.response_id });
           break;
         case 'response.done': {
           lastActivity = now;
