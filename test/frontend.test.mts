@@ -545,10 +545,14 @@ test('first-visit tour: shown once, skippable, repeatable from Settings and plac
   const { TOUR_STEPS, TOUR_KEY, TOUR_VERSION, tourSeen, markTourSeen, placeCard, spotlight } = await import('../public/tour.js');
   // Every step names a part of the page and has text in every language.
   for (const step of TOUR_STEPS) {
-    if (step.target) assert.ok(step.target.startsWith('#') ? ids.has(step.target.slice(1)) : html.includes(`class="${step.target.slice(1)}"`), `missing ${step.target}`);
+    if (step.target) assert.ok(step.target.startsWith('#') ? ids.has(step.target.slice(1)) : step.target.startsWith('.setting[') ? html.includes(`class="setting" data-field="${step.target.match(/"(\w+)"/)![1]}"`) : html.includes(`class="${step.target.slice(1)}"`), `missing ${step.target}`);
+    // A step in Settings names a real tab and an element inside its panel.
+    if (step.settings) assert.match(html, new RegExp(`data-tab="${step.settings}"`));
     for (const [name, dictionary] of Object.entries(dictionaries)) assert.ok(dictionary[step.title] && dictionary[step.body], `${name}: ${step.title}`);
   }
   assert.equal(TOUR_STEPS[0].target, undefined, 'opens with a centered welcome');
+  assert.deepEqual([...new Set(TOUR_STEPS.map(step => step.settings).filter(Boolean))], ['general', 'voice', 'key', 'devices'], 'walks through every Settings tab in order');
+  assert.equal(TOUR_STEPS.at(-1)!.settings, undefined, 'ends outside Settings');
   // Seen once it ends, whether finished or skipped; blocked storage never nags.
   const store = new Map<string, string>();
   const storage = { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => void store.set(key, value) };
@@ -576,6 +580,9 @@ test('first-visit tour: shown once, skippable, repeatable from Settings and plac
   assert.match(app, /if \(!tourSeen\(localStorage\) && !\$\('settings'\)\.open && !localCall\(\)\)\s+tour\.start\(\)/);
   assert.match(app, /\$\('tour-restart'\)\.onclick = \(\) => \{ \$\('settings'\)\.close\(\);\s+if \(!localCall\(\)\)\s+tour\.start\(\);\s+\}/);
   assert.match(app, /\$\('tour-restart'\)\.disabled = localCall\(\)/);
+  // The tour opens Settings on a tab, keeps it open between its steps and closes it at the end.
+  assert.match(app, /\$\('open-settings'\)\.onclick = \(\) => openSettings\(\)/);
+  assert.match(app, /if \(\$\('settings'\)\.open\) \{\s*showSettingsTab\(tab, false\);\s*return false;\s*\}\s*openSettings\(tab\);\s*return true;/);
   assert.match(html, /<div class="tour-text" aria-live="polite">/, 'each step is announced');
   assert.match(readFileSync(new URL('../src/server.mjs', import.meta.url), 'utf8'), /'tour'/, 'the module is served');
   assert.equal(t('tour.count', { current: 2, total: 7 }), '2 of 7');

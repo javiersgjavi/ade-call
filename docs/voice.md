@@ -289,10 +289,13 @@ Diagnostics and optional call recordings are covered in
 
 The first time a browser opens the workspace, a short tour
 ([tour.ts](../public/tour.ts)) walks through the ADE switch, calling, that sent
-work keeps running after hanging up, the conversation, the projects and Settings. Finishing or
-skipping it (Escape also skips) is remembered in that browser's
-`localStorage`; **Settings → General → Take the tour again** repeats it, except
-during a call. Steps whose part of the page is hidden are left out.
+work keeps running after hanging up, the conversation and the projects. It then
+opens Settings and goes through its tabs: General, the voice models and
+providers, custom instructions, API keys and Devices; Settings closes again when
+the tour ends or steps back before it. Finishing or skipping it (Escape also
+skips) is remembered in that browser's `localStorage`; **Settings → General →
+Take the tour again** repeats it, except during a call. Steps whose part of the
+page is hidden are left out.
 
 ## Replaying a recorded call
 
