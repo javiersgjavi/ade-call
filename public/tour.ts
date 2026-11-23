@@ -2,8 +2,10 @@ import { t, type MessageKey } from './i18n.js';
 
 // First-visit tour of the workspace: a modal dialog that dims the page, rings
 // one part of it and explains it in a short card. It runs once per browser;
-// skipping counts as seen, and Settings → General repeats it.
-export type TourStep = { target?: string; title: MessageKey; body: MessageKey };
+// skipping counts as seen, and Settings → General repeats it. Its last steps
+// open Settings and walk through its tabs.
+export type SettingsTab = 'general' | 'voice' | 'key' | 'devices';
+export type TourStep = { target?: string; settings?: SettingsTab; title: MessageKey; body: MessageKey };
 export const TOUR_STEPS: readonly TourStep[] = [
   { title: 'tour.welcomeTitle', body: 'tour.welcomeBody' },
   { target: '#backend', title: 'tour.adeTitle', body: 'tour.adeBody' },
@@ -12,7 +14,16 @@ export const TOUR_STEPS: readonly TourStep[] = [
   { target: '.convo', title: 'tour.conversationTitle', body: 'tour.conversationBody' },
   { target: '.side', title: 'tour.projectsTitle', body: 'tour.projectsBody' },
   { target: '#open-settings', title: 'tour.settingsTitle', body: 'tour.settingsBody' },
+  { target: '#general-settings', settings: 'general', title: 'tour.generalTitle', body: 'tour.generalBody' },
+  { target: '.setting[data-field="model"]', settings: 'voice', title: 'tour.modelTitle', body: 'tour.modelBody' },
+  { target: '#instructions-form', settings: 'voice', title: 'tour.instructionsTitle', body: 'tour.instructionsBody' },
+  { target: '#key-settings', settings: 'key', title: 'tour.keysTitle', body: 'tour.keysBody' },
+  { target: '#browser-access', settings: 'devices', title: 'tour.devicesTitle', body: 'tour.devicesBody' },
+  { title: 'tour.endTitle', body: 'tour.endBody' },
 ];
+// Opens Settings on a tab, or closes it with null. True when it was opened
+// now, so the tour puts itself back on top of it.
+export type ShowSettings = (tab: SettingsTab | null) => boolean;
 
 // Bump the version when the tour changes enough to show it again.
 export const TOUR_KEY = 'tour-seen', TOUR_VERSION = '1';
@@ -49,11 +60,12 @@ export function spotlight(target: Box, view: { width: number; height: number }, 
 
 type Parts = { dialog: HTMLDialogElement; spot: HTMLElement; card: HTMLElement; count: HTMLElement; title: HTMLElement; body: HTMLElement; skip: HTMLButtonElement; back: HTMLButtonElement; next: HTMLButtonElement };
 export class Tour {
-  private steps: { step: TourStep; element: Element | null }[] = [];
+  private steps: TourStep[] = [];
+  private element: Element | null = null;
   private index = 0;
   private frame = 0;
   private readonly resized: ResizeObserver;
-  constructor(private readonly parts: Parts, private readonly onEnd: () => void) {
+  constructor(private readonly parts: Parts, private readonly settings: ShowSettings, private readonly onEnd: () => void) {
     parts.skip.onclick = () => this.end();
     parts.back.onclick = () => this.show(this.index - 1);
     parts.next.onclick = () => this.index === this.steps.length - 1 ? this.end() : this.show(this.index + 1);
@@ -66,15 +78,20 @@ export class Tour {
     // The page keeps changing under the tour (projects arrive, the viewport
     // turns), so the ring and the card follow the target.
     const follow = () => { cancelAnimationFrame(this.frame); this.frame = requestAnimationFrame(() => this.place()); };
-    addEventListener('resize', follow); addEventListener('scroll', follow, { passive: true });
+    addEventListener('resize', follow);
+    // Captured, so scrolling inside Settings also moves the ring.
+    addEventListener('scroll', follow, { passive: true, capture: true });
     this.resized = new ResizeObserver(follow);
   }
   get open() { return this.parts.dialog.open; }
-  // Steps whose part of the page is not shown (one ADE, a hidden panel) are left out.
+  // Steps whose part of the page is not shown (one ADE, a hidden panel) are
+  // left out; those in Settings only need to exist, since Settings is closed now.
   start() {
     if (this.open) return;
-    this.steps = TOUR_STEPS.map(step => ({ step, element: step.target ? document.querySelector(step.target) : null }))
-      .filter(({ step, element }) => !step.target || (element && element.getClientRects().length));
+    this.steps = TOUR_STEPS.filter(step => {
+      const element = step.target ? document.querySelector(step.target) : null;
+      return !step.target || (element && (step.settings || element.getClientRects().length));
+    });
     delete this.parts.dialog.dataset.ready;
     // The first step is written before opening, so the dialog opens with its name and description.
     this.fill(0);
@@ -86,10 +103,11 @@ export class Tour {
     if (!this.open) return;
     this.resized.disconnect();
     this.parts.dialog.close();
+    this.settings(null);
     this.onEnd();
   }
   private fill(index: number) {
-    const { step } = this.steps[index];
+    const step = this.steps[index];
     this.parts.count.textContent = t('tour.count', { current: index + 1, total: this.steps.length });
     this.parts.title.textContent = t(step.title); this.parts.body.textContent = t(step.body);
     this.parts.back.hidden = index === 0;
@@ -97,9 +115,12 @@ export class Tour {
     this.parts.skip.hidden = index === this.steps.length - 1;
   }
   private show(index: number) {
-    const { element } = this.steps[index];
+    const step = this.steps[index];
     this.index = index;
     this.fill(index);
+    // Settings is a modal too: opened after the tour, the tour is shown again to stay on top.
+    if (this.settings(step.settings || null)) { this.parts.dialog.close(); this.parts.dialog.showModal(); }
+    const element = this.element = step.target ? document.querySelector(step.target) : null;
     this.resized.disconnect(); this.resized.observe(this.parts.card); this.resized.observe(document.body);
     if (element) {
       this.resized.observe(element);
@@ -112,7 +133,7 @@ export class Tour {
   }
   private place() {
     if (!this.open) return;
-    const { element } = this.steps[this.index];
+    const { element } = this;
     const view = { width: document.documentElement.clientWidth, height: innerHeight };
     const target = element?.getBoundingClientRect() || null;
     const { spot, card } = this.parts;
