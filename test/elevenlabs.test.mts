@@ -107,6 +107,7 @@ test('the first call creates the tools and the agent; later calls only ask for a
   const prompt: string = override.agent.prompt.prompt;
   assert.ok(prompt.startsWith(directInstructions(f.ade, { provider: 'elevenlabs', language: { tag: 'es-ES', source: 'browser' } as never }).slice(0, 200)), 'the ADE instructions first');
   assert.match(prompt, /Earlier history\./); assert.match(prompt, /fake CATALOG · p1/);
+  assert.match(prompt, /SENDING STEPS/, 'the send steps, as with Gemini');
   assert.deepEqual(f.browser.events[0], { type: 'session.started', inputRate: 16000, outputRate: 24000 });
   f.eleven.close(result.session.id);
   // Nothing changed: no tool or agent request, only a new signed URL.

@@ -328,6 +328,9 @@ What differs from Gemini Live:
 - Transcription and turn detection are the provider's own (`transcriptionModel`
   is `built-in`). The recognition hints are the call's ASR keywords. A user turn
   is recorded when ElevenLabs sends its transcript, once per turn.
+- The LLM answers a tool result after a second or more, so after a result the
+  voice is not quiet until it answers or 10 s pass; otherwise the scenario would
+  move on, or end, before the answer.
 - Latency runs, as with Gemini, from the end of the turn's scripted audio to the
   first sample of the answer that played.
 

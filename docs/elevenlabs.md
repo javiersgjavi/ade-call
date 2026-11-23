@@ -93,8 +93,10 @@ The signed URL carries a short-lived token and is never logged; errors that coul
 quote it, or the key, are replaced by a generic message or redacted.
 
 Each call sends, as overrides: the instructions built by
-[`directInstructions()`](../src/direct/prompt.mts) with the owner's custom
-instructions, followed by the resume of the conversation and the catalog as
+[`directInstructions()`](../src/direct/prompt.mts) with the send steps of
+[resources/gemini_prompt.txt](../resources/gemini_prompt.txt) (as with Gemini: in
+the evaluations the LLM sent a direct order without proposing it) and the owner's
+custom instructions, followed by the resume of the conversation and the catalog as
 server notes; the LLM; the language of the call (its primary subtag); the voice;
 and up to 50 of your project and thread names as recognition keywords.
 

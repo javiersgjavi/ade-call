@@ -92,6 +92,8 @@ export async function runElevenLabsScenario(scenario: Scenario, options: ElevenL
       if (message.type === 'user_message') covering = [...covering, n];
     }
     if (message.type === 'client_tool_result' && message.tool_call_id) {
+      // The LLM answers a result after a second or more: the turn is not over yet.
+      lastResult = clock();
       const id = message.tool_call_id, full = redactEvidence(String(message.result ?? ''), [options.key]);
       outputs.set(id, full);
       const line = record.tools.find(t => t.callId === id);
@@ -104,6 +106,8 @@ export async function runElevenLabsScenario(scenario: Scenario, options: ElevenL
   const interrupted = new Map<string, { heardMs: number; totalMs: number }>();
   const cutResponses = new Set<string>(), said = new Map<string, string>();
   let playhead = 0, lastActivity = 0, current: string | null = null, responses = 0;
+  // When the latest tool result went out, and whether any output followed it.
+  let lastResult = -Infinity, lastOutput = -Infinity;
   const cut = (now: number) => {
     let heard: string | null = null;
     for (const part of voiceTrack) {
@@ -148,6 +152,7 @@ export async function runElevenLabsScenario(scenario: Scenario, options: ElevenL
         const data = message.audio_event?.audio_base_64;
         if (!data) return;
         const id = begin(), chunk = Buffer.from(data, 'base64');
+        lastOutput = now;
         const at = Math.max(now, playhead);
         voiceTrack.push({ at, audio: chunk, item: id, response: id });
         playhead = at + chunk.length / BYTES_PER_MS; lastActivity = now;
@@ -264,13 +269,17 @@ export async function runElevenLabsScenario(scenario: Scenario, options: ElevenL
       }
     })();
     const speak = async (pcm: Buffer, first?: () => void) => { firstSample.run = first ?? null; queue = Buffer.concat([queue, pcm]); while (queue.length && pumping) { alive(); await sleep(20); } };
-    const quiet = () => !live.responding && !live.toolsPending.size && !live.queue.length && !eleven.working && clock() >= playhead && clock() - lastActivity > 1200;
+    // After a tool result, quiet only once the answer came or 10 s passed without one.
+    const awaitingAnswer = () => lastResult > lastOutput && clock() - lastResult < 10_000;
+    const quiet = () => !live.responding && !live.toolsPending.size && !live.queue.length && !eleven.working && !awaitingAnswer() && clock() >= playhead && clock() - lastActivity > 1200;
     const answered = (owner: number) => [...responseTurn].some(([id, turn]) => turn === owner && substantive(id));
     const settle = async (limit: number, done: () => boolean, noResponseMs = options.noResponseMs ?? 10_000) => {
       const from = clock(), until = from + limit;
       while (clock() < until) {
         alive();
-        if (quiet() && (done() || clock() - from >= noResponseMs)) { if (current && clock() >= playhead) end(clock()); if (!open.size) return true; }
+        // A response ends at agent_response_complete; one with no event for a long while is over.
+        if (current && clock() >= playhead && clock() - lastActivity > 8000) end(clock());
+        if (quiet() && !open.size && (done() || clock() - from >= noResponseMs)) return true;
         await sleep(100);
       }
       return false;

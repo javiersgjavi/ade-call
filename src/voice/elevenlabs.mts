@@ -48,8 +48,9 @@ export const INPUT_RATE = 16_000, OUTPUT_RATE = 24_000;
 const MAX_FRAME = INPUT_RATE * 2;
 // ElevenLabs boosts at most 50 keywords per conversation.
 const MAX_KEYWORDS = 50;
-// Without the end of a response, the model counts as idle this long after its last audio.
-const RESPONSE_IDLE_MS = 1500;
+// A response ends at agent_response_complete; without it, the model counts as
+// idle this long after its last audio (speech arrives sentence by sentence).
+const RESPONSE_IDLE_MS = 8000;
 // A message that asked for a reply and got no audio at all frees the queue after this.
 const NO_REPLY_MS = 15_000;
 // The provider events this server reads; others are not sent.
@@ -157,6 +158,7 @@ export interface ElevenLabsOptions {
   settings?: ElevenLabsSettings;
   // The agent's name in the account (the evaluations keep their own).
   agentName?: string;
+
   // The owner's custom instructions (Settings), appended to the instructions when not blank.
   instructions?: string;
   // Tests pass fakes for the REST API and the conversation socket.

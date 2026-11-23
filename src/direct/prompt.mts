@@ -38,7 +38,8 @@ export const languageReminder = () => voiceLanguageText('reminder');
 // Values known only when a session opens: the time context of a call, the
 // ADE with its capabilities and the language the call starts in.
 // custom: the owner's instructions from Settings; appended last, and only when not blank.
-// provider: 'gemini' adds the Gemini part (resources/gemini_prompt.txt) before them.
+// provider: 'gemini' or 'elevenlabs' adds the send steps (resources/gemini_prompt.txt) before them:
+// both models proposed and sent in one response without them in the evaluations.
 export interface SessionValues { callStart?: unknown; capabilities?: unknown; language?: CallLanguage; custom?: string; provider?: 'realtime' | 'gemini' | 'elevenlabs' }
 
 // The instructions of a voice call: resources/system_prompt_voice.txt
@@ -51,7 +52,7 @@ export function directInstructions(ade: Pick<DirectAde, 'name' | 'tools' | 'prom
     sending: sendingTools(ade), destination: p.destination, evidence: p.evidence, limits: p.limits, ids: p.ids, search: p.search ? ` ${p.search}` : '',
     spoken_language: spokenLanguage(session.language), call_start: JSON.stringify(session.callStart || {}), ade_capabilities: JSON.stringify(session.capabilities || {})
   }, 'system_prompt_voice.txt');
-  const gemini = session.provider === 'gemini' ? `\n${geminiPromptText({ target, sending: sendingTools(ade) })}` : '';
+  const gemini = session.provider === 'gemini' || session.provider === 'elevenlabs' ? `\n${geminiPromptText({ target, sending: sendingTools(ade) })}` : '';
   const custom = session.custom?.trim();
   return `${text}${gemini}${custom ? `\n\n${customInstructionsText(custom)}` : ''}`;
 }
