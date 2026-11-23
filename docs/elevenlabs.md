@@ -72,11 +72,15 @@ The session is OpenAI's: the instructions built by
 [`directInstructions()`](../src/direct/prompt.mts) with the send steps of
 [resources/gemini_prompt.txt](../resources/gemini_prompt.txt) (as with Gemini: in the
 evaluations the model sent without proposing the message, or on a lone
-mistranscribed word) and the owner's custom instructions, the ADE's tools with the schemas from
+mistranscribed word), then [resources/eleven_prompt.txt](../resources/eleven_prompt.txt)
+(examples of a proposal: it took a yes to "Do you mean that thread?" as a yes to
+send), and the owner's custom instructions, the ADE's tools with the schemas from
 [resources/tools.json](../resources/tools.json), semantic turn detection that
 interrupts the answer, and the voice. What differs:
 
 - Audio is `audio/pcm` at 24 kHz in both directions.
+- The temperature is 0.2 (the provider's default is 0.7): in the evaluations it
+  nearly halved the failures on the send scenarios.
 - Transcription is the provider's own, fixed to the call's language (its
   primary subtag); there is no transcription model to choose and no hint list.
 - Reasoning, noise reduction and the transcription model are OpenAI settings;

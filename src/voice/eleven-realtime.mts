@@ -22,6 +22,9 @@ export const isElevenRealtimeModel = (model: string) => model.startsWith('eleven
 // Realtime API accepts. A value configured by hand stays offered.
 export const ELEVEN_REALTIME_VOICES = ['sarah', 'jessica', 'alice', 'lily', 'eric', 'brian', 'george', 'will'] as const;
 export const ELEVEN_REALTIME_DEFAULTS = { model: ELEVEN_REALTIME_MODELS[0], voice: 'sarah' } as const;
+// Sampling temperature (the provider's default is 0.7): deciding whether a turn
+// accepts a send needs consistency more than variety.
+export const ELEVEN_REALTIME_TEMPERATURE = 0.2;
 export const ELEVEN_REALTIME_URL = 'wss://api.elevenlabs.io/v1/convai/realtime';
 // PCM at 24 kHz both ways (the only PCM rate the provider takes); the page
 // captures at 16 kHz, which the server resamples.
@@ -66,7 +69,7 @@ export class ElevenRealtimeCalls extends RealtimeCalls {
     const code = (language?.tag || '').split('-')[0].toLowerCase();
     this.hints = [];
     return {
-      type: 'realtime', model: this.model, output_modalities: ['audio'],
+      type: 'realtime', model: this.model, output_modalities: ['audio'], temperature: ELEVEN_REALTIME_TEMPERATURE,
       instructions: directInstructions(this.ade, { callStart: this.context.timing?.(), capabilities: { backend: this.context.backend, capabilities: this.context.capabilities }, language, custom: this.instructions, provider: 'elevenlabs' }),
       audio: {
         input: {

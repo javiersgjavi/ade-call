@@ -31,6 +31,8 @@ export const customInstructionsText = (instructions: string) =>
 // procedure as separate steps, appended after the voice instructions.
 let geminiPrompt: string | undefined;
 export const geminiPromptText = (vars: Vars) => render(geminiPrompt ??= resourceText('gemini_prompt.txt').trimEnd(), vars, 'gemini_prompt.txt');
+let elevenPrompt: string | undefined;
+export const elevenPromptText = (vars: Vars) => render(elevenPrompt ??= resourceText('eleven_prompt.txt').trimEnd(), vars, 'eleven_prompt.txt');
 
 // The language and accent a call starts in (resources/voice_language.json):
 // the one chosen in the settings, the browser's, or unknown; and the short

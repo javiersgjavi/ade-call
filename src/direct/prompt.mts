@@ -1,5 +1,5 @@
 import type { DirectAde } from './contract.mjs';
-import { customInstructionsText, geminiPromptText, render, systemPrompt, voiceLanguageText } from '../resources.mjs';
+import { customInstructionsText, elevenPromptText, geminiPromptText, render, systemPrompt, voiceLanguageText } from '../resources.mjs';
 
 // Names of the tools that change the ADE, as the instructions mention them.
 export const sendingTools = (ade: Pick<DirectAde, 'tools'>) => ade.tools.filter(t => t.sends && !t.keepsAuthorization).map(t => t.name).join(' or ') || 'the sending tool';
@@ -53,6 +53,8 @@ export function directInstructions(ade: Pick<DirectAde, 'name' | 'tools' | 'prom
     spoken_language: spokenLanguage(session.language), call_start: JSON.stringify(session.callStart || {}), ade_capabilities: JSON.stringify(session.capabilities || {})
   }, 'system_prompt_voice.txt');
   const gemini = session.provider === 'gemini' || session.provider === 'elevenlabs' ? `\n${geminiPromptText({ target, sending: sendingTools(ade) })}` : '';
+  // ElevenLabs Realtime also gets examples of a proposal and of the message (resources/eleven_prompt.txt).
+  const eleven = session.provider === 'elevenlabs' ? `\n${elevenPromptText({ target, sending: sendingTools(ade) })}` : '';
   const custom = session.custom?.trim();
-  return `${text}${gemini}${custom ? `\n\n${customInstructionsText(custom)}` : ''}`;
+  return `${text}${gemini}${eleven}${custom ? `\n\n${customInstructionsText(custom)}` : ''}`;
 }
