@@ -551,8 +551,8 @@ test('first-visit tour: shown once, skippable, repeatable from Settings and plac
     for (const [name, dictionary] of Object.entries(dictionaries)) assert.ok(dictionary[step.title] && dictionary[step.body], `${name}: ${step.title}`);
   }
   assert.equal(TOUR_STEPS[0].target, undefined, 'opens with a centered welcome');
-  assert.deepEqual([...new Set(TOUR_STEPS.map(step => step.settings).filter(Boolean))], ['general', 'voice', 'key', 'devices'], 'walks through every Settings tab in order');
-  assert.equal(TOUR_STEPS.at(-1)!.settings, undefined, 'ends outside Settings');
+  assert.deepEqual([...new Set(TOUR_STEPS.map(step => step.settings).filter(Boolean))], ['voice', 'devices'], 'shows the Settings tabs worth knowing');
+  assert.ok(TOUR_STEPS.length <= 7, 'short');
   // Seen once it ends, whether finished or skipped; blocked storage never nags.
   const store = new Map<string, string>();
   const storage = { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => void store.set(key, value) };

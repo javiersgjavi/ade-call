@@ -3,23 +3,17 @@ import { t, type MessageKey } from './i18n.js';
 // First-visit tour of the workspace: a modal dialog that dims the page, rings
 // one part of it and explains it in a short card. It runs once per browser;
 // skipping counts as seen, and Settings → General repeats it. Its last steps
-// open Settings and walk through its tabs.
+// open Settings on the tabs worth knowing.
 export type SettingsTab = 'general' | 'voice' | 'key' | 'devices';
 export type TourStep = { target?: string; settings?: SettingsTab; title: MessageKey; body: MessageKey };
 export const TOUR_STEPS: readonly TourStep[] = [
   { title: 'tour.welcomeTitle', body: 'tour.welcomeBody' },
-  { target: '#backend', title: 'tour.adeTitle', body: 'tour.adeBody' },
   { target: '.dial', title: 'tour.callTitle', body: 'tour.callBody' },
-  { target: '#stage', title: 'tour.sendTitle', body: 'tour.sendBody' },
   { target: '.convo', title: 'tour.conversationTitle', body: 'tour.conversationBody' },
   { target: '.side', title: 'tour.projectsTitle', body: 'tour.projectsBody' },
-  { target: '#open-settings', title: 'tour.settingsTitle', body: 'tour.settingsBody' },
-  { target: '#general-settings', settings: 'general', title: 'tour.generalTitle', body: 'tour.generalBody' },
   { target: '.setting[data-field="model"]', settings: 'voice', title: 'tour.modelTitle', body: 'tour.modelBody' },
-  { target: '#custom-instructions', settings: 'voice', title: 'tour.instructionsTitle', body: 'tour.instructionsBody' },
-  { target: '#key-settings', settings: 'key', title: 'tour.keysTitle', body: 'tour.keysBody' },
+  { target: '#instructions-form', settings: 'voice', title: 'tour.instructionsTitle', body: 'tour.instructionsBody' },
   { target: '#browser-access', settings: 'devices', title: 'tour.devicesTitle', body: 'tour.devicesBody' },
-  { title: 'tour.endTitle', body: 'tour.endBody' },
 ];
 // Opens Settings on a tab, or closes it with null. True when it was opened
 // now, so the tour puts itself back on top of it.
