@@ -23,6 +23,10 @@ paid calls, and how to turn the results into a verdict.
   (the systemd unit shows them); keys come from there. Never print a key.
 - **Build the branch under test** (`npm run build`), with Node 24. `ffmpeg` must be
   installed for phone-channel scenarios and recorded clips.
+- **Read the baselines.** `$ADE_CALL_STATE/evals/BASELINES.md`, if it exists, holds the
+  latest reference results (pass rates, run folders, known weak spots) to compare
+  against. Update it after a run that becomes the new reference. It is private, like
+  the runs: never commit it.
 - `npm run check` must pass first: the prompt has a size limit and assertions, and a
   broken build only wastes the run.
 
