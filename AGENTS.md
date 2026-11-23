@@ -102,18 +102,23 @@ The owner may give you only this repository's link. Follow these steps in order;
      with a public hostname (own domain or automatic DNS, ports 80/443 reachable)
      or Tailscale Serve (no domain or open ports; the phone joins their tailnet). The
      table in [docs/deployment.md](docs/deployment.md#phone-access) helps them choose.
-   - Whether they already have an OpenAI API key on an account with billing and
-     credit. Never ask them to paste the key into the chat.
+   - Which voice provider they want: OpenAI Realtime (the default, more reliable)
+     or Gemini Live (experimental; see [docs/gemini.md](docs/gemini.md)), and
+     whether they already have that provider's API key on an account with billing
+     and credit (for Gemini, from Google AI Studio). Never ask them to paste the key
+     into the chat.
 3. Clone into a permanent folder (for example `~/ade-call`), not a temporary one: the
    systemd unit runs from the checkout. Run `npm ci` and `npm test`. This does not
    install T3 or Orca.
-4. Have the owner store the key themselves, either with the no-echo terminal snippet
-   in [docs/installation.md](docs/installation.md#3-store-the-openai-key) or later in
-   **Settings → API keys** on the page. Both keep existing `config.json` fields and
+4. Have the owner store the key of the chosen provider themselves, either with the
+   no-echo terminal snippet in
+   [docs/installation.md](docs/installation.md#3-store-the-voice-key) (`openaiKey`
+   or `geminiKey`) or later in **Settings → API keys** on the page. For Gemini, also
+   choose `gemini-3.8-live` in **Settings → Voice** or set `realtimeModel` to it. Both keep existing `config.json` fields and
    mode `600`. Never invent keys or model IDs; other settings are in
    [docs/configuration.md](docs/configuration.md).
-5. Explain that the OpenAI key, the web access token and the ADE agents' own
-   credentials are separate, and that every call uses paid API time.
+5. Explain that the voice key (OpenAI or Gemini), the web access token and the ADE
+   agents' own credentials are separate, and that every call uses paid API time.
 6. Start with `npm start`, confirm access and that projects are listed, and do one
    read-only query. Never send work to an agent as an installation test. Make a real
    call only if the user asked for one.
@@ -141,6 +146,11 @@ The owner may give you only this repository's link. Follow these steps in order;
    outside-access check: the owner opens the page over mobile data (with Tailscale
    connected for Serve), pairs and checks projects. A pairing link or a successful
    local request does not prove outside access. Report it as unverified until tested.
+9. At the end, ask the owner once whether they would like to star the repository on
+   GitHub to support the project. Star it only on a clear yes, with
+   `gh repo star javiersgjavi/ade-call` if `gh` is signed in to their account, or
+   give them the repository link otherwise. Never star it without asking, and do not
+   ask again.
 
 ## Secrets and personal data
 

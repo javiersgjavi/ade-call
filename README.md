@@ -84,7 +84,7 @@ npm start
 npm run access -- pair --url http://127.0.0.1:8787 --name "Laptop"
 ```
 
-Open the `link` it prints and press **Pair browser**. Save your OpenAI key in **Settings → API keys**, or from your terminal without echo as in [Installation](docs/installation.md#3-store-the-openai-key); either way it lands in `~/.config/ade-call/config.json`, readable only by you. Then press **Call**, allow the microphone and ask "What projects do I have?". To use it from your phone, set up the [service and HTTPS](docs/deployment.md) first. [Installation](docs/installation.md) covers each step and its checks.
+Open the `link` it prints and press **Pair browser**. Save your OpenAI (or Gemini) key in **Settings → API keys**, or from your terminal without echo as in [Installation](docs/installation.md#3-store-the-voice-key); either way it lands in `~/.config/ade-call/config.json`, readable only by you. Then press **Call**, allow the microphone and ask "What projects do I have?". To use it from your phone, set up the [service and HTTPS](docs/deployment.md) first. [Installation](docs/installation.md) covers each step and its checks.
 
 ## Install with a coding agent
 

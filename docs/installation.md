@@ -12,7 +12,7 @@ t3 --help        # or: orca-ide --help
 
 - **Node 24+ and npm.** The server relies on Node's built-in SQLite and TypeScript support; older versions are not supported.
 - **An ADE on the same machine.** For T3, the `t3` CLI must be on `PATH` (or in `~/.local/bin/t3`) and have at least one project. If it lives elsewhere, set `T3_BIN` to its absolute path; if T3 keeps its data outside `~/.t3`, set `T3CODE_HOME`. The adapter is tested against T3 0.1.9; see [T3 compatibility](t3.md). For Orca, the `orca-ide` CLI must be on `PATH` or in `ORCA_BIN`, with its repositories registered (`orca-ide repo add --path /path/to/repo --json`). Do not point `ORCA_BIN` at `orca`, the Linux screen reader. One ADE is enough: on a machine with only Orca, T3 shows as unavailable.
-- **An API key for the voice.** OpenAI Realtime is the default; [Gemini Live](gemini.md) is an experimental alternative chosen in **Settings → Voice**. You need the key of the provider you use: for Gemini, a Gemini API key from Google AI Studio with billing, saved in **Settings → API keys** or set as `GEMINI_API_KEY`. The rest of this item and step 3 are about the OpenAI key.
+- **An API key for the voice.** OpenAI Realtime is the default; [Gemini Live](gemini.md) is an experimental alternative chosen in **Settings → Voice**. You need the key of the provider you use: for Gemini, a Gemini API key from Google AI Studio with billing, saved in **Settings → API keys** or set as `GEMINI_API_KEY`. The next item is about the OpenAI key; step 3 stores either.
 - **An OpenAI API key** with access to the Realtime model, on an account with billing set up and credit available. Create one following [OpenAI's quickstart](https://developers.openai.com/api/docs/quickstart). ADE Call only checks the key's format when you save it. Without credit, every call fails with `OpenAI Realtime could not create the call (429, …)` and OpenAI's quota message; a wrong key fails with `401`, and one without access to the model with `403`. See [Troubleshooting](troubleshooting.md#common-problems).
 
 Three different credentials are involved, and they do not replace each other:
@@ -36,35 +36,37 @@ Clone into a permanent folder, such as `~/ade-call`. The [systemd service](deplo
 
 `npm test` compiles the TypeScript sources into `dist/` and runs the test suite against simulated providers. It needs no keys and does not touch your ADE. `npm ci` installs development dependencies, which the build needs; if `NODE_ENV=production` is set, use `npm ci --include=dev`.
 
-## 3. Store the OpenAI key
+## 3. Store the voice key
 
 Keep the key out of chats, shell history and command lines. Two ways do this:
 
-- **From your own terminal, without echo.** Run this on the server machine. It asks for the key without showing it, creates the configuration directory with mode `700`, and writes `openaiKey` into `config.json` with mode `600`, keeping any other field already there. It uses `ADE_CALL_CONFIG` if you set one.
+- **From your own terminal, without echo.** Run this on the server machine. It asks for the key without showing it, creates the configuration directory with mode `700`, and writes the key (`openaiKey`, or `geminiKey`) into `config.json` with mode `600`, keeping any other field already there. It uses `ADE_CALL_CONFIG` if you set one. For a Gemini key, set `field=geminiKey` in the first line.
 
   ```bash
+  field=openaiKey
   dir="${ADE_CALL_CONFIG:-$HOME/.config/ade-call}"
   mkdir -p "$dir" && chmod 700 "$dir"
-  read -rsp 'OpenAI API key: ' key; echo
+  read -rsp "API key ($field): " key; echo
   printf '%s' "$key" | node -e '
   const fs = require("node:fs"), file = require("node:path").join(process.argv[1], "config.json");
   const text = fs.existsSync(file) ? fs.readFileSync(file, "utf8").trim() : "";
   const config = text ? JSON.parse(text) : {};
-  config.openaiKey = fs.readFileSync(0, "utf8").trim();
-  if (!config.openaiKey) { console.error("No key entered; config.json unchanged."); process.exit(1); }
+  const field = process.argv[2];
+  config[field] = fs.readFileSync(0, "utf8").trim();
+  if (!config[field]) { console.error("No key entered; config.json unchanged."); process.exit(1); }
   fs.writeFileSync(file + ".tmp", JSON.stringify(config, null, 2) + "\n", { mode: 0o600 });
   fs.chmodSync(file + ".tmp", 0o600);
   fs.renameSync(file + ".tmp", file);
-  console.log("Saved openaiKey in " + file);
-  ' "$dir"
-  unset key
+  console.log("Saved " + field + " in " + file);
+  ' "$dir" "$field"
+  unset key field
   ```
 
   `printf` is a shell builtin, so the key never appears in the process list. If `config.json` exists but is not valid JSON, the script stops and leaves it untouched.
 
 - **From the page.** Start the server and pair the browser first (steps 4 and 5), then open **Settings → API keys** and press **Save key**. The server writes the same field with the same permissions; the page never shows the key again. See [Settings](configuration.md#settings).
 
-`openaiKey` is the only required field. The voice model, voice, reasoning effort, turn detection and noise reduction are optional and listed in [Configuration](configuration.md). As an alternative to the file, export `OPENAI_API_KEY` in the environment of the server; the file takes priority. `.env` files are not read.
+The key of the provider you use is the only required field. For Gemini, also choose `gemini-3.8-live` in **Settings → Voice**, or set `"realtimeModel": "gemini-3.8-live"` in `config.json`. The voice model, voice, reasoning effort, turn detection and noise reduction are optional and listed in [Configuration](configuration.md). As an alternative to the file, export `OPENAI_API_KEY` (or `GEMINI_API_KEY`) in the environment of the server; the file takes priority. `.env` files are not read.
 
 ## 4. Start the server
 
