@@ -271,6 +271,47 @@ test('a socket that cannot open a signed URL never quotes it', async t => {
   await assert.rejects(f.start(), (error: Error) => /could not be connected/.test(error.message) && !/secret-token/.test(error.message));
 });
 
+test('words transcribed after a send request arrived never authorize it, even in the same tick', async t => {
+  const f = fixture(); t.after(() => f.close());
+  await f.start();
+  f.call('fake_send', 'call_early', { message: 'hola' });
+  f.heard('Espera.');
+  await wait(100);
+  assert.deepEqual(f.runs, []);
+  assert.match(f.results().find(r => r.tool_call_id === 'call_early')!.result, /no_user_turn/);
+  // A yes before the request authorizes it, and later words do not move what it used.
+  f.heard('Sí, mándalo.');
+  f.call('fake_send', 'call_yes', { message: 'hola' });
+  f.heard('Y otra cosa.');
+  await wait(100);
+  assert.equal(f.runs.length, 1);
+  f.call('fake_send', 'call_next', { message: 'otra' });
+  await wait(100);
+  assert.equal(f.runs.length, 2, '"Y otra cosa." came after the first send used its turn: it is a new turn');
+});
+
+test('a refused new tool keeps the saved agent and tools', async t => {
+  const f = fixture(); t.after(() => f.close());
+  const one = await f.start(); f.eleven.close(one.session.id);
+  const extra: DirectTool = { name: 'fake_more', description: 'More', parameters: { type: 'object' }, execute: async () => ({ text: 'ok' }) };
+  f.ade.tools.push(extra);
+  const real = f.provider.api;
+  f.provider.api = async (path, init = {}) => path === '/v1/convai/tools' ? { status: 400, json: { detail: 'invalid schema' } } : real(path, init);
+  f.provider.requests = [];
+  await assert.rejects(f.start(), /refused the tool fake_more \(400/);
+  assert.deepEqual(f.provider.requests, [], 'after the refused tool, nothing else is created, updated or removed');
+  assert.equal(f.provider.tools.size, 2); assert.equal(f.provider.agents.size, 1);
+});
+
+test('a page that never attaches is closed; a call still connecting is not', async t => {
+  const f = fixture(); t.after(() => f.close());
+  const result = await f.eleven.create();
+  const call = f.eleven.sessions.get(result.session.id)!;
+  call.seen = Date.now() - 46_000;
+  (f.eleven as unknown as { timer: { _onTimeout: () => void } }).timer._onTimeout();
+  assert.equal(f.eleven.sessions.has(result.session.id), false, 'no page attached within 45 s of connecting');
+});
+
 test('the provider closing the conversation ends the call; work sent keeps running', async t => {
   const f = fixture(); t.after(() => f.close());
   const result = await f.start();
@@ -287,10 +328,12 @@ test('without a key no call starts', async () => {
   eleven.shutdown();
 });
 
-test('error text never carries an ElevenLabs key or a signed URL', async () => {
+test('error text never carries a key or a signed URL token, and ordinary names stay', async () => {
   const { redact } = await import('../src/direct/text.mjs');
-  assert.equal(redact('Invalid header value "sk_0123456789abcdef\nx"'), 'Invalid header value "[credential omitted]\nx"');
-  assert.equal(redact('Invalid URL: wss://api.elevenlabs.io/v1/convai/conversation?agent_id=a&conversation_signature=abc def'), 'Invalid URL: [credential omitted] def');
-  assert.equal(redact('see https://example.invalid/?token=abc'), 'see [credential omitted]');
-  assert.equal(redact('sk-openai-key and AIzaGoogle'), '[credential omitted] and [credential omitted]');
+  const key = 'sk_0123456789abcdef0123456789abcdef01234567';
+  assert.equal(redact(`Invalid header value "${key}\nx"`), 'Invalid header value "[credential omitted]\nx"');
+  assert.equal(redact('Invalid URL: wss://api.elevenlabs.io/v1/convai/conversation?agent_id=a&conversation_signature=abc def'), 'Invalid URL: wss://api.elevenlabs.io/v1/convai/conversation?agent_id=a&conversation_signature=[credential omitted] def');
+  assert.equal(redact('{"url":"https://example.invalid/?token=abc","status":"failed","exitCode":1}'), '{"url":"https://example.invalid/?token=[credential omitted]","status":"failed","exitCode":1}');
+  assert.equal(redact('sk-proj-0123456789abcdefghij and AIzaSyA0123456789abcdefghijklmnopqrstu'), '[credential omitted] and [credential omitted]');
+  for (const name of ['task_queue.mts', 'disk-usage', 'risk_assessment_v2', 'ask_user']) assert.equal(redact(name), name);
 });

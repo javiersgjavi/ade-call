@@ -128,9 +128,10 @@ function detail(json: unknown) {
   return redact(String(message)).slice(0, 300);
 }
 // A refusal from the provider, with its status.
-class ProviderError extends StatusError { constructor(message: string, readonly provider: number) { super(502, message); } }
+// agent: the refusal is of the agent (one that names its tools), not of a new tool.
+class ProviderError extends StatusError { constructor(message: string, readonly provider: number, readonly agent = false) { super(502, message); } }
 // The provider no longer has an agent or tool this installation kept.
-const missing = (error: unknown) => error instanceof ProviderError && (error.provider === 404 || error.provider === 422 || (error.provider === 400 && /tool/i.test(error.message)));
+const missing = (error: unknown) => error instanceof ProviderError && (error.provider === 404 || error.provider === 422 || (error.provider === 400 && error.agent));
 // Stored in the server's meta: the agent and tools this installation created,
 // for the account of the key that created them (a fingerprint, not the key).
 interface AgentState { account: string; agentId?: string; hash?: string; tools: Record<string, { id: string; hash: string }> }
@@ -201,8 +202,9 @@ export class ElevenLabsCalls {
     this.api = api || elevenlabsApi;
     this.connect = connect || connectElevenLabs;
     this.timer = setInterval(() => {
-      // A call still connecting (creating the agent can take a while) has no page yet.
-      for (const [id, call] of this.sessions) if (call.browser && Date.now() - call.seen > 45_000) this.close(id, `The connection with the phone was lost. Requests keep running in ${this.ade.name}.`);
+      // A call still connecting (creating the agent can take a while) has no page yet;
+      // one whose page never attaches is closed 45 s after it connected.
+      for (const [id, call] of this.sessions) if (!(this.creating && !call.ready) && Date.now() - call.seen > 45_000) this.close(id, `The connection with the phone was lost. Requests keep running in ${this.ade.name}.`);
     }, 10_000).unref();
   }
   apply(settings: ElevenLabsSettings) { this.llm = settings.llm || ELEVENLABS_DEFAULTS.llm; this.voice = settings.voice || ELEVENLABS_DEFAULTS.voice; }
@@ -240,12 +242,12 @@ export class ElevenLabsCalls {
     if (state.agentId) {
       const patched = await api(`/v1/convai/agents/${encodeURIComponent(state.agentId)}`, { method: 'PATCH', body: spec });
       if (patched.status < 300) updated = true;
-      else if (patched.status !== 404) throw new ProviderError(`ElevenLabs refused the agent update (${patched.status}: ${detail(patched.json)}).`, patched.status);
+      else if (patched.status !== 404) throw new ProviderError(`ElevenLabs refused the agent update (${patched.status}: ${detail(patched.json)}).`, patched.status, true);
     }
     if (!updated) {
       const created = await api('/v1/convai/agents/create', { method: 'POST', body: spec });
       const id = (created.json as { agent_id?: string })?.agent_id;
-      if (created.status >= 300 || !id) throw new ProviderError(`ElevenLabs refused the agent (${created.status}: ${detail(created.json)}).`, created.status);
+      if (created.status >= 300 || !id) throw new ProviderError(`ElevenLabs refused the agent (${created.status}: ${detail(created.json)}).`, created.status, true);
       state.agentId = id;
     }
     state.hash = hash; this.store.meta(AGENT_META, state);
@@ -460,21 +462,24 @@ export class ElevenLabsCalls {
     if (known) { this.result(call, id, known.output); return; }
     if (call.toolsPending.has(id)) return;
     call.toolsPending.add(id); this.slot(call, `fn:${id}`);
-    void this.tool(call, id, request.tool_name || '', request.parameters ?? {}).then(output => {
+    // The conversation as it is now, before any await: words that arrive later
+    // (even in the same tick) are a later turn and never authorize this call.
+    const arrival = { at: call.direct?.turns().at(-1) };
+    void this.tool(call, id, request.tool_name || '', request.parameters ?? {}, arrival).then(output => {
       call.toolsPending.delete(id);
       call.results.set(id, { name: request.tool_name, output });
       if (!call.closed && !call.closing) { this.result(call, id, output); this.flush(call); }
     });
   }
   result(call: ElevenLabsCall, id: string, output: string) { this.send(call, { type: 'client_tool_result', tool_call_id: id, result: output, is_error: false }); }
-  async tool(call: ElevenLabsCall, callId: string, name: string, args: Record<string, unknown>) {
+  async tool(call: ElevenLabsCall, callId: string, name: string, args: Record<string, unknown>, arrival?: { at: { role: string; text: string } | undefined }) {
     const direct = call.direct;
     if (!direct) return voiceNoteText('abandoned');
     this.running++;
     let run;
     try {
       run = await direct.run({ name, call_id: callId, arguments: JSON.stringify(args) }, {
-        requestId: requestIdFor('voice', call.id, callId), signal: AbortSignal.timeout(90_000),
+        requestId: requestIdFor('voice', call.id, callId), signal: AbortSignal.timeout(90_000), arrival,
         // ElevenLabs sends a turn's transcript before the LLM answers it: speech
         // that arrives after the call is a later turn and never authorizes it.
         beforeSend: async () => {

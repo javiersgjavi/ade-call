@@ -170,7 +170,7 @@ test('Orca text output: grouped listing, generic terminal rendering, redaction a
     assert.match(text, /^ORCA PROJECTS: 1 · activity queried\nIncomplete discovery/);
     assert.match(text, /- P · id p\n {2}· workspace "principal" id p::\/repo\n {4}- terminal term_1 · agent codex · connected\n {4}- terminal term_2 · shell \(no agent\) · connected/);
   } finally { listing.cleanup(); }
-  const read = setup(async () => ({ terminal: { text: 'line 1\nkey sk-secret-1\nline 3', nextCursor: 42 } }));
+  const read = setup(async () => ({ terminal: { text: 'line 1\nkey sk-proj-secret0123456789abcdef\nline 3', nextCursor: 42 } }));
   try {
     const text = (await read.tools.orca_read_terminal.execute('', { projectId: 'p', terminal: 'term_1' })).content[0].text;
     assert.match(text, /^TERMINAL term_1 · project p · agent codex\nTerminal output, not structured chat messages/);
