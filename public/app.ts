@@ -406,7 +406,7 @@ async function boot() {
     resetCalls(); $('messages').append(emptyState);
     $('login').hidden = true; $('workspace').hidden = false;
     discovered(status.runtime);
-    if (!tourSeen(localStorage) && !$('settings').open) tour.start();
+    if (!tourSeen(localStorage) && !$('settings').open && !localCall()) tour.start();
     // Stored up to the cursor; the stream sends everything after it. The
     // stream opens first and its events wait until the history is drawn: a
     // failed history read leaves the call live, never without updates.
@@ -907,7 +907,7 @@ $('open-settings').onclick = () => {
   for (const block of $('settings').querySelectorAll<HTMLElement>('.settings-tabs, .settings-block[data-auth]')) block.hidden = !signedIn;
   showSettingsTab(signedIn ? settingsTab : 'general', false);
   formStatus('voice-status', ''); formStatus('instructions-status', ''); formStatus('key-status', ''); formStatus('gemini-key-status', '');
-  $('tour-restart').disabled = !!(stream || callId);
+  $('tour-restart').disabled = localCall();
   $('settings').showModal();
   if (signedIn) { void refreshBrowsers(); void loadVoiceSettings(); watchSettingsBusy(); }
 };
@@ -962,7 +962,7 @@ const tour = new Tour({
   dialog: $('tour'), spot: $('tour-spot'), card: $('tour-card'), count: $('tour-count'), title: $('tour-title'), body: $('tour-body'),
   skip: $('tour-skip'), back: $('tour-back'), next: $('tour-next'),
 }, () => markTourSeen(localStorage));
-$('tour-restart').onclick = () => { $('settings').close(); tour.start(); };
+$('tour-restart').onclick = () => { $('settings').close(); if (!localCall()) tour.start(); };
 $('settings').addEventListener('click', event => { if (event.target === $('settings')) $('settings').close(); });
 // The page is rebuilt in the new language by reloading it, never in the middle of a call.
 $('ui-language').onchange = () => {

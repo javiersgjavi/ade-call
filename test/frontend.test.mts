@@ -553,10 +553,15 @@ test('first-visit tour: shown once, skippable, repeatable from Settings and plac
   const store = new Map<string, string>();
   const storage = { getItem: (key: string) => store.get(key) ?? null, setItem: (key: string, value: string) => void store.set(key, value) };
   assert.equal(tourSeen(storage), false);
-  markTourSeen(storage); assert.equal(store.get(TOUR_KEY), TOUR_VERSION); assert.equal(tourSeen(storage), true);
-  store.set(TOUR_KEY, '0'); assert.equal(tourSeen(storage), false, 'a new tour version shows again');
+  store.set(TOUR_KEY, '0'); assert.equal(tourSeen(storage), false, 'an older tour version shows again');
   const blocked = { getItem: () => { throw new Error('blocked'); }, setItem: () => { throw new Error('blocked'); } };
-  assert.equal(tourSeen(blocked), true); assert.doesNotThrow(() => markTourSeen(blocked));
+  assert.equal(tourSeen(blocked), true);
+  markTourSeen(storage); assert.equal(store.get(TOUR_KEY), TOUR_VERSION); assert.equal(tourSeen(storage), true);
+  // Storage that reads but refuses writes (full): ended in this page, it stays ended.
+  const fresh = await import(new URL('../public/tour.js?full-storage', import.meta.url).href) as typeof import('../public/tour.js');
+  const full = { getItem: () => null, setItem: () => { throw new Error('quota'); } };
+  assert.equal(fresh.tourSeen(full), false);
+  assert.doesNotThrow(() => fresh.markTourSeen(full)); assert.equal(fresh.tourSeen(full), true);
   // Placement: below, else above, else over a tall target; always inside the viewport.
   const view = { width: 400, height: 800 }, card = { width: 360, height: 200 };
   assert.deepEqual(placeCard(null, card, view), { top: 300, left: 20, side: 'center' });
@@ -568,9 +573,10 @@ test('first-visit tour: shown once, skippable, repeatable from Settings and plac
   // repeated from Settings, which offers it only outside a call.
   assert.match(tag('tour'), /<dialog id="tour" class="tour" aria-labelledby="tour-title" aria-describedby="tour-body">/);
   for (const id of ['tour-skip', 'tour-back', 'tour-next', 'tour-restart']) assert.match(tag(id), /type="button"/);
-  assert.match(app, /if \(!tourSeen\(localStorage\) && !\$\('settings'\)\.open\)\s+tour\.start\(\)/);
-  assert.match(app, /\$\('tour-restart'\)\.onclick = \(\) => \{ \$\('settings'\)\.close\(\); tour\.start\(\); \}/);
-  assert.match(app, /\$\('tour-restart'\)\.disabled = !!\(stream \|\| callId\)/);
+  assert.match(app, /if \(!tourSeen\(localStorage\) && !\$\('settings'\)\.open && !localCall\(\)\)\s+tour\.start\(\)/);
+  assert.match(app, /\$\('tour-restart'\)\.onclick = \(\) => \{ \$\('settings'\)\.close\(\);\s+if \(!localCall\(\)\)\s+tour\.start\(\);\s+\}/);
+  assert.match(app, /\$\('tour-restart'\)\.disabled = localCall\(\)/);
+  assert.match(html, /<div class="tour-text" aria-live="polite">/, 'each step is announced');
   assert.match(readFileSync(new URL('../src/server.mjs', import.meta.url), 'utf8'), /'tour'/, 'the module is served');
   assert.equal(t('tour.count', { current: 2, total: 7 }), '2 of 7');
 });

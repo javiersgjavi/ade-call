@@ -339,9 +339,11 @@
   <dialog id="tour" class="tour" aria-labelledby="tour-title" aria-describedby="tour-body">
     <div id="tour-spot" class="tour-spot" aria-hidden="true"></div>
     <div id="tour-card" class="tour-card">
-      <p id="tour-count" class="tour-count"></p>
-      <h2 id="tour-title"></h2>
-      <p id="tour-body"></p>
+      <div class="tour-text" aria-live="polite">
+        <p id="tour-count" class="tour-count"></p>
+        <h2 id="tour-title"></h2>
+        <p id="tour-body"></p>
+      </div>
       <div class="tour-actions">
         <button id="tour-skip" class="btn btn-ghost tour-skip" type="button" data-i18n="tour.skip">Skip tour</button>
         <button id="tour-back" class="btn btn-ghost" type="button" data-i18n="tour.back">Back</button>

@@ -1020,6 +1020,8 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
   position: fixed;
   box-sizing: border-box;
   width: min(380px, calc(100vw - 2 * var(--gutter)));
+  max-height: calc(100dvh - 2 * var(--gutter));
+  overflow-y: auto;
   padding: 18px 20px 16px;
   border: 1px solid var(--line-strong);
   border-radius: var(--r);
@@ -1031,7 +1033,7 @@ audio { display: block; width: 100%; max-width: 320px; height: 40px; margin: 14p
 .tour[data-ready] .tour-card { transition: top .3s var(--ease), left .3s var(--ease); }
 .tour-count { margin: 0 0 6px; color: var(--faint); font-family: var(--mono); font-size: 12px; }
 .tour-card h2 { margin: 0 0 8px; font-family: var(--serif); font-weight: 400; font-size: 22px; line-height: 1.2; }
-.tour-card h2 + p { margin: 0; color: var(--muted); line-height: 1.5; }
+.tour-text p:last-child { margin: 0; color: var(--muted); line-height: 1.5; }
 .tour-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; margin-top: 16px; }
 .tour-actions .btn { padding-inline: 14px; }
 .tour-actions .tour-skip { margin-right: auto; border-color: transparent; color: var(--muted); padding-inline: 8px; }

@@ -17,11 +17,15 @@ export const TOUR_STEPS: readonly TourStep[] = [
 // Bump the version when the tour changes enough to show it again.
 export const TOUR_KEY = 'tour-seen', TOUR_VERSION = '1';
 // Storage that throws (blocked site data) counts as seen: a tour on every load is worse than none.
+// A tour ended in this page stays ended even if storage refused to save it.
+let dismissed = false;
 export function tourSeen(storage: Pick<Storage, 'getItem'>) {
+  if (dismissed) return true;
   try { return storage.getItem(TOUR_KEY) === TOUR_VERSION; } catch { return true; }
 }
 export function markTourSeen(storage: Pick<Storage, 'setItem'>) {
-  try { storage.setItem(TOUR_KEY, TOUR_VERSION); } catch { /* Not remembered; the tour may show again. */ }
+  dismissed = true;
+  try { storage.setItem(TOUR_KEY, TOUR_VERSION); } catch { /* Not remembered after a reload; the tour may show again. */ }
 }
 
 export type Box = { top: number; left: number; width: number; height: number };
@@ -72,6 +76,8 @@ export class Tour {
     this.steps = TOUR_STEPS.map(step => ({ step, element: step.target ? document.querySelector(step.target) : null }))
       .filter(({ step, element }) => !step.target || (element && element.getClientRects().length));
     delete this.parts.dialog.dataset.ready;
+    // The first step is written before opening, so the dialog opens with its name and description.
+    this.fill(0);
     this.parts.dialog.showModal();
     this.show(0);
     requestAnimationFrame(() => { this.parts.dialog.dataset.ready = ''; });
@@ -82,14 +88,18 @@ export class Tour {
     this.parts.dialog.close();
     this.onEnd();
   }
-  private show(index: number) {
-    const { step, element } = this.steps[index];
-    this.index = index;
+  private fill(index: number) {
+    const { step } = this.steps[index];
     this.parts.count.textContent = t('tour.count', { current: index + 1, total: this.steps.length });
     this.parts.title.textContent = t(step.title); this.parts.body.textContent = t(step.body);
     this.parts.back.hidden = index === 0;
     this.parts.next.textContent = t(index === this.steps.length - 1 ? 'tour.done' : 'tour.next');
     this.parts.skip.hidden = index === this.steps.length - 1;
+  }
+  private show(index: number) {
+    const { element } = this.steps[index];
+    this.index = index;
+    this.fill(index);
     this.resized.disconnect(); this.resized.observe(this.parts.card); this.resized.observe(document.body);
     if (element) {
       this.resized.observe(element);
