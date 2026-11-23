@@ -274,7 +274,7 @@ const en = {
   'tour.projectsTitle': 'Projects',
   'tour.projectsBody': 'The projects of your ADE and the threads this conversation is working with. Ask the voice about any of them by name.',
   'tour.settingsTitle': 'Settings',
-  'tour.settingsBody': 'Language, voice model, API keys and paired devices, to call from your phone too. Each call uses paid time on your API key. You can repeat this tour from Settings → General.',
+  'tour.settingsBody': 'In Voice, choose among several models from different providers (OpenAI GPT Realtime or Gemini Live) and add custom instructions for the voice. Here too: language, API keys and paired devices, to call from your phone. Each call uses paid time on your API key. You can repeat this tour from Settings → General.',
   'tour.settingsBlock': 'Guided tour',
   'tour.restartHint': 'A short walk through the page: calling, sending work to agents, the conversation and the projects.',
   'tour.restart': 'Take the tour again'
@@ -555,7 +555,7 @@ const es: Dictionary = {
   'tour.projectsTitle': 'Proyectos',
   'tour.projectsBody': 'Los proyectos de tu ADE y los hilos con los que trabaja esta conversación. Pregúntale a la voz por cualquiera de ellos por su nombre.',
   'tour.settingsTitle': 'Ajustes',
-  'tour.settingsBody': 'Idioma, modelo de voz, claves API y dispositivos vinculados, para llamar también desde el móvil. Cada llamada consume tiempo de pago de tu clave API. Puedes repetir este tour desde Ajustes → General.',
+  'tour.settingsBody': 'En Voz, elige entre varios modelos de distintos proveedores (OpenAI GPT Realtime o Gemini Live) y añade instrucciones personalizadas para la voz. Aquí también están el idioma, las claves API y los dispositivos vinculados, para llamar desde el móvil. Cada llamada consume tiempo de pago de tu clave API. Puedes repetir este tour desde Ajustes → General.',
   'tour.settingsBlock': 'Tour guiado',
   'tour.restartHint': 'Un recorrido corto por la página: llamar, enviar trabajo a los agentes, la conversación y los proyectos.',
   'tour.restart': 'Hacer el tour de nuevo'
