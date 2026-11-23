@@ -288,8 +288,8 @@ Diagnostics and optional call recordings are covered in
 [troubleshooting.md](troubleshooting.md).
 
 The first time a browser opens the workspace, a short tour
-([tour.ts](../public/tour.ts)) walks through the ADE switch, calling, how work
-is sent to agents, the conversation, the projects and Settings. Finishing or
+([tour.ts](../public/tour.ts)) walks through the ADE switch, calling, that sent
+work keeps running after hanging up, the conversation, the projects and Settings. Finishing or
 skipping it (Escape also skips) is remembered in that browser's
 `localStorage`; **Settings → General → Take the tour again** repeats it, except
 during a call. Steps whose part of the page is hidden are left out.
