@@ -905,7 +905,7 @@ function openSettings(tab?: SettingsTab) {
   const signedIn = !$('workspace').hidden;
   $('settings').dataset.signedIn = String(signedIn);
   for (const block of $('settings').querySelectorAll<HTMLElement>('.settings-tabs, .settings-block[data-auth]')) block.hidden = !signedIn;
-  showSettingsTab(signedIn ? tab || settingsTab : 'general', false);
+  showSettingsTab(signedIn ? tab || settingsTab : 'general', false, !tab);
   formStatus('voice-status', ''); formStatus('instructions-status', ''); formStatus('key-status', ''); formStatus('gemini-key-status', '');
   $('tour-restart').disabled = localCall();
   $('settings').showModal();
@@ -938,8 +938,9 @@ function watchSettingsBusy() {
 // one chosen is reopened in this page; arrow keys move between tabs.
 let settingsTab: SettingsTab = 'general';
 const settingsTabs = () => [...$('settings').querySelectorAll<HTMLButtonElement>('[role="tab"]')];
-function showSettingsTab(tab: SettingsTab, focus = true) {
-  settingsTab = tab;
+// The tour shows tabs without changing the one Settings reopens on.
+function showSettingsTab(tab: SettingsTab, focus = true, remember = true) {
+  if (remember) settingsTab = tab;
   for (const button of settingsTabs()) {
     const selected = button.dataset.tab === tab;
     button.setAttribute('aria-selected', String(selected)); button.tabIndex = selected ? 0 : -1;
@@ -963,7 +964,7 @@ const tour = new Tour({
   skip: $('tour-skip'), back: $('tour-back'), next: $('tour-next'),
 }, tab => {
   if (!tab) { if ($('settings').open) $('settings').close(); return false; }
-  if ($('settings').open) { showSettingsTab(tab, false); return false; }
+  if ($('settings').open) { showSettingsTab(tab, false, false); return false; }
   openSettings(tab); return true;
 }, () => markTourSeen(localStorage));
 $('tour-restart').onclick = () => { $('settings').close(); if (!localCall()) tour.start(); };

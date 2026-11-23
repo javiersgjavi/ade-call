@@ -582,7 +582,7 @@ test('first-visit tour: shown once, skippable, repeatable from Settings and plac
   assert.match(app, /\$\('tour-restart'\)\.disabled = localCall\(\)/);
   // The tour opens Settings on a tab, keeps it open between its steps and closes it at the end.
   assert.match(app, /\$\('open-settings'\)\.onclick = \(\) => openSettings\(\)/);
-  assert.match(app, /if \(\$\('settings'\)\.open\) \{\s*showSettingsTab\(tab, false\);\s*return false;\s*\}\s*openSettings\(tab\);\s*return true;/);
+  assert.match(app, /if \(\$\('settings'\)\.open\) \{\s*showSettingsTab\(tab, false, false\);\s*return false;\s*\}\s*openSettings\(tab\);\s*return true;/);
   assert.match(html, /<div class="tour-text" aria-live="polite">/, 'each step is announced');
   assert.match(readFileSync(new URL('../src/server.mjs', import.meta.url), 'utf8'), /'tour'/, 'the module is served');
   assert.equal(t('tour.count', { current: 2, total: 7 }), '2 of 7');

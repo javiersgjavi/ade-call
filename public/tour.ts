@@ -16,7 +16,7 @@ export const TOUR_STEPS: readonly TourStep[] = [
   { target: '#open-settings', title: 'tour.settingsTitle', body: 'tour.settingsBody' },
   { target: '#general-settings', settings: 'general', title: 'tour.generalTitle', body: 'tour.generalBody' },
   { target: '.setting[data-field="model"]', settings: 'voice', title: 'tour.modelTitle', body: 'tour.modelBody' },
-  { target: '#instructions-form', settings: 'voice', title: 'tour.instructionsTitle', body: 'tour.instructionsBody' },
+  { target: '#custom-instructions', settings: 'voice', title: 'tour.instructionsTitle', body: 'tour.instructionsBody' },
   { target: '#key-settings', settings: 'key', title: 'tour.keysTitle', body: 'tour.keysBody' },
   { target: '#browser-access', settings: 'devices', title: 'tour.devicesTitle', body: 'tour.devicesBody' },
   { title: 'tour.endTitle', body: 'tour.endBody' },
@@ -62,6 +62,7 @@ type Parts = { dialog: HTMLDialogElement; spot: HTMLElement; card: HTMLElement; 
 export class Tour {
   private steps: TourStep[] = [];
   private element: Element | null = null;
+  private returnFocus: Element | null = null;
   private index = 0;
   private frame = 0;
   private readonly resized: ResizeObserver;
@@ -88,6 +89,8 @@ export class Tour {
   // left out; those in Settings only need to exist, since Settings is closed now.
   start() {
     if (this.open) return;
+    // Re-showing the dialog over Settings loses its own return target, so the tour keeps it.
+    this.returnFocus = document.activeElement;
     this.steps = TOUR_STEPS.filter(step => {
       const element = step.target ? document.querySelector(step.target) : null;
       return !step.target || (element && (step.settings || element.getClientRects().length));
@@ -104,6 +107,7 @@ export class Tour {
     this.resized.disconnect();
     this.parts.dialog.close();
     this.settings(null);
+    if (this.returnFocus instanceof HTMLElement && this.returnFocus.isConnected) this.returnFocus.focus();
     this.onEnd();
   }
   private fill(index: number) {
@@ -125,7 +129,9 @@ export class Tour {
     if (element) {
       this.resized.observe(element);
       const box = element.getBoundingClientRect();
-      element.scrollIntoView({ block: box.height > innerHeight * 0.6 ? 'start' : 'center', behavior: 'auto' });
+      // On a phone, Settings fills the screen: a part of it goes to the top so the card fits below.
+      const top = box.height > innerHeight * 0.6 || (step.settings && innerWidth < 900);
+      element.scrollIntoView({ block: top ? 'start' : 'center', behavior: 'auto' });
     }
     this.place();
     // Focus moves for keyboards and screen readers, without a ring on every tap.
