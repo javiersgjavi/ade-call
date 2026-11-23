@@ -753,7 +753,7 @@ function rowState(field: VoiceSettingField, state: 'saving' | 'saved' | 'error' 
 // Only the settings of the chosen model's provider are shown; the others keep their values.
 function showProviderRows(model: string) {
   const provider = modelProvider(model);
-  for (const row of $('voice-form').querySelectorAll<HTMLElement>('.setting[data-provider]')) row.hidden = row.dataset.provider !== provider;
+  for (const row of $('voice-form').querySelectorAll<HTMLElement>('.setting[data-provider]')) row.hidden = !row.dataset.provider!.split(' ').includes(provider);
   for (const group of $('voice-form').querySelectorAll<HTMLElement>('.setting-group')) group.hidden = ![...group.querySelectorAll<HTMLElement>('.setting')].some(row => !row.hidden);
 }
 function saveVoiceField(field: VoiceSettingField, value: string) {

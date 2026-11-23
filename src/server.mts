@@ -70,7 +70,7 @@ catch (error) { throw new Error(`config.json ${INSTRUCTIONS_FIELD}: ${errorMessa
 const provider = (): VoiceProvider => isGeminiModel(realtimeSettings.model) ? 'gemini' : isElevenRealtimeModel(realtimeSettings.model) ? 'elevenlabs' : 'realtime';
 const geminiSettings = () => ({ model: realtimeSettings.model, voice: realtimeSettings.geminiVoice });
 // The model only when it is one of ElevenLabs': the engine falls back to its default otherwise.
-const elevenlabsSettings = () => ({ model: isElevenRealtimeModel(realtimeSettings.model) ? realtimeSettings.model : undefined, voice: realtimeSettings.elevenlabsVoice });
+const elevenlabsSettings = () => ({ model: isElevenRealtimeModel(realtimeSettings.model) ? realtimeSettings.model : undefined, voice: realtimeSettings.elevenlabsVoice, eagerness: realtimeSettings.eagerness });
 const providerKey = () => ({ gemini: geminiKey, elevenlabs: elevenlabsKey, realtime: openaiKey })[provider()]();
 // Voice exists only for an ADE with direct tools (src/direct). Each ADE has
 // one engine per provider; only the configured provider's starts calls.

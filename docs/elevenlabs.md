@@ -57,8 +57,14 @@ There is no WebRTC leg: the Realtime API is WebSocket only. The server holds the
 provider socket with the key and relays the audio, as with Gemini Live, so the
 page never sees the key or a tool call. The page captures 16 kHz PCM; the server
 resamples it to the 24 kHz the provider takes, and the answer comes back at
-24 kHz. When the provider's voice activity detection hears you over the answer,
-the page drops the audio it had queued; **Interrupt** also cancels the response.
+24 kHz. When the provider's voice activity detection hears you, the page drops
+the audio it had queued, even if the provider had already finished the answer;
+**Interrupt** also cancels the response. Muting sends half a second of silence so
+that turn detection ends your turn. The interrupted answer is not truncated in the
+provider's history (as with Gemini); the evaluations do truncate it.
+
+A call starts only once ElevenLabs accepts its session (`session.updated`); a
+refusal, such as an unknown voice, fails the call with the provider's reason.
 
 ## The session
 
@@ -72,8 +78,8 @@ interrupts the answer, and the voice. What differs:
 - Transcription is the provider's own, fixed to the call's language (its
   primary subtag); there is no transcription model to choose and no hint list.
 - Reasoning, noise reduction and the transcription model are OpenAI settings;
-  Settings hides them while an ElevenLabs model is chosen. Turn taking uses the
-  `realtimeEagerness` value.
+  Settings hides them while an ElevenLabs model is chosen. Turn taking
+  (`realtimeEagerness`) is shown and applies; `auto` means ElevenLabs' `medium`.
 - ElevenLabs drops `system` messages, and asking for a response with nothing new
   in the conversation turns the microphone's silence into a user turn (it was
   transcribed as "Sí." in the evaluations). So the resume, the catalog, the

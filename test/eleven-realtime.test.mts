@@ -12,7 +12,12 @@ import { double, fakeAde } from './fixtures.mjs';
 type Message = Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 class Upstream extends EventEmitter {
   readyState = 1; sent: Message[] = [];
-  send(raw: string) { this.sent.push(JSON.parse(raw)); }
+  // refuse: the provider answers the session with an error instead of session.updated.
+  constructor(readonly refuse?: string) { super(); }
+  send(raw: string) {
+    const message = JSON.parse(raw); this.sent.push(message);
+    if (message.type === 'session.update') setImmediate(() => this.emit('message', Buffer.from(JSON.stringify(this.refuse ? { type: 'error', error: { message: this.refuse } } : { type: 'session.updated', session: message.session }))));
+  }
   close() { this.readyState = 3; this.emit('close'); }
 }
 class Browser extends EventEmitter {
@@ -20,15 +25,15 @@ class Browser extends EventEmitter {
   send(data: string | Buffer) { if (Buffer.isBuffer(data)) this.frames.push(data); else this.events.push(JSON.parse(data)); }
   close(code = 1000) { this.readyState = 3; this.closed = code; }
 }
-function fixture({ key = 'test-elevenlabs-key' }: { key?: string } = {}) {
-  const upstream = new Upstream(), browser = new Browser(), models: string[] = [];
+function fixture({ key = 'test-elevenlabs-key', refuse, eagerness }: { key?: string; refuse?: string; eagerness?: string } = {}) {
+  const upstream = new Upstream(refuse), browser = new Browser(), models: string[] = [];
   const published: { type: string; data: Record<string, unknown> }[] = [], runs: Record<string, unknown>[] = [];
   const tools: DirectTool[] = [
     { name: 'fake_send', description: 'Send', parameters: { type: 'object' }, sends: true, execute: async params => { runs.push(params); return { text: 'ok' }; } },
     { name: 'fake_read', description: 'Read', parameters: { type: 'object' }, execute: async () => ({ text: 'read ok' }) }];
   const ade = fakeAde(tools, 'fake CATALOG · p1');
   const eleven = new ElevenRealtimeCalls(double<ConstructorParameters<typeof ElevenRealtimeCalls>[0]>({
-    key, ade, store: { meta() {} }, settings: { model: 'eleven_realtime_v1_mini', voice: 'george' }, publish: (type, data) => published.push({ type, data }),
+    key, ade, store: { meta() {} }, settings: { model: 'eleven_realtime_v1_mini', voice: 'george', ...(eagerness ? { eagerness } : {}) }, publish: (type, data) => published.push({ type, data }),
     context: { conversation: () => ({ id: 'current' }), resume: () => 'Earlier history.', vocabulary: () => ['Faro'], rememberClose() {}, timing: () => ({}) },
     connect: () => { models.push(eleven.model); setImmediate(() => upstream.emit('open')); return upstream; }
   }));
@@ -106,6 +111,25 @@ test('expressive tags are not transcript; closing ends the provider and page soc
   assert.equal(f.upstream.readyState, 3); assert.equal(f.browser.closed, 1000);
 });
 
+test('a session the provider refuses is no call, with the provider\'s reason', async t => {
+  const f = fixture({ refuse: 'Unknown voice: nobody' }); t.after(() => f.close());
+  await assert.rejects(f.eleven.createRelayed(), (error: StatusError) => error.status === 502 && /refused the session: Unknown voice: nobody/.test(error.message));
+  assert.equal(f.eleven.busy, false); assert.equal(f.eleven.sessions.size, 0);
+});
+
+test('speech over audio the page still plays flushes it, and a mute ends the user\'s turn with silence', async t => {
+  const f = fixture({ eagerness: 'high' }); t.after(() => f.close());
+  await f.start();
+  assert.equal(f.upstream.sent.find(m => m.type === 'session.update')!.session.audio.input.turn_detection.eagerness, 'high', 'the configured turn taking');
+  f.emit({ type: 'response.created' }); f.emit({ type: 'response.output_audio.delta', delta: Buffer.alloc(48000).toString('base64') }); f.emit({ type: 'response.done' });
+  f.emit({ type: 'input_audio_buffer.speech_started' });
+  assert.equal(f.browser.events.at(-1)!.type, 'interrupted', 'the provider finished, the page had not');
+  f.browser.emit('message', Buffer.from(JSON.stringify({ type: 'audio.end' })), false);
+  const last = f.upstream.sent.at(-1)!;
+  assert.equal(last.type, 'input_audio_buffer.append'); assert.equal(Buffer.from(last.audio, 'base64').length, 24000, 'half a second at 24 kHz');
+  assert.ok(Buffer.from(last.audio, 'base64').every(byte => byte === 0));
+});
+
 test('16 kHz page audio becomes 24 kHz at the same pace', () => {
   const pcm = Buffer.alloc(1600 * 2);
   for (let i = 0; i < 1600; i++) pcm.writeInt16LE(i * 3, i * 2);
@@ -126,5 +150,6 @@ test('error text never carries a key or a URL token, and ordinary names stay', a
   assert.equal(redact(`Invalid header value "${key}\nx"`), 'Invalid header value "[credential omitted]\nx"');
   assert.equal(redact('{"url":"https://example.invalid/?token=abc","status":"failed","exitCode":1}'), '{"url":"https://example.invalid/?token=[credential omitted]","status":"failed","exitCode":1}');
   assert.equal(redact('sk-proj-0123456789abcdefghij and AIzaSyA0123456789abcdefghijklmnopqrstu'), '[credential omitted] and [credential omitted]');
+  assert.equal(redact('key: __sk-proj-0123456789abcdefghij__'), 'key: __[credential omitted]', 'a key in Markdown bold (its closing marks go with it)');
   for (const name of ['task_queue.mts', 'disk-usage', 'risk_assessment_v2', 'ask_user']) assert.equal(redact(name), name);
 });

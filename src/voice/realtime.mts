@@ -252,7 +252,7 @@ export class RealtimeCalls {
     return new Promise<void>((resolve, reject) => {
       const socket = call.socket = this.connect(call.id);
       socket.once('open', () => { call.attached = true; resolve(); });
-      socket.once('error', () => reject(new StatusError(502, 'The OpenAI Realtime control could not be connected.')));
+      socket.once('error', () => reject(new StatusError(502, 'The voice provider\'s control channel could not be connected.')));
       socket.on('error', () => {});
       socket.on('message', (raw: Buffer) => {
         try { this.event(call, JSON.parse(raw.toString())); }

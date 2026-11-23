@@ -4,6 +4,7 @@ import WebSocket from 'ws';
 import { randomUUID } from 'node:crypto';
 import { directInstructions, type CallLanguage } from '../direct/prompt.mjs';
 import { voiceNoteText } from '../resources.mjs';
+import { redact } from '../direct/text.mjs';
 import { RealtimeCalls, type RealtimeCall, type RealtimeOptions, type RealtimeSession, type RealtimeSettings, type Socket } from './realtime.mjs';
 import type { Socket as AudioSocket } from './gemini.mjs';
 
@@ -48,6 +49,8 @@ export class ElevenRealtimeCalls extends RealtimeCalls {
   override readonly provider = 'elevenlabs';
   // The page's audio socket of each call.
   browsers = new Map<string, AudioSocket>();
+  // Calls waiting for the provider to accept their session.
+  confirming = new Map<string, { resolve: () => void; reject: (error: Error) => void }>();
   constructor(options: RealtimeOptions) {
     const self: { engine?: ElevenRealtimeCalls } = {};
     super({ ...options, connect: options.connect || (() => connectElevenRealtime(self.engine!.key!, self.engine!.model)) });
@@ -86,14 +89,22 @@ export class ElevenRealtimeCalls extends RealtimeCalls {
     const id = `elr_${randomUUID()}`;
     let call: RealtimeCall | undefined;
     try {
+      // The provider accepts the session (session.updated) or refuses it (error).
+      const accepted = new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(() => reject(new StatusError(502, 'ElevenLabs Realtime did not confirm the session.')), 10_000);
+        timer.unref?.();
+        this.confirming.set(id, { resolve: () => { clearTimeout(timer); resolve(); }, reject: error => { clearTimeout(timer); reject(error); } });
+      });
+      accepted.catch(() => {});
       call = this.track(id);
       await this.start(call, { update: true, languages, language });
+      await accepted;
       return { session: { id }, transport: { stream: `/api/live/stream?id=${encodeURIComponent(id)}` } };
     } catch (error) {
       if (call && !call.closed) this.close(id, 'The voice service could not be connected.');
       this.sessions.delete(id);
       throw error instanceof StatusError ? error : new StatusError(502, 'ElevenLabs Realtime could not be connected.');
-    } finally { this.creating = false; }
+    } finally { this.creating = false; this.confirming.delete(id); }
   }
   // The page's audio socket for a call this server created (server.mts checks
   // authentication, origin and the call's owner first).
@@ -103,7 +114,10 @@ export class ElevenRealtimeCalls extends RealtimeCalls {
     this.browsers.set(id, browser); call.seen = Date.now();
     browser.on('message', (data: Buffer, binary: boolean) => {
       try {
-        if (!binary || call.closed || data.length > MAX_FRAME || data.length % 2) return;
+        if (call.closed) return;
+        // Muting stops the frames: half a second of silence lets turn detection end the user's turn.
+        if (!binary) { if (/"audio\.end"/.test(data.toString())) this.send(call, { type: 'input_audio_buffer.append', audio: Buffer.alloc(PROVIDER_RATE).toString('base64') }); return; }
+        if (data.length > MAX_FRAME || data.length % 2) return;
         call.seen = Date.now();
         this.send(call, { type: 'input_audio_buffer.append', audio: toProviderRate(data).toString('base64') });
       } catch { /* Dropped. */ }
@@ -124,7 +138,11 @@ export class ElevenRealtimeCalls extends RealtimeCalls {
     // The answer's audio goes to the page; the user speaking over it (barge-in
     // by the provider's VAD) or the end of the response tells the page.
     if (event.type === 'response.output_audio.delta' && event.delta) { this.toBrowser(call.id, Buffer.from(event.delta, 'base64')); call.greeted = true; }
-    if (event.type === 'input_audio_buffer.speech_started' && call.responding) this.toBrowser(call.id, { type: 'interrupted' });
+    // The page may still be playing an answer the provider finished: always flush it.
+    if (event.type === 'input_audio_buffer.speech_started') this.toBrowser(call.id, { type: 'interrupted' });
+    const confirming = this.confirming.get(call.id);
+    if (confirming && event.type === 'session.updated') confirming.resolve();
+    if (confirming && event.type === 'error') { confirming.reject(new StatusError(502, `ElevenLabs Realtime refused the session: ${redact(String((event as { error?: { message?: string } }).error?.message || 'unknown')).slice(0, 300)}`)); return; }
     if (event.type === 'response.done') this.toBrowser(call.id, { type: 'turn.done' });
     super.event(call, event);
   }
