@@ -44,14 +44,14 @@ export const ELEVENLABS_DEFAULTS = { llm: 'gemini-3.8-flash', voice: 'Sarah' } a
 export const ELEVENLABS_API = 'https://api.elevenlabs.io';
 // Audio formats on both legs: the page sends 16 kHz PCM and plays 24 kHz.
 export const INPUT_RATE = 16_000, OUTPUT_RATE = 24_000;
-// Waiting for a transcript lets a tool call see the words that authorize it.
-const TRANSCRIPT_WAIT_MS = 2500;
 // Browser frames: at most one second of 16 kHz mono PCM each.
 const MAX_FRAME = INPUT_RATE * 2;
 // ElevenLabs boosts at most 50 keywords per conversation.
 const MAX_KEYWORDS = 50;
 // Without the end of a response, the model counts as idle this long after its last audio.
 const RESPONSE_IDLE_MS = 1500;
+// A message that asked for a reply and got no audio at all frees the queue after this.
+const NO_REPLY_MS = 15_000;
 // The provider events this server reads; others are not sent.
 export const CLIENT_EVENTS = ['conversation_initiation_metadata', 'audio', 'interruption', 'user_transcript', 'tentative_user_transcript', 'agent_response',
   'agent_response_correction', 'agent_response_complete', 'client_tool_call', 'ping', 'vad_score', 'client_error'] as const;
@@ -92,7 +92,7 @@ export const toolConfig = (tool: Pick<DirectTool, 'name' | 'description' | 'para
 export const agentSpec = (toolIds: string[], name = 'ADE Call') => ({
   name, tags: ['ade-call'],
   conversation_config: {
-    agent: { first_message: '', language: 'en', prompt: { prompt: 'ADE Call sets the instructions of each call.', llm: ELEVENLABS_DEFAULTS.llm, tool_ids: toolIds, built_in_tools: {}, temperature: 0 } },
+    agent: { first_message: '', language: 'en', prompt: { prompt: voiceNoteText('agentPrompt'), llm: ELEVENLABS_DEFAULTS.llm, tool_ids: toolIds, built_in_tools: {}, temperature: 0 } },
     asr: { user_input_audio_format: `pcm_${INPUT_RATE}` },
     tts: { agent_output_audio_format: `pcm_${OUTPUT_RATE}`, expressive_mode: false, voice_id: ELEVENLABS_VOICES[ELEVENLABS_DEFAULTS.voice] },
     turn: { turn_timeout: -1, silence_end_call_timeout: -1 },
@@ -109,9 +109,13 @@ const digest = (value: unknown) => createHash('sha256').update(JSON.stringify(va
 export const connectElevenLabs = (url: string) => new WebSocket(url, { handshakeTimeout: 15_000, maxPayload: 4 * 1024 * 1024 }) as unknown as Socket;
 export type Api = (path: string, init?: { method?: string; body?: unknown }) => Promise<{ status: number; json: unknown }>;
 // The key goes in a header; no error quotes it.
+// A failed request is reported without its cause, which can quote the key.
 export const elevenlabsApi = (key: string): Api => async (path, init = {}) => {
-  const response = await fetch(ELEVENLABS_API + path, { method: init.method || 'GET', signal: AbortSignal.timeout(15_000),
-    headers: { 'xi-api-key': key, ...(init.body !== undefined ? { 'content-type': 'application/json' } : {}) }, body: init.body !== undefined ? JSON.stringify(init.body) : undefined });
+  let response: Response;
+  try {
+    response = await fetch(ELEVENLABS_API + path, { method: init.method || 'GET', signal: AbortSignal.timeout(15_000),
+      headers: { 'xi-api-key': key, ...(init.body !== undefined ? { 'content-type': 'application/json' } : {}) }, body: init.body !== undefined ? JSON.stringify(init.body) : undefined });
+  } catch { throw new StatusError(502, 'ElevenLabs could not be reached.'); }
   const text = await response.text();
   const json = (() => { try { return text ? JSON.parse(text) as unknown : null; } catch { return text.slice(0, 300); } })();
   return { status: response.status, json };
@@ -122,6 +126,10 @@ function detail(json: unknown) {
   const message = typeof d === 'string' ? d : (d as { message?: unknown })?.message ?? JSON.stringify(d ?? '');
   return redact(String(message)).slice(0, 300);
 }
+// A refusal from the provider, with its status.
+class ProviderError extends StatusError { constructor(message: string, readonly provider: number) { super(502, message); } }
+// The provider no longer has an agent or tool this installation kept.
+const missing = (error: unknown) => error instanceof ProviderError && (error.provider === 404 || error.provider === 422 || (error.provider === 400 && /tool/i.test(error.message)));
 // Stored in the server's meta: the agent and tools this installation created,
 // for the account of the key that created them (a fingerprint, not the key).
 interface AgentState { account: string; agentId?: string; hash?: string; tools: Record<string, { id: string; hash: string }> }
@@ -132,8 +140,8 @@ export interface ElevenLabsCall {
   // Function results by call ID: answered again if the provider repeats the ID.
   results: Map<string, { name?: string; output: string }>;
   direct?: DirectSession; items: number; order: Map<string, number>;
-  // The assistant message of each provider response, to apply corrections.
-  responses: Map<string, { item: string; message: { text: string } }>;
+  // The assistant message of each provider response, and the latest one, to apply corrections.
+  responses: Map<string, { item: string; message: { text: string } }>; lastResponse?: { item: string; message: { text: string } };
   greeted?: boolean; responding?: boolean; userSpeaking?: boolean; lastUserAt?: number; lastAudioAt?: number; idleTimer?: NodeJS.Timeout;
   toolsPending: Set<string>;
   queue: { text: string; speak: boolean; reply?: boolean }[]; flushTimer?: NodeJS.Timeout;
@@ -191,7 +199,8 @@ export class ElevenLabsCalls {
     this.api = api || elevenlabsApi;
     this.connect = connect || connectElevenLabs;
     this.timer = setInterval(() => {
-      for (const [id, call] of this.sessions) if (Date.now() - call.seen > 45_000) this.close(id, `The connection with the phone was lost. Requests keep running in ${this.ade.name}.`);
+      // A call still connecting (creating the agent can take a while) has no page yet.
+      for (const [id, call] of this.sessions) if (call.browser && Date.now() - call.seen > 45_000) this.close(id, `The connection with the phone was lost. Requests keep running in ${this.ade.name}.`);
     }, 10_000).unref();
   }
   apply(settings: ElevenLabsSettings) { this.llm = settings.llm || ELEVENLABS_DEFAULTS.llm; this.voice = settings.voice || ELEVENLABS_DEFAULTS.voice; }
@@ -218,7 +227,7 @@ export class ElevenLabsCalls {
       if (known?.hash === hash) continue;
       const created = await api('/v1/convai/tools', { method: 'POST', body: { tool_config: config } });
       const id = (created.json as { id?: string })?.id;
-      if (created.status >= 300 || !id) throw new StatusError(502, `ElevenLabs refused the tool ${tool.name} (${created.status}: ${detail(created.json)}).`);
+      if (created.status >= 300 || !id) throw new ProviderError(`ElevenLabs refused the tool ${tool.name} (${created.status}: ${detail(created.json)}).`, created.status);
       if (known) replaced.push(known.id);
       state.tools[tool.name] = { id, hash };
       this.store.meta(AGENT_META, state);
@@ -229,12 +238,12 @@ export class ElevenLabsCalls {
     if (state.agentId) {
       const patched = await api(`/v1/convai/agents/${encodeURIComponent(state.agentId)}`, { method: 'PATCH', body: spec });
       if (patched.status < 300) updated = true;
-      else if (patched.status !== 404) throw new StatusError(502, `ElevenLabs refused the agent update (${patched.status}: ${detail(patched.json)}).`);
+      else if (patched.status !== 404) throw new ProviderError(`ElevenLabs refused the agent update (${patched.status}: ${detail(patched.json)}).`, patched.status);
     }
     if (!updated) {
       const created = await api('/v1/convai/agents/create', { method: 'POST', body: spec });
       const id = (created.json as { agent_id?: string })?.agent_id;
-      if (created.status >= 300 || !id) throw new StatusError(502, `ElevenLabs refused the agent (${created.status}: ${detail(created.json)}).`);
+      if (created.status >= 300 || !id) throw new ProviderError(`ElevenLabs refused the agent (${created.status}: ${detail(created.json)}).`, created.status);
       state.agentId = id;
     }
     state.hash = hash; this.store.meta(AGENT_META, state);
@@ -244,8 +253,8 @@ export class ElevenLabsCalls {
     return state.agentId!;
   }
   // A signed conversation URL for the agent. An agent deleted in the
-  // dashboard is created again, and so are its tools if the provider no
-  // longer has them; once.
+  // dashboard is created again, and so are its tools if the provider says it
+  // no longer has them; once.
   async signedUrl(api: Api) {
     const account = digest(`elevenlabs:${this.key}`);
     const forget = (tools: boolean) => {
@@ -257,7 +266,8 @@ export class ElevenLabsCalls {
     for (;;) {
       let agentId: string;
       try { agentId = await this.ensureAgent(api); }
-      catch (error) { if (toolsGone) throw error; toolsGone = true; forget(true); continue; }
+      // Only a missing tool or agent starts over; a busy or failing provider keeps the IDs.
+      catch (error) { if (toolsGone || !missing(error)) throw error; toolsGone = true; forget(true); continue; }
       const signed = await api(`/v1/convai/conversation/get-signed-url?agent_id=${encodeURIComponent(agentId)}`);
       const url = (signed.json as { signed_url?: string })?.signed_url;
       if (signed.status < 300 && url) return url;
@@ -294,6 +304,7 @@ export class ElevenLabsCalls {
       const notes = [this.context.resume({ languages, language }), await catalog].filter(Boolean);
       await this.open(call, url, this.initiation(spoken, notes, call.hints));
       if (call.closed || this.stopping) throw new StatusError(503, 'The call ended while it was connecting.');
+      call.seen = Date.now();
       this.publish('voice', { status: 'connected', id, provider: 'elevenlabs', backend: call.backend, conversationId: call.conversationId, ...(spoken ? { language: spoken.tag, languageSource: spoken.source } : {}) });
       return { session: { id }, transport: { stream: `/api/live/stream?id=${encodeURIComponent(id)}` } };
     } catch (error) {
@@ -308,8 +319,10 @@ export class ElevenLabsCalls {
     return new Promise<void>((resolve, reject) => {
       let settled = false;
       const fail = (message: string) => { if (!settled) { settled = true; reject(new StatusError(502, message)); } };
-      // The signed URL carries a token: it is never logged or quoted.
-      const socket = call.upstream = this.connect(url);
+      // The signed URL carries a token: it is never logged or quoted, not even
+      // in the error of a URL the socket cannot open.
+      let socket: Socket;
+      try { socket = call.upstream = this.connect(url); } catch { fail('ElevenLabs could not be connected.'); return; }
       const timeout = setTimeout(() => { fail('ElevenLabs did not confirm the conversation.'); socket.close(); }, 20_000);
       timeout.unref?.();
       socket.once('open', () => socket.send(JSON.stringify(initiation)));
@@ -373,9 +386,7 @@ export class ElevenLabsCalls {
         call.responding = true; call.greeted = true; call.lastAudioAt = Date.now();
         this.toBrowser(call, Buffer.from(data, 'base64'));
         // Without the end of the response, the model is idle a moment after its last audio.
-        clearTimeout(call.idleTimer);
-        call.idleTimer = setTimeout(() => { if (call.responding && Date.now() - (call.lastAudioAt || 0) >= RESPONSE_IDLE_MS) this.done(call); }, RESPONSE_IDLE_MS);
-        call.idleTimer.unref?.();
+        this.idleAfter(call, RESPONSE_IDLE_MS);
         return;
       }
       case 'agent_response': this.said(call, message.agent_response_event?.agent_response || '', message.agent_response_event?.response_id); return;
@@ -390,8 +401,13 @@ export class ElevenLabsCalls {
       }
       case 'user_transcript': this.heard(call, message.user_transcription_event?.user_transcript || ''); return;
       case 'client_tool_call': this.toolCall(call, message.client_tool_call || {}); return;
-      case 'client_error': this.publish('notice', { text: `ElevenLabs reported an error: ${redact(String(message.error_event?.message || message.error_event?.error_name || 'unknown')).slice(0, 200)}` }); return;
+      case 'client_error': call.responding = false; this.later(call); this.publish('notice', { text: `ElevenLabs reported an error: ${redact(String(message.error_event?.message || message.error_event?.error_name || 'unknown')).slice(0, 200)}` }); return;
     }
+  }
+  idleAfter(call: ElevenLabsCall, ms: number) {
+    clearTimeout(call.idleTimer);
+    call.idleTimer = setTimeout(() => { if (call.responding && Date.now() - (call.lastAudioAt || 0) >= ms) this.done(call); }, ms);
+    call.idleTimer.unref?.();
   }
   // The model finished a response: notes waiting for a quiet moment may go.
   done(call: ElevenLabsCall) {
@@ -416,12 +432,14 @@ export class ElevenLabsCalls {
     if (!text) return;
     call.greeted = true;
     const id = `a${++call.items}`, message = call.direct?.fill(undefined, 'assistant', text) || { text };
-    if (responseId) call.responses.set(responseId, { item: id, message });
+    call.lastResponse = { item: id, message };
+    if (responseId) call.responses.set(responseId, call.lastResponse);
     this.publish('transcript', { call: call.id, role: 'assistant', text, order: this.slot(call, id), item: id, backend: call.backend, conversationId: call.conversationId });
   }
   // The user cut a response: the history keeps what was spoken.
   corrected(call: ElevenLabsCall, raw: string, responseId?: string) {
-    const known = responseId ? call.responses.get(responseId) : undefined, text = plain(raw);
+    // Without a response ID, the correction is of the latest response.
+    const known = responseId ? call.responses.get(responseId) : call.lastResponse, text = plain(raw);
     if (!known || !text) return;
     known.message.text = text;
     this.publish('transcript', { call: call.id, role: 'assistant', text, order: this.slot(call, known.item), item: known.item, backend: call.backend, conversationId: call.conversationId, corrected: true });
@@ -455,9 +473,9 @@ export class ElevenLabsCalls {
     try {
       run = await direct.run({ name, call_id: callId, arguments: JSON.stringify(args) }, {
         requestId: requestIdFor('voice', call.id, callId), signal: AbortSignal.timeout(90_000),
-        // The transcript of a yes can arrive after the call it authorizes.
+        // ElevenLabs sends a turn's transcript before the LLM answers it: speech
+        // that arrives after the call is a later turn and never authorizes it.
         beforeSend: async () => {
-          for (let waited = 0; direct.sendRefusal() && waited < TRANSCRIPT_WAIT_MS && !call.closed; waited += 100) await new Promise(resolve => setTimeout(resolve, 100));
           return !call.closed && !call.closing && this.isCurrent(call);
         } });
     } catch {
@@ -489,8 +507,10 @@ export class ElevenLabsCalls {
     const items = call.queue.splice(0);
     // Right after English data, so the reply keeps the user's language and accent.
     const text = [...items.map(item => voiceNoteText('note', { text: item.text })), languageReminder()].join('\n\n');
-    call.responding = true; call.notes.add(text.trim());
+    call.responding = true; call.notes.add(text.trim()); call.lastAudioAt = Date.now();
     this.send(call, { type: 'user_message', text });
+    // A message the provider never answers does not hold the queue forever.
+    this.idleAfter(call, NO_REPLY_MS);
   }
   later(call: ElevenLabsCall, ms = 500) {
     if (call.flushTimer || !call.queue.length) return;

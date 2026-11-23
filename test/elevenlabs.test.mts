@@ -168,12 +168,12 @@ test('a send runs only after a new transcribed user turn, once per call ID; a re
   assert.match(greeting.text, /never authorize a send/);
   f.heard(greeting.text);
   f.call('fake_send', 'call_1', { message: 'hola' });
-  await wait(2800);
+  await wait(100);
   assert.match(f.results().find(r => r.tool_call_id === 'call_1')!.result, /no_user_turn/);
   assert.deepEqual(f.runs, []);
   f.heard('Faro, Codex, README.');
   f.call('fake_send', 'call_2', { message: 'hola' });
-  await wait(2800);
+  await wait(100);
   assert.match(f.results().find(r => r.tool_call_id === 'call_2')!.result, /no_user_turn/, 'a recital of the hints');
   assert.equal(f.published.find(e => e.type === 'transcript' && e.data.text === 'Faro, Codex, README.')!.data.echo, true);
   f.heard('Sí, mándalo.');
@@ -185,10 +185,14 @@ test('a send runs only after a new transcribed user turn, once per call ID; a re
   f.call('fake_send', 'call_3', { message: 'hola' });
   await wait(50);
   assert.equal(f.runs.length, 1); assert.equal(f.results().filter(r => r.tool_call_id === 'call_3').length, 2);
-  // A second send needs a new turn.
+  // A second send needs a new turn, and speech after the request is a later turn:
+  // the request is refused at once, never kept waiting for it.
   f.call('fake_send', 'call_4', { message: 'otra' });
-  await wait(2800);
+  await wait(20);
+  f.heard('Espera.');
+  await wait(100);
   assert.equal(f.runs.length, 1);
+  assert.match(f.results().find(r => r.tool_call_id === 'call_4')!.result, /no_user_turn/);
   assert.ok(f.published.some(e => e.type === 'voice-tool' && e.data.callId === 'call_3'));
 });
 
@@ -211,6 +215,10 @@ test('audio, interruptions, pings, responses and corrections are relayed', async
   f.upstream().server({ type: 'agent_response_correction', agent_response_correction_event: { original_agent_response: 'x', corrected_agent_response: 'Hola, tienes', response_id: 'r1' } });
   const corrected = f.published.filter(e => e.type === 'transcript' && e.data.role === 'assistant').at(-1)!;
   assert.equal(corrected.data.text, 'Hola, tienes'); assert.equal(corrected.data.item, said[0].data.item, 'the same item, corrected');
+  // A correction without a response ID is of the latest response.
+  f.upstream().server({ type: 'agent_response', agent_response_event: { agent_response: '¿Lo envío al hilo de pagos?' } });
+  f.upstream().server({ type: 'agent_response_correction', agent_response_correction_event: { original_agent_response: '¿Lo envío al hilo de pagos?', corrected_agent_response: '¿Lo envío' } });
+  assert.equal(f.published.filter(e => e.type === 'transcript' && e.data.role === 'assistant').at(-1)!.data.text, '¿Lo envío');
 });
 
 test('a quiet notice is context; a notice to speak waits for the model and the user', async t => {
@@ -228,6 +236,40 @@ test('a quiet notice is context; a notice to speak waits for the model and the u
   assert.equal(message.type, 'user_message'); assert.match(message.text, /Done\./);
 });
 
+test('a provider error, or a message it never answers, does not hold the notices', async t => {
+  const f = fixture(); t.after(() => f.close());
+  await f.start();
+  const id = [...f.eleven.sessions.keys()][0], call = f.eleven.sessions.get(id)!;
+  call.greeted = true; call.lastUserAt = 0;
+  assert.equal(f.eleven.threadNotice({ kind: 'final', threadId: 't1', title: 'T', project: 'p', conversationId: 'current', text: 'Done.' } as never), true);
+  assert.equal(call.responding, true, 'the message asks for a reply');
+  f.upstream().server({ type: 'client_error', error_event: { code: 1, error_name: 'bad', message: 'refused' } });
+  assert.equal(call.responding, false);
+  assert.equal(f.eleven.threadNotice({ kind: 'final', threadId: 't2', title: 'T', project: 'p', conversationId: 'current', text: 'Again.' } as never), true);
+});
+
+test('a busy provider keeps the saved agent; credentials never reach an error', async t => {
+  const f = fixture(); t.after(() => f.close());
+  const one = await f.start(); f.eleven.close(one.session.id);
+  // A change needs a PATCH, and the provider is busy: the IDs are kept, nothing is created again.
+  f.eleven.synced = undefined;
+  const real = f.provider.api;
+  f.provider.api = async (path, init = {}) => init.method === 'PATCH' ? { status: 503, json: { detail: 'busy' } } : real(path, init);
+  f.provider.requests = [];
+  await assert.rejects(f.start(), /agent update \(503/);
+  assert.equal(f.provider.agents.size, 1); assert.equal(f.provider.tools.size, 2);
+  f.provider.api = real;
+  await f.start();
+  assert.equal(f.provider.agents.size, 1, 'the same agent, updated');
+});
+
+test('a socket that cannot open a signed URL never quotes it', async t => {
+  const provider = new Provider();
+  const f = fixture({ provider }); t.after(() => f.close());
+  (f.eleven as unknown as { connect: (url: string) => never }).connect = (url: string) => { throw new Error(`Invalid URL: ${url}`); };
+  await assert.rejects(f.start(), (error: Error) => /could not be connected/.test(error.message) && !/secret-token/.test(error.message));
+});
+
 test('the provider closing the conversation ends the call; work sent keeps running', async t => {
   const f = fixture(); t.after(() => f.close());
   const result = await f.start();
@@ -242,4 +284,12 @@ test('without a key no call starts', async () => {
   const eleven = new ElevenLabsCalls(double<ConstructorParameters<typeof ElevenLabsCalls>[0]>({ ade: fakeAde([], ''), store: { meta() {} }, publish() {}, context: { resume: () => '', vocabulary: () => [], rememberClose() {} } }));
   await assert.rejects(eleven.create(), (error: StatusError) => error.status === 503 && /ElevenLabs key is missing/.test(error.message));
   eleven.shutdown();
+});
+
+test('error text never carries an ElevenLabs key or a signed URL', async () => {
+  const { redact } = await import('../src/direct/text.mjs');
+  assert.equal(redact('Invalid header value "sk_0123456789abcdef\nx"'), 'Invalid header value "[credential omitted]\nx"');
+  assert.equal(redact('Invalid URL: wss://api.elevenlabs.io/v1/convai/conversation?agent_id=a&conversation_signature=abc def'), 'Invalid URL: [credential omitted] def');
+  assert.equal(redact('see https://example.invalid/?token=abc'), 'see [credential omitted]');
+  assert.equal(redact('sk-openai-key and AIzaGoogle'), '[credential omitted] and [credential omitted]');
 });

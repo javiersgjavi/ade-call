@@ -43,8 +43,10 @@ table of `caller.sqlite`, with a fingerprint of the key's account, never the key
 Later calls reuse them. When the tools change (another ADE, a new version of
 ADE Call), the changed tools are created again, the agent is updated and the
 replaced tools are removed. An agent deleted in the dashboard is created again
-on the next call, and so are its tools if they are gone too. Do not edit the
-agent by hand: the next change overwrites it.
+on the next call, and so are its tools if ElevenLabs says they are gone too; a
+busy or failing provider (429, 5xx, no connection) fails the call and keeps the
+saved IDs, so nothing is duplicated. Do not edit the agent by hand: the next
+change overwrites it.
 
 The agent is created with:
 
@@ -87,7 +89,8 @@ sequenceDiagram
 
 The server holds the provider socket and the key, and relays the audio, for the
 same reason as with Gemini: whoever holds the socket receives the tool calls.
-The signed URL carries a short-lived token and is never logged.
+The signed URL carries a short-lived token and is never logged; errors that could
+quote it, or the key, are replaced by a generic message or redacted.
 
 Each call sends, as overrides: the instructions built by
 [`directInstructions()`](../src/direct/prompt.mts) with the owner's custom
@@ -112,8 +115,10 @@ events that feed it differ.
   turn. As with the other providers, one that only recites the recognition
   keywords is shown but is not a turn ([hint-echo.mts](../src/conversation/hint-echo.mts)).
 - Each `client_tool_call` runs once per `tool_call_id` through
-  `DirectSession.run()`. A sending tool with no new user words waits up to 2.5 s
-  for a transcript, then is refused with `NOT SENT (no_user_turn)`. An ID the
+  `DirectSession.run()`. Because a turn's transcript always arrives before the
+  LLM answers it, a sending tool with no new user words is refused at once with
+  `NOT SENT (no_user_turn)`: unlike with Gemini, it does not wait for a late
+  transcript, so words you say after the request never authorize it. An ID the
   provider asks for again gets the same result and never runs again.
 - ElevenLabs cannot cancel a tool call. A send that ran, or may have, is not
   undone: hanging up or interrupting never cancels ADE work.
