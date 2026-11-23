@@ -55,7 +55,7 @@ import { browserRows, browserNote, type PairedBrowser } from './browser-list.js'
 import { PairDevice, type PairInvite } from './pair-device.js';
 import { play } from './sounds.js';
 import { InstructionsSync, modelName, modelProvider, optionLabel, VOICE_FIELDS, type VoiceValues } from './voice-settings.js';
-import { Tour, tourSeen, markTourSeen } from './tour.js';
+import { Tour, tourSeen, markTourSeen, type SettingsTab } from './tour.js';
 import { t, locale, isMessageKey, storedPreference, storePreference, voiceLanguages } from './i18n.js';
 const recordings = new RecordingPanel();
 const $ = <K extends string>(id: K) => document.getElementById(id)! as K extends keyof Elements ? Elements[K] : HTMLElement;
@@ -901,16 +901,17 @@ $('remove-gemini-key').onclick = () => {
 // Settings: language, voice, key, call recording and paired browsers. All but
 // the language need a paired session, so they are hidden on the login screen.
 $('ui-language').value = storedPreference(localStorage);
-$('open-settings').onclick = () => {
+function openSettings(tab?: SettingsTab) {
   const signedIn = !$('workspace').hidden;
   $('settings').dataset.signedIn = String(signedIn);
   for (const block of $('settings').querySelectorAll<HTMLElement>('.settings-tabs, .settings-block[data-auth]')) block.hidden = !signedIn;
-  showSettingsTab(signedIn ? settingsTab : 'general', false);
+  showSettingsTab(signedIn ? tab || settingsTab : 'general', false, !tab);
   formStatus('voice-status', ''); formStatus('instructions-status', ''); formStatus('key-status', ''); formStatus('gemini-key-status', '');
   $('tour-restart').disabled = localCall();
   $('settings').showModal();
   if (signedIn) { void refreshBrowsers(); void loadVoiceSettings(); watchSettingsBusy(); }
-};
+}
+$('open-settings').onclick = () => openSettings();
 // Closing forgets a typed key that was not saved.
 $('settings').addEventListener('close', () => { $('openai-key').value = ''; hideKey(); $('gemini-key').value = ''; hideGeminiKey(); clearInterval(settingsBusyTimer); settingsBusyWatch++; });
 // While Settings is open, a call another browser starts or ends locks or
@@ -935,11 +936,11 @@ function watchSettingsBusy() {
 }
 // Tabs: General (language, recording), Voice, API key and Devices. The last
 // one chosen is reopened in this page; arrow keys move between tabs.
-type SettingsTab = 'general' | 'voice' | 'key' | 'devices';
 let settingsTab: SettingsTab = 'general';
 const settingsTabs = () => [...$('settings').querySelectorAll<HTMLButtonElement>('[role="tab"]')];
-function showSettingsTab(tab: SettingsTab, focus = true) {
-  settingsTab = tab;
+// The tour shows tabs without changing the one Settings reopens on.
+function showSettingsTab(tab: SettingsTab, focus = true, remember = true) {
+  if (remember) settingsTab = tab;
   for (const button of settingsTabs()) {
     const selected = button.dataset.tab === tab;
     button.setAttribute('aria-selected', String(selected)); button.tabIndex = selected ? 0 : -1;
@@ -961,6 +962,10 @@ $('close-settings').onclick = () => $('settings').close();
 const tour = new Tour({
   dialog: $('tour'), spot: $('tour-spot'), card: $('tour-card'), count: $('tour-count'), title: $('tour-title'), body: $('tour-body'),
   skip: $('tour-skip'), back: $('tour-back'), next: $('tour-next'),
+}, tab => {
+  if (!tab) { if ($('settings').open) $('settings').close(); return false; }
+  if ($('settings').open) { showSettingsTab(tab, false, false); return false; }
+  openSettings(tab); return true;
 }, () => markTourSeen(localStorage));
 $('tour-restart').onclick = () => { $('settings').close(); if (!localCall()) tour.start(); };
 $('settings').addEventListener('click', event => { if (event.target === $('settings')) $('settings').close(); });
