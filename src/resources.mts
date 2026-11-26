@@ -58,6 +58,20 @@ export function voiceNoteText(key: VoiceNote, vars: Vars = {}) {
   return render(template, vars, `voice_notes.json ${key}`);
 }
 
+// The parts of a Lokutor call's instructions (resources/lokutor_prompt.json):
+// its protocol cannot add a message to the conversation, so the call start,
+// the catalog and every server note go into the instructions, and a tool that
+// outlasts the provider's wait is answered that it is still running.
+export type LokutorText = 'session' | 'start' | 'catalog' | 'notes' | 'running' | 'late';
+let lokutorTexts: Record<LokutorText, string> | undefined;
+export function lokutorText(key: LokutorText, vars: Vars = {}) {
+  lokutorTexts ??= json<Record<LokutorText, string>>('lokutor_prompt.json');
+  const template = lokutorTexts[key];
+  if (template === undefined) throw new Error(`lokutor_prompt.json: missing text ${key}.`);
+  // Values are data: a {{name}} inside them is not a placeholder.
+  return render(template, vars, `lokutor_prompt.json ${key}`);
+}
+
 // ADE-specific parts of the system prompt, keyed by ADE id.
 export interface AdePrompt { role: string; target: string; source: string; destination: string; evidence: string; limits: string; ids: string; search?: string }
 export const adePrompt = (id: 't3' | 'orca') => json<Record<string, AdePrompt>>('ade_prompts.json')[id];

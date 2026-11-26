@@ -7,7 +7,7 @@ import { MAX_INSTRUCTIONS, updateConfig, validateInstructions, validateKey, vali
 import { REALTIME_DEFAULTS } from '../src/voice/realtime.mjs';
 
 test('voice settings accept only the offered values, and the current ones', () => {
-  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore', voice: 'hand-picked', transcriptionModel: 'whisper-1' };
+  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore', lokutorVoice: 'F1', voice: 'hand-picked', transcriptionModel: 'whisper-1' };
   assert.deepEqual(voiceOptions(current).voice, ['marin', 'cedar', 'hand-picked']);
   assert.deepEqual(validateVoiceSettings({ voice: 'hand-picked', transcriptionModel: 'gpt-4o-mini-transcribe' }, current), { ...current, transcriptionModel: 'gpt-4o-mini-transcribe' });
   assert.deepEqual(validateVoiceSettings({}, current), current);
@@ -16,11 +16,20 @@ test('voice settings accept only the offered values, and the current ones', () =
 });
 
 test('Gemini Live models and voices are offered next to the Realtime ones', () => {
-  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore' };
-  assert.deepEqual(voiceOptions(current).model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live']);
+  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore', lokutorVoice: 'F1' };
+  assert.deepEqual(voiceOptions(current).model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live', 'lokutor']);
   assert.ok(voiceOptions(current).geminiVoice.includes('Puck'));
   assert.deepEqual(validateVoiceSettings({ model: 'gemini-3.8-live', geminiVoice: 'Puck' }, current), { ...current, model: 'gemini-3.8-live', geminiVoice: 'Puck' });
   for (const bad of [{ geminiVoice: 'marin' }, { voice: 'Kore' }, { model: 'gemini-made-up' }])
+    assert.throws(() => validateVoiceSettings(bad, current), SettingsError, JSON.stringify(bad));
+});
+
+test('Lokutor is offered with its voice slots, and a hand-configured voice stays offered', () => {
+  const current = { ...REALTIME_DEFAULTS, geminiVoice: 'Kore', lokutorVoice: 'hand-voice' };
+  const options = voiceOptions(current);
+  assert.deepEqual(options.lokutorVoice, ['F1', 'F2', 'F3', 'F4', 'F5', 'M1', 'M2', 'M3', 'M4', 'M5', 'hand-voice']);
+  assert.deepEqual(validateVoiceSettings({ model: 'lokutor', lokutorVoice: 'M2' }, current), { ...current, model: 'lokutor', lokutorVoice: 'M2' });
+  for (const bad of [{ lokutorVoice: 'Kore' }, { lokutorVoice: 'f1' }, { model: 'lokutor-2' }, { geminiVoice: 'F1' }])
     assert.throws(() => validateVoiceSettings(bad, current), SettingsError, JSON.stringify(bad));
 });
 
