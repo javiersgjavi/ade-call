@@ -3,13 +3,15 @@ import { t, locale, type MessageKey } from './i18n.js';
 
 // The server-wide voice settings edited in Settings (GET/POST /api/settings/voice).
 // The options come from the server; this only names them for people.
-export const VOICE_FIELDS = ['model', 'reasoning', 'voice', 'geminiVoice', 'eagerness', 'noiseReduction', 'transcriptionModel'] as const satisfies readonly VoiceSettingField[];
+export const VOICE_FIELDS = ['model', 'reasoning', 'voice', 'geminiVoice', 'lokutorVoice', 'eagerness', 'noiseReduction', 'transcriptionModel'] as const satisfies readonly VoiceSettingField[];
 export type VoiceValues = Record<VoiceSettingField, string>;
 
 // "gpt-realtime-2.1-mini" → "GPT Realtime 2.1 Mini", "gemini-3.8-live" → "Gemini 3.8 Live": readable at a glance.
 export const modelName = (id: string) => id.split('-').filter(Boolean).map(part => part === 'gpt' ? 'GPT' : part[0].toUpperCase() + part.slice(1)).join(' ');
-// The provider a model runs on, as the server decides it (src/voice/gemini.mts isGeminiModel).
-export const modelProvider = (model: string) => model.startsWith('gemini-') ? 'gemini' : 'realtime';
+// The provider a model runs on, as the server decides it (isGeminiModel, isLokutorModel in src/voice).
+export const modelProvider = (model: string) => model.startsWith('gemini-') ? 'gemini' : model === 'lokutor' ? 'lokutor' : 'realtime';
+// The names Lokutor gives its voice slots (GET https://api.lokutor.com/voices).
+const LOKUTOR_NAMES: Record<string, string> = { F1: 'Claire', F2: 'Sophie', F3: 'Emma', F4: 'Maria', F5: 'Isabella', M1: 'James', M2: 'Oliver', M3: 'Lucas', M4: 'Ethan', M5: 'Noah' };
 const capital = (text: string) => text.charAt(0).toLocaleUpperCase(locale()) + text.slice(1);
 const LABELS: Partial<Record<string, MessageKey>> = {
   'reasoning:minimal': 'reasoning.minimal', 'reasoning:low': 'reasoning.low', 'reasoning:medium': 'reasoning.medium', 'reasoning:high': 'reasoning.high', 'reasoning:xhigh': 'reasoning.xhigh',
@@ -23,6 +25,7 @@ export function optionLabel(field: VoiceSettingField, value: string) {
   if (key) return capital(t(key));
   if (field === 'model') return modelName(value);
   if (field === 'voice' || field === 'geminiVoice') return capital(value);
+  if (field === 'lokutorVoice') return LOKUTOR_NAMES[value] ? `${LOKUTOR_NAMES[value]} (${value})` : value;
   return value;
 }
 

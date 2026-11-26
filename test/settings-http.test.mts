@@ -16,12 +16,12 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
   const listener = net.createServer(); listener.listen(0, '127.0.0.1'); await once(listener, 'listening');
   const port = (listener.address() as net.AddressInfo).port; await new Promise(resolve => listener.close(resolve));
   const base = `http://127.0.0.1:${port}`;
-  const envKey = 'sk-test-environment-0123456789abcdef', savedKey = 'sk-test-saved-key-ABCDEFGHIJ0123456789', geminiKey = 'AIzaTestGeminiKey-0123456789abcdefghijk';
+  const envKey = 'sk-test-environment-0123456789abcdef', savedKey = 'sk-test-saved-key-ABCDEFGHIJ0123456789', geminiKey = 'AIzaTestGeminiKey-0123456789abcdefghijk', lokutorKey = 'lk_test_lokutor_key_0123456789abcdefghij';
   const configDir = join(tmp, 'config'), configPath = join(configDir, 'config.json');
   mkdirSync(configDir, { recursive: true, mode: 0o700 });
   // Hand-written fields the page does not know stay as they are.
   writeFileSync(configPath, JSON.stringify({ realtimeModel: 'gpt-realtime-2', realtimeReasoning: 'medium', otherTool: 'legacy-value', custom: { nested: [1, 2] } }), { mode: 0o644 });
-  const env = { ...process.env, PORT: String(port), ADE_CALL_HOST: '127.0.0.1', ADE_CALL_CONFIG: configDir, ADE_CALL_STATE: join(tmp, 'state'), T3CODE_HOME: join(tmp, 't3'), T3_BIN: join(tmp, 'missing-t3'), ORCA_BIN: join(tmp, 'missing-orca'), OPENAI_API_KEY: envKey, GEMINI_API_KEY: '', GOOGLE_API_KEY: '' };
+  const env = { ...process.env, PORT: String(port), ADE_CALL_HOST: '127.0.0.1', ADE_CALL_CONFIG: configDir, ADE_CALL_STATE: join(tmp, 'state'), T3CODE_HOME: join(tmp, 't3'), T3_BIN: join(tmp, 'missing-t3'), ORCA_BIN: join(tmp, 'missing-orca'), OPENAI_API_KEY: envKey, GEMINI_API_KEY: '', GOOGLE_API_KEY: '', LOKUTOR_API_KEY: '' };
   let child: ChildProcess | undefined, output = '';
   const stop = async () => { if (child && child.exitCode === null) { child.kill(); await once(child, 'exit'); } };
   const start = async (extra: Record<string, string> = {}) => {
@@ -58,13 +58,13 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
   // Current values, the options of each one and where the key comes from.
   const initial = await call('/api/settings/voice', { headers: bearer });
   assert.equal(initial.status, 200);
-  assert.deepEqual(initial.body.settings, { model: 'gpt-realtime-2', voice: 'marin', reasoning: 'medium', eagerness: 'low', noiseReduction: 'near_field', transcriptionModel: 'gpt-4o-transcribe', geminiVoice: 'Kore' });
-  assert.deepEqual(initial.body.options.model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live', 'gpt-realtime-2'], 'a hand-configured model stays offered');
+  assert.deepEqual(initial.body.settings, { model: 'gpt-realtime-2', voice: 'marin', reasoning: 'medium', eagerness: 'low', noiseReduction: 'near_field', transcriptionModel: 'gpt-4o-transcribe', geminiVoice: 'Kore', lokutorVoice: 'F1' });
+  assert.deepEqual(initial.body.options.model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live', 'lokutor', 'gpt-realtime-2'], 'a hand-configured model stays offered');
   assert.deepEqual(initial.body.options.voice, ['marin', 'cedar']);
   assert.deepEqual(initial.body.options.transcriptionModel, ['gpt-4o-transcribe', 'gpt-4o-mini-transcribe']);
   assert.deepEqual(initial.body.options.reasoning, ['minimal', 'low', 'medium', 'high', 'xhigh']);
   assert.deepEqual(initial.body.key, { set: true, source: 'env' });
-  assert.deepEqual(initial.body.geminiKey, { set: false, source: null }); assert.equal(initial.body.provider, 'realtime');
+  assert.deepEqual(initial.body.geminiKey, { set: false, source: null }); assert.deepEqual(initial.body.lokutorKey, { set: false, source: null }); assert.equal(initial.body.provider, 'realtime');
   assert.equal(initial.body.busy, false);
   assert.equal((await call('/api/status', { headers: bearer })).body.voiceReady, true, 'OPENAI_API_KEY from the environment');
 
@@ -75,8 +75,8 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
 
   const saved = await post('/api/settings/voice', { model: 'gpt-realtime-2.1-mini', reasoning: 'high', voice: 'cedar', eagerness: 'medium', noiseReduction: 'far_field', transcriptionModel: 'gpt-4o-mini-transcribe' });
   assert.equal(saved.status, 200);
-  assert.deepEqual(saved.body.settings, { model: 'gpt-realtime-2.1-mini', voice: 'cedar', reasoning: 'high', eagerness: 'medium', noiseReduction: 'far_field', transcriptionModel: 'gpt-4o-mini-transcribe', geminiVoice: 'Kore' });
-  assert.deepEqual(saved.body.options.model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live'], 'the earlier hand-configured model is no longer current');
+  assert.deepEqual(saved.body.settings, { model: 'gpt-realtime-2.1-mini', voice: 'cedar', reasoning: 'high', eagerness: 'medium', noiseReduction: 'far_field', transcriptionModel: 'gpt-4o-mini-transcribe', geminiVoice: 'Kore', lokutorVoice: 'F1' });
+  assert.deepEqual(saved.body.options.model, ['gpt-realtime-2.1', 'gpt-realtime-2.1-mini', 'gemini-3.8-live', 'lokutor'], 'the earlier hand-configured model is no longer current');
   const status = (await call('/api/status', { headers: bearer })).body;
   assert.deepEqual(status.voiceModel, { provider: 'realtime', model: 'gpt-realtime-2.1-mini', reasoning: 'high', eagerness: 'medium', noiseReduction: 'far_field', voice: 'cedar' }, 'applied without a restart');
   assert.deepEqual((await call('/api/status?backend=orca', { headers: bearer })).body.voiceModel.model, 'gpt-realtime-2.1-mini', 'the same for every ADE');
@@ -182,8 +182,25 @@ test('voice settings and the OpenAI key: authenticated, validated, saved atomica
   assert.equal('geminiKey' in config(), false);
   assert.equal((await call('/api/status', { headers: bearer })).body.voiceReady, false);
 
+  // Lokutor: its model, voice and key, the same way; its calls use the same audio socket.
+  const lokutor = await post('/api/settings/voice', { model: 'lokutor', lokutorVoice: 'M1' });
+  assert.equal(lokutor.status, 200); assert.equal(lokutor.body.provider, 'lokutor');
+  let lokutorStatus = (await call('/api/status', { headers: bearer })).body;
+  assert.equal(lokutorStatus.voiceReady, false, 'no Lokutor key yet');
+  assert.deepEqual([lokutorStatus.voiceModel.provider, lokutorStatus.voiceModel.model, lokutorStatus.voiceModel.voice], ['lokutor', 'lokutor', 'M1']);
+  const lokutorSet = await post('/api/settings/key', { provider: 'lokutor', key: lokutorKey });
+  assert.equal(lokutorSet.status, 200); assert.deepEqual(lokutorSet.body.lokutorKey, { set: true, source: 'config' }); assert.deepEqual(lokutorSet.body.geminiKey, { set: false, source: null }, 'each key is separate');
+  assert.equal(config().lokutorKey, lokutorKey); assert.equal(config().realtimeModel, 'lokutor'); assert.equal(config().lokutorVoice, 'M1');
+  lokutorStatus = (await call('/api/status', { headers: bearer })).body;
+  assert.equal(lokutorStatus.voiceReady, true, 'the Lokutor key applies without a restart');
+  assert.equal((await post('/api/live', { provider: 'gemini', backend: 't3' })).status, 409, 'a page prepared for another provider reloads');
+  assert.equal(await upgrade({ Cookie: cookie, Origin: base }), 404, 'no such call');
+  assert.equal((await post('/api/settings/key', { provider: 'lokutor', key: null })).status, 200);
+  assert.equal('lokutorKey' in config(), false);
+  assert.equal((await call('/api/status', { headers: bearer })).body.voiceReady, false);
+
   // No response or log line ever carries any key, or a fragment of it.
-  for (const secret of [savedKey, envKey, geminiKey]) for (const text of [...responses, output]) {
+  for (const secret of [savedKey, envKey, geminiKey, lokutorKey]) for (const text of [...responses, output]) {
     assert.ok(!text.includes(secret.slice(8)), 'a key fragment was returned or logged');
   }
 });

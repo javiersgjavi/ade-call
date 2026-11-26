@@ -2,7 +2,7 @@
 
 ADE Call lets one person talk by voice, from a browser or phone, with the
 coding agents of a local ADE (agentic development environment): T3 Code or Orca. A
-Node server opens GPT Realtime calls over WebRTC (or Gemini Live calls whose audio it relays), gives the model tools to read
+Node server opens GPT Realtime calls over WebRTC (or Gemini Live and Lokutor calls whose audio it relays), gives the model tools to read
 projects and threads through the ADE's CLI, and sends work to agents after the model
 proposes it and hears the user's yes; the server requires a new user turn for each
 send. Each installation has its own keys, state and projects;
@@ -15,7 +15,7 @@ keep the code free of personal names, machines, domains and networks.
 - [docs/delivery-safety.md](docs/delivery-safety.md): send rule, deduplication, uncertain deliveries.
 - [docs/adapters.md](docs/adapters.md), [docs/t3.md](docs/t3.md), [docs/orca.md](docs/orca.md): ADE adapters.
 - [docs/access.md](docs/access.md): pairing, sessions, origin checks.
-- [docs/gemini.md](docs/gemini.md): the Gemini Live provider.
+- [docs/gemini.md](docs/gemini.md), [docs/lokutor.md](docs/lokutor.md): the Gemini Live and Lokutor providers.
 - [CONTRIBUTING.md](CONTRIBUTING.md): setup, conventions, PR process.
 - [docs/testing.md](docs/testing.md): what the tests prove and what they do not.
 - [docs/evals.md](docs/evals.md): paid conversation evaluations of the voice model.
@@ -27,6 +27,7 @@ keep the code free of personal names, machines, domains and networks.
 | `src/server.mts` | HTTP, authentication, configuration, lifecycle. |
 | `src/voice/realtime.mts` | GPT Realtime calls (WebRTC plus sideband WebSocket), tool dispatch, transcript and `voice-tool` events. |
 | `src/voice/gemini.mts` | Gemini Live calls: provider WebSocket on the server, audio relayed to the page, the same tool dispatch and send rule ([docs/gemini.md](docs/gemini.md)). |
+| `src/voice/lokutor.mts` | Lokutor calls: the same relay, with server notes folded into the instructions because the protocol cannot add messages ([docs/lokutor.md](docs/lokutor.md)). |
 | `src/direct/contract.mts`, `session.mts`, `prompt.mts`, `state.mts` | ADE-agnostic engine: DirectAde contract, send rule, instructions, short IDs. |
 | `src/direct/t3.mts`, `src/direct/orca.mts` | The DirectAde of each ADE. |
 | `src/adapters/registry.mts` | Which ADEs exist and their capabilities. |
@@ -36,7 +37,7 @@ keep the code free of personal names, machines, domains and networks.
 | `src/access/browsers.mts` | Pairing codes and browser sessions. |
 | `src/eval/`, `scripts/eval.mts`, `evals/` | Paid conversation evaluations: simulated T3 world, ElevenLabs speech, closed-loop runners for Realtime and Gemini Live, checks, LLM judges ([docs/evals.md](docs/evals.md)). |
 | `src/resources.mts`, `resources/` | Model-facing text and its loader ([resources/README.md](resources/README.md)). |
-| `public/` | Browser UI and audio (`relayed-call.ts` and `pcm-capture.ts` for Gemini); `public/i18n.ts` holds the interface dictionaries. |
+| `public/` | Browser UI and audio (`relayed-call.ts` and `pcm-capture.ts` for Gemini and Lokutor); `public/i18n.ts` holds the interface dictionaries. |
 | `scripts/`, `deploy/` | Build, checks, installer, access CLI, integration scripts, systemd units, proxy example. |
 | `skills/` | Agent skills ([skills/README.md](skills/README.md)), such as running a branch as a separate preview. |
 | `test/` | Node tests with simulated providers and CLIs; `test/project-sync_test.py`. |
@@ -102,22 +103,24 @@ The owner may give you only this repository's link. Follow these steps in order;
      with a public hostname (own domain or automatic DNS, ports 80/443 reachable)
      or Tailscale Serve (no domain or open ports; the phone joins their tailnet). The
      table in [docs/deployment.md](docs/deployment.md#phone-access) helps them choose.
-   - Which voice provider they want: OpenAI Realtime (the default, more reliable)
-     or Gemini Live (experimental; see [docs/gemini.md](docs/gemini.md)), and
-     whether they already have that provider's API key on an account with billing
-     and credit (for Gemini, from Google AI Studio). Never ask them to paste the key
+   - Which voice provider they want: OpenAI Realtime (the default, more reliable),
+     Gemini Live or Lokutor (both experimental; see [docs/gemini.md](docs/gemini.md)
+     and [docs/lokutor.md](docs/lokutor.md)), and whether they already have that
+     provider's API key on an account with billing and credit (for Gemini, from
+     Google AI Studio; for Lokutor, from its dashboard). Never ask them to paste the key
      into the chat.
 3. Clone into a permanent folder (for example `~/ade-call`), not a temporary one: the
    systemd unit runs from the checkout. Run `npm ci` and `npm test`. This does not
    install T3 or Orca.
 4. Have the owner store the key of the chosen provider themselves, either with the
    no-echo terminal snippet in
-   [docs/installation.md](docs/installation.md#3-store-the-voice-key) (`openaiKey`
-   or `geminiKey`) or later in **Settings → API keys** on the page. For Gemini, also
-   choose `gemini-3.8-live` in **Settings → Voice** or set `realtimeModel` to it. Both keep existing `config.json` fields and
+   [docs/installation.md](docs/installation.md#3-store-the-voice-key) (`openaiKey`,
+   `geminiKey` or `lokutorKey`) or later in **Settings → API keys** on the page. For Gemini, also
+   choose `gemini-3.8-live` in **Settings → Voice** or set `realtimeModel` to it; for
+   Lokutor, `lokutor`. Both keep existing `config.json` fields and
    mode `600`. Never invent keys or model IDs; other settings are in
    [docs/configuration.md](docs/configuration.md).
-5. Explain that the voice key (OpenAI or Gemini), the web access token and the ADE
+5. Explain that the voice key (OpenAI, Gemini or Lokutor), the web access token and the ADE
    agents' own credentials are separate, and that every call uses paid API time.
 6. Start with `npm start`, confirm access and that projects are listed, and do one
    read-only query. Never send work to an agent as an installation test. Make a real

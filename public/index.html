@@ -180,7 +180,7 @@
         <div class="setting" data-field="model">
           <div class="setting-text">
             <div class="setting-label"><label for="setting-model" data-i18n="settings.model">Model</label><span class="setting-saved" aria-hidden="true"></span></div>
-          <p id="setting-model-hint" class="fine" data-i18n="settings.modelHint">Mini answers faster and costs less; the full model reasons better. Gemini models use the Gemini API key.</p>
+          <p id="setting-model-hint" class="fine" data-i18n="settings.modelHint">Mini answers faster and costs less; the full model reasons better. Gemini models use the Gemini API key; Lokutor, the Lokutor key.</p>
           </div>
           <div class="setting-control">
             <select id="setting-model" aria-describedby="setting-model-hint"></select>
@@ -212,6 +212,15 @@
           </div>
           <div class="setting-control">
             <select id="setting-gemini-voice"></select>
+          </div>
+        </div>
+        <div class="setting" data-field="lokutorVoice" data-provider="lokutor" hidden>
+          <div class="setting-text">
+            <div class="setting-label"><label for="setting-lokutor-voice" data-i18n="settings.voiceName">Voice</label><span class="setting-saved" aria-hidden="true"></span></div>
+          <p id="setting-lokutor-voice-hint" class="fine" data-i18n="settings.lokutorVoiceHint">Each voice has a native speaker in every language: it speaks the language of the call.</p>
+          </div>
+          <div class="setting-control">
+            <select id="setting-lokutor-voice" aria-describedby="setting-lokutor-voice-hint"></select>
           </div>
         </div>
         <div class="setting" data-field="eagerness" data-provider="realtime">
@@ -291,6 +300,23 @@
           <button id="remove-gemini-key" class="btn btn-ghost btn-danger" type="button" hidden data-i18n="settings.keyRemove">Remove saved key</button>
         </div>
         <p id="gemini-key-status" class="fine form-status" role="status" aria-live="polite"></p>
+      </form>
+      <div class="settings-section-head">
+        <h3 id="lokutor-key-title" data-i18n="settings.lokutorKey">Lokutor API key</h3>
+        <span id="lokutor-key-state" class="key-state" data-state="loading"></span>
+      </div>
+      <p id="lokutor-key-hint" class="fine settings-lead"></p>
+      <form id="lokutor-key-form" class="key-form" autocomplete="off">
+        <label for="lokutor-key" class="sr-only" data-i18n="settings.keyLabel">New API key</label>
+        <div class="field">
+          <input id="lokutor-key" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" aria-describedby="lokutor-key-hint" maxlength="512">
+          <button type="button" id="reveal-lokutor-key" class="reveal" aria-controls="lokutor-key" aria-pressed="false" data-i18n="login.show">Show</button>
+        </div>
+        <div class="settings-actions">
+          <button id="save-lokutor-key" class="btn btn-accent" type="submit" data-i18n="settings.keySave">Save key</button>
+          <button id="remove-lokutor-key" class="btn btn-ghost btn-danger" type="button" hidden data-i18n="settings.keyRemove">Remove saved key</button>
+        </div>
+        <p id="lokutor-key-status" class="fine form-status" role="status" aria-live="polite"></p>
       </form>
     </section>
     <section class="settings-section settings-panel" data-auth data-panel="devices" id="browser-access" role="tabpanel" aria-labelledby="tab-devices" hidden>

@@ -52,8 +52,8 @@ export type Publish = (type: string, data: Publication) => unknown;
 // Events of the Realtime data channel that the page reads.
 export interface LiveEvent { type: string; delta?: string; error?: { code?: string } }
 // transport: the SDP answer of a WebRTC call (OpenAI Realtime), or the path of
-// the server's audio socket for a relayed call (Gemini Live).
-export type VoiceProvider = 'realtime' | 'gemini';
+// the server's audio socket for a relayed call (Gemini Live, Lokutor).
+export type VoiceProvider = 'realtime' | 'gemini' | 'lokutor';
 export interface LiveResponse { session: { id: string }; transport: { sdp?: string; stream?: string }; error?: { code?: string; message?: string } }
 export interface OrcaResponse {
   repos?: { id: string; displayName: string; path: string }[];
@@ -79,13 +79,15 @@ export interface StatusResponse {
 }
 // GET/POST /api/settings/voice and POST /api/settings/key: the server-wide voice
 // settings, the values each one accepts and whether a key exists (never the key).
-// geminiVoice applies when the model is a Gemini Live model; the others, except model, to OpenAI Realtime.
-export type VoiceSettingField = 'model' | 'voice' | 'reasoning' | 'eagerness' | 'noiseReduction' | 'transcriptionModel' | 'geminiVoice';
+// geminiVoice applies when the model is a Gemini Live model, lokutorVoice to Lokutor; the others,
+// except model, to OpenAI Realtime.
+export type VoiceSettingField = 'model' | 'voice' | 'reasoning' | 'eagerness' | 'noiseReduction' | 'transcriptionModel' | 'geminiVoice' | 'lokutorVoice';
 export type KeyState = { set: boolean; source: 'config' | 'env' | null };
 export interface VoiceSettingsResponse {
   settings: Record<VoiceSettingField, string>; options: Record<VoiceSettingField, string[]>;
-  // key: the OpenAI key; geminiKey: the Gemini API key. provider: the one the model in use needs.
-  key: KeyState; geminiKey: KeyState; provider: VoiceProvider; busy: boolean;
+  // key: the OpenAI key; geminiKey: the Gemini API key; lokutorKey: the Lokutor API key.
+  // provider: the one the model in use needs.
+  key: KeyState; geminiKey: KeyState; lokutorKey: KeyState; provider: VoiceProvider; busy: boolean;
   // The owner's custom instructions ('' when none) and their maximum length.
   instructions: string; instructionsMax: number;
 }

@@ -38,8 +38,10 @@ export const languageReminder = () => voiceLanguageText('reminder');
 // Values known only when a session opens: the time context of a call, the
 // ADE with its capabilities and the language the call starts in.
 // custom: the owner's instructions from Settings; appended last, and only when not blank.
-// provider: 'gemini' adds the Gemini part (resources/gemini_prompt.txt) before them.
-export interface SessionValues { callStart?: unknown; capabilities?: unknown; language?: CallLanguage; custom?: string; provider?: 'realtime' | 'gemini' }
+// provider: 'gemini' adds the Gemini part (resources/gemini_prompt.txt) before them, and so
+// does 'lokutor': its language model has not been through the conversation evaluations yet, so
+// it starts with the stricter, step-by-step send procedure.
+export interface SessionValues { callStart?: unknown; capabilities?: unknown; language?: CallLanguage; custom?: string; provider?: 'realtime' | 'gemini' | 'lokutor' }
 
 // The instructions of a voice call: resources/system_prompt_voice.txt
 // filled with the ADE's own parts (resources/ade_prompts.json). The server
@@ -51,7 +53,7 @@ export function directInstructions(ade: Pick<DirectAde, 'name' | 'tools' | 'prom
     sending: sendingTools(ade), destination: p.destination, evidence: p.evidence, limits: p.limits, ids: p.ids, search: p.search ? ` ${p.search}` : '',
     spoken_language: spokenLanguage(session.language), call_start: JSON.stringify(session.callStart || {}), ade_capabilities: JSON.stringify(session.capabilities || {})
   }, 'system_prompt_voice.txt');
-  const gemini = session.provider === 'gemini' ? `\n${geminiPromptText({ target, sending: sendingTools(ade) })}` : '';
+  const gemini = session.provider === 'gemini' || session.provider === 'lokutor' ? `\n${geminiPromptText({ target, sending: sendingTools(ade) })}` : '';
   const custom = session.custom?.trim();
   return `${text}${gemini}${custom ? `\n\n${customInstructionsText(custom)}` : ''}`;
 }

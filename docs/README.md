@@ -19,6 +19,7 @@ Start with the [project README](../README.md) for what the project is and a quic
 | [How it works](how-it-works.md) | One call from the phone to the agents: audio, reads and sends, with a diagram |
 | [Architecture](architecture.md) | Components, data stores, call lifecycle, tool calls, ADE selection |
 | [Voice](voice.md) | Realtime session setup, instructions, turn detection, language, notices, tones |
+| [Gemini Live](gemini.md), [Lokutor](lokutor.md) | The providers whose audio the server relays: what differs, limits, what has been verified |
 | [Delivery safety](delivery-safety.md) | The send rule, deduplication, uncertain deliveries, what hanging up does |
 | [Adapters](adapters.md) | The ADE adapter model and how to add an ADE |
 | [T3](t3.md) | T3 adapter: CLI commands, read-only database reads, main threads, receipts |

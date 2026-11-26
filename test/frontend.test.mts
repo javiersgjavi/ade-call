@@ -27,8 +27,8 @@ test('call-only controls and gated sections start hidden', () => {
     assert.ok(app.includes(`$('${id}').onclick`), `#${id} sin manejador`);
 });
 
-test('one voice design per provider (GPT Realtime or Gemini Live), always with direct tools', () => {
-  assert.deepEqual([...html.matchAll(/<select id="([^"]+)"/g)].map(m => m[1]), ['ui-language', 'setting-model', 'setting-reasoning', 'setting-voice', 'setting-gemini-voice', 'setting-eagerness', 'setting-noise', 'setting-transcription'], 'the interface language and the server-wide voice settings');
+test('one voice design per provider (GPT Realtime, Gemini Live or Lokutor), always with direct tools', () => {
+  assert.deepEqual([...html.matchAll(/<select id="([^"]+)"/g)].map(m => m[1]), ['ui-language', 'setting-model', 'setting-reasoning', 'setting-voice', 'setting-gemini-voice', 'setting-lokutor-voice', 'setting-eagerness', 'setting-noise', 'setting-transcription'], 'the interface language and the server-wide voice settings');
   assert.doesNotMatch(app, /realtime-model|voice-model|localStorage[^;]*model/, 'the voice model is one server setting, not a per-browser choice');
   assert.match(html, /<span id="voice-name" class="voice-name">GPT Realtime<\/span><span class="voice-chips"><span id="voice-reasoning" class="voice-chip" hidden><\/span><span id="voice-language" class="voice-chip" hidden><\/span><\/span>/);
   assert.doesNotMatch(html, /id="voice-model"|stage-title|id="transcript"/, 'no model details, stage kicker or live caption: the conversation panel shows the transcript');
